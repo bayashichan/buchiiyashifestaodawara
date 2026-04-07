@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>イベント設定 | 早割・満枠の管理</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #f0f4ff;
+      color: #1e293b;
+      min-height: 100vh
+    }
+
+    .header {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      padding: 1.25rem 1.5rem;
+      text-align: center
+    }
+
+    .header h1 {
+      font-size: 1.2rem;
+      font-weight: 700
+    }
+
+    .header p {
+      font-size: 0.85rem;
+      opacity: 0.85;
+      margin-top: 0.25rem
+    }
+
+    .container {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 1.25rem 1rem 5rem
+    }
+
+    /* カード */
+    .card {
+      background: #fff;
+      border-radius: 1rem;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+      border: 1px solid #e2e8f0
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #6366f1;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem
+    }
+
+    /* フィールド */
+    .field {
+      margin-bottom: 0.75rem
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #64748b;
+      margin-bottom: 0.3rem
+    }
+
+    .field input[type="text"],
+    .field input[type="url"],
+    .field input[type="datetime-local"] {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+      color: #1e293b;
+      outline: none;
+      background: #fff;
+      transition: border-color 0.15s
+    }
+
+    .field input:focus {
+      border-color: #6366f1
+    }
+
+    .field .hint {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      margin-top: 0.25rem
+    }
+
+    /* トグルスイッチ */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid #f1f5f9
+    }
+
+    .toggle-row:last-child {
+      border-bottom: none
+    }
+
+    .toggle-info .name {
+      font-size: 0.95rem;
+      font-weight: 600
+    }
+
+    .toggle-info .sub {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      margin-top: 0.1rem
+    }
+
+    .toggle {
+      position: relative;
+      width: 50px;
+      height: 28px;
+      flex-shrink: 0
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0
+    }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #cbd5e1;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: 0.2s
+    }
+
+    .toggle-slider:before {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.2s;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2)
+    }
+
+    .toggle input:checked+.toggle-slider {
+      background: #6366f1
+    }
+
+    .toggle input:checked+.toggle-slider:before {
+      transform: translateX(22px)
+    }
+
+    .toggle input.danger:checked+.toggle-slider {
+      background: #f87171
+    }
+
+    /* ステータスバッジ */
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700
+    }
+
+    .badge-on {
+      background: #dcfce7;
+      color: #16a34a
+    }
+
+    .badge-off {
+      background: #fee2e2;
+      color: #dc2626
+    }
+
+    .badge-wait {
+      background: #fef3c7;
+      color: #d97706
+    }
+
+    /* 初回設定セクション */
+    .setup-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      color: #6366f1;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: none;
+      border: none;
+      font-family: inherit;
+      padding: 0.25rem 0;
+      margin-bottom: 0.5rem
+    }
+
+    .setup-area {
+      display: none
+    }
+
+    .setup-area.open {
+      display: block
+    }
+
+    /* ボタン */
+    .save-btn {
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      border: none;
+      border-radius: 1rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      transition: all 0.2s
+    }
+
+    .save-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4)
+    }
+
+    .save-btn:active {
+      transform: none
+    }
+
+    .save-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none
+    }
+
+    .load-btn {
+      padding: 0.55rem 1rem;
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: background 0.15s
+    }
+
+    .load-btn:hover {
+      background: #4f46e5
+    }
+
+    /* フッター固定ボタン */
+    .footer-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 0.75rem 1rem;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid #e2e8f0;
+      z-index: 100
+    }
+
+    .footer-bar-inner {
+      max-width: 520px;
+      margin: 0 auto
+    }
+
+    /* トースト */
+    .toast {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: #fff;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 999;
+      white-space: nowrap;
+      border-left: 4px solid #34d399;
+      pointer-events: none
+    }
+
+    .toast.error {
+      border-left-color: #f87171
+    }
+
+    .toast.show {
+      opacity: 1
+    }
+
+    /* ローディング */
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #94a3b8
+    }
+
+    .spinner {
+      width: 2rem;
+      height: 2rem;
+      border: 3px solid #e2e8f0;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 0.75rem
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    .section-note {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      margin-top: 0.5rem;
+      line-height: 1.5
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="header">
+    <h1>⚙️ イベント設定</h1>
+    <p>早割・満枠のON/OFFを管理できます</p>
+  </header>
+
+  <div class="container">
+
+    <!-- GitHub 接続設定 -->
+    <div class="card">
+      <div class="card-title">🔗 GitHub 接続設定</div>
+
+      <button class="setup-toggle" onclick="toggleSetup()" id="setupToggleBtn">
+        ▼ 接続設定を表示
+      </button>
+
+      <div class="setup-area" id="setupArea">
+        <div class="field">
+          <label>GitHub ユーザー名（管理者から教えてもらう）</label>
+          <input type="text" id="ghOwner" placeholder="例: tanaka-events">
+        </div>
+        <div class="field">
+          <label>リポジトリ名（管理者から教えてもらう）</label>
+          <input type="text" id="ghRepo" placeholder="例: client-tanaka-form">
+        </div>
+        <div class="field">
+          <label>GitHub アクセストークン（管理者から教えてもらう）</label>
+          <input type="text" id="ghToken" placeholder="ghp_xxxxxxxxxxxxx">
+          <div class="hint">※ このページにのみ保存されます。外部には送信されません。</div>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+          <button class="load-btn" onclick="saveGitHubSettings()">保存して読み込む</button>
+          <button class="load-btn" style="background:#64748b" onclick="clearSettings()">設定をリセット</button>
+        </div>
+      </div>
+
+      <!-- 接続状態表示 -->
+      <div id="connectionStatus" style="margin-top:0.75rem;font-size:0.85rem;color:#94a3b8">
+        接続設定が必要です
+      </div>
+    </div>
+
+    <!-- メイン設定エリア -->
+    <div id="mainSettings" style="display:none">
+
+      <!-- 早割設定 -->
+      <div class="card">
+        <div class="card-title">🎉 早割設定</div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="name">早割機能</div>
+            <div class="sub" id="earlyBirdStatus">---</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="earlyBirdEnabled" onchange="onEarlyBirdToggle()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div id="earlyBirdDeadlineArea" style="margin-top:0.75rem;display:none">
+          <div class="field">
+            <label>早割締切日時</label>
+            <input type="datetime-local" id="earlyBirdDeadline" onchange="onDeadlineChange()">
+            <div class="hint">この日時を過ぎると自動的に通常料金になります</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ブース満枠設定 -->
+      <div class="card">
+        <div class="card-title">🏪 ブース 満枠設定</div>
+        <div id="boothList">
+          <div class="loading">
+            <div class="spinner"></div>読み込み中...
+          </div>
+        </div>
+        <div class="section-note">
+          ※ 満枠にすると申込フォームでそのブースが選択できなくなります
+        </div>
+      </div>
+
+      <!-- 変更プレビュー -->
+      <div class="card" id="changePreviewCard" style="display:none">
+        <div class="card-title">📋 変更内容</div>
+        <div id="changePreview" style="font-size:0.85rem;color:#475569;line-height:1.8"></div>
+      </div>
+
+    </div>
+
+    <!-- 未接続状態の案内 -->
+    <div id="noConnectionMsg" class="card" style="text-align:center;padding:2rem">
+      <div style="font-size:2.5rem;margin-bottom:0.75rem">🔗</div>
+      <p style="font-weight:700;margin-bottom:0.5rem">GitHub に接続してください</p>
+      <p style="font-size:0.85rem;color:#94a3b8">上の「接続設定」に管理者から教えてもらった情報を入力してください</p>
+    </div>
+
+  </div>
+
+  <!-- 固定フッター -->
+  <div class="footer-bar" id="footerBar" style="display:none">
+    <div class="footer-bar-inner">
+      <button class="save-btn" onclick="saveConfig()" id="saveBtn">
+        💾 変更を保存する
+      </button>
+    </div>
+  </div>
+
+  <!-- トースト -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ========================================
+    // 状態管理
+    // ========================================
+    let config = null;        // 現在のconfig.json
+    let fileSha = null;       // GitHub ファイルのSHA（更新に必要）
+    let isDirty = false;      // 変更があるか
+    const STORAGE_KEY = 'qs_github_settings';
+
+    // ========================================
+    // 起動時
+    // ========================================
+    window.onload = () => {
+      const settings = loadSettings();
+      if (settings?.owner && settings?.repo && settings?.token) {
+        document.getElementById('ghOwner').value = settings.owner;
+        document.getElementById('ghRepo').value = settings.repo;
+        document.getElementById('ghToken').value = settings.token;
+        fetchConfig(settings);
+        updateConnectionStatus('接続中...', '#fbbf24');
+      } else {
+        openSetup();
+      }
+    };
+
+    // ========================================
+    // 接続設定
+    // ========================================
+    function toggleSetup() {
+      const area = document.getElementById('setupArea');
+      const btn = document.getElementById('setupToggleBtn');
+      const open = area.classList.toggle('open');
+      btn.textContent = open ? '▲ 接続設定を閉じる' : '▼ 接続設定を表示';
+    }
+
+    function openSetup() {
+      document.getElementById('setupArea').classList.add('open');
+      document.getElementById('setupToggleBtn').textContent = '▲ 接続設定を閉じる';
+    }
+
+    function saveGitHubSettings() {
+      const owner = document.getElementById('ghOwner').value.trim();
+      const repo = document.getElementById('ghRepo').value.trim();
+      const token = document.getElementById('ghToken').value.trim();
+      if (!owner || !repo || !token) {
+        showToast('すべての項目を入力してください', true);
+        return;
+      }
+      const settings = { owner, repo, token };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      document.getElementById('setupArea').classList.remove('open');
+      document.getElementById('setupToggleBtn').textContent = '▼ 接続設定を表示';
+      fetchConfig(settings);
+    }
+
+    function clearSettings() {
+      localStorage.removeItem(STORAGE_KEY);
+      config = null; fileSha = null;
+      document.getElementById('ghOwner').value = '';
+      document.getElementById('ghRepo').value = '';
+      document.getElementById('ghToken').value = '';
+      document.getElementById('mainSettings').style.display = 'none';
+      document.getElementById('noConnectionMsg').style.display = 'block';
+      document.getElementById('footerBar').style.display = 'none';
+      updateConnectionStatus('接続設定が必要です', '#94a3b8');
+      showToast('設定をリセットしました');
+    }
+
+    function loadSettings() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { return null; }
+    }
+
+    // ========================================
+    // config.json 取得
+    // ========================================
+    async function fetchConfig(settings) {
+      updateConnectionStatus('接続中...', '#fbbf24');
+      try {
+        const { owner, repo, token } = settings;
+        const url = `https://api.github.com/repos/${owner}/${repo}/contents/apply/config.json`;
+        const res = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || `HTTPエラー: ${res.status}`);
+        }
+        const data = await res.json();
+        fileSha = data.sha;
+        config = JSON.parse(atob(data.content.replace(/\n/g, '')));
+
+        updateConnectionStatus(`✅ 接続済み（${owner}/${repo}）`, '#16a34a');
+        renderSettings();
+        document.getElementById('mainSettings').style.display = 'block';
+        document.getElementById('noConnectionMsg').style.display = 'none';
+        document.getElementById('footerBar').style.display = 'block';
+        isDirty = false;
+        updateSaveBtn();
+
+      } catch (err) {
+        console.error(err);
+        updateConnectionStatus(`❌ 接続エラー: ${err.message}`, '#dc2626');
+        showToast('読み込み失敗: ' + err.message, true);
+        openSetup();
+      }
+    }
+
+    // ========================================
+    // 設定を画面に反映
+    // ========================================
+    function renderSettings() {
+      if (!config) return;
+
+      // 早割
+      const earlyBirdOn = config.features?.earlyBird !== false;
+      document.getElementById('earlyBirdEnabled').checked = earlyBirdOn;
+      onEarlyBirdToggle();
+
+      if (config.event?.earlyBirdDeadline) {
+        // datetime-local 用に変換（YYYY-MM-DDTHH:mm 形式）
+        const dl = config.event.earlyBirdDeadline.replace(' ', 'T').slice(0, 16);
+        document.getElementById('earlyBirdDeadline').value = dl;
+      }
+      updateEarlyBirdStatus();
+
+      // ブース一覧
+      renderBoothList();
+    }
+
+    function renderBoothList() {
+      const container = document.getElementById('boothList');
+      container.innerHTML = '';
+      const booths = config.booths || [];
+
+      if (!booths.length) {
+        container.innerHTML = '<div style="color:#94a3b8;font-size:0.85rem;text-align:center;padding:1rem">ブースが設定されていません</div>';
+        return;
+      }
+
+      booths.forEach((booth, idx) => {
+        const row = document.createElement('div');
+        row.className = 'toggle-row';
+        row.innerHTML = `
+      <div class="toggle-info">
+        <div class="name">${booth.name}</div>
+        <div class="sub">
+          通常: ¥${(booth.prices?.regular || 0).toLocaleString()}
+          ${booth.prices?.earlyBird !== booth.prices?.regular ? ` / 早割: ¥${(booth.prices?.earlyBird || 0).toLocaleString()}` : ''}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.75rem">
+        <span id="soldOutBadge_${idx}" class="badge ${booth.soldOut ? 'badge-off' : 'badge-on'}">
+          ${booth.soldOut ? '満枠' : '受付中'}
+        </span>
+        <label class="toggle">
+          <input type="checkbox" class="danger" id="soldOut_${idx}" ${booth.soldOut ? 'checked' : ''}
+            onchange="onSoldOutToggle(${idx})">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>`;
+        container.appendChild(row);
+      });
+    }
+
+    // ========================================
+    // 早割トグル
+    // ========================================
+    function onEarlyBirdToggle() {
+      const on = document.getElementById('earlyBirdEnabled').checked;
+      const area = document.getElementById('earlyBirdDeadlineArea');
+      area.style.display = on ? 'block' : 'none';
+      if (config && config.features) {
+        config.features.earlyBird = on;
+      }
+      updateEarlyBirdStatus();
+      markDirty('早割機能を' + (on ? 'ON' : 'OFF') + 'に変更');
+    }
+
+    function onDeadlineChange() {
+      const val = document.getElementById('earlyBirdDeadline').value;
+      if (!val) return;
+      const formatted = val.replace('T', ' ') + ':00';
+      if (config && config.event) {
+        config.event.earlyBirdDeadline = formatted;
+      }
+      updateEarlyBirdStatus();
+      markDirty(`早割締切を ${val.replace('T', ' ')} に変更`);
+    }
+
+    function updateEarlyBirdStatus() {
+      const statusEl = document.getElementById('earlyBirdStatus');
+      if (!config) return;
+      const on = config.features?.earlyBird !== false;
+      if (!on) {
+        statusEl.textContent = '無効（通常料金で表示中）';
+        return;
+      }
+      const dl = config.event?.earlyBirdDeadline;
+      if (!dl) { statusEl.textContent = '有効（締切日時未設定）'; return; }
+      const deadlineDate = new Date(dl.replace(' ', 'T'));
+      const now = new Date();
+      if (now > deadlineDate) {
+        statusEl.textContent = `締切済み（${formatDate(deadlineDate)}）`;
+      } else {
+        const diff = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
+        statusEl.textContent = `有効（締切まで残り${diff}日：${formatDate(deadlineDate)}）`;
+      }
+    }
+
+    // ========================================
+    // 満枠トグル
+    // ========================================
+    function onSoldOutToggle(idx) {
+      const checked = document.getElementById(`soldOut_${idx}`).checked;
+      config.booths[idx].soldOut = checked;
+      const badge = document.getElementById(`soldOutBadge_${idx}`);
+      badge.textContent = checked ? '満枠' : '受付中';
+      badge.className = 'badge ' + (checked ? 'badge-off' : 'badge-on');
+      markDirty(`「${config.booths[idx].name}」を${checked ? '満枠' : '受付中'}に変更`);
+    }
+
+    // ========================================
+    // 変更追跡
+    // ========================================
+    const changes = new Set();
+
+    function markDirty(msg) {
+      isDirty = true;
+      changes.add(msg);
+      updateChangePreview();
+      updateSaveBtn();
+    }
+
+    function updateChangePreview() {
+      const card = document.getElementById('changePreviewCard');
+      const preview = document.getElementById('changePreview');
+      if (!changes.size) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = 'block';
+      preview.innerHTML = [...changes].map(c => `• ${c}`).join('<br>');
+    }
+
+    function updateSaveBtn() {
+      const btn = document.getElementById('saveBtn');
+      btn.textContent = isDirty ? '💾 変更を保存する' : '✅ 保存済み（変更なし）';
+      btn.disabled = !isDirty;
+    }
+
+    // ========================================
+    // GitHub に保存
+    // ========================================
+    async function saveConfig() {
+      if (!isDirty || !config) return;
+      const settings = loadSettings();
+      if (!settings) { showToast('接続設定がありません', true); return; }
+
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ 保存中...';
+
+      try {
+        const { owner, repo, token } = settings;
+        const url = `https://api.github.com/repos/${owner}/${repo}/contents/apply/config.json`;
+        const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(config, null, 2))));
+        const changeMsg = [...changes].join('、');
+
+        const res = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            message: `設定更新: ${changeMsg}`,
+            content: newContent,
+            sha: fileSha
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || `HTTPエラー: ${res.status}`);
+        }
+
+        const result = await res.json();
+        fileSha = result.content.sha; // 新しいSHAを保存
+
+        isDirty = false;
+        changes.clear();
+        updateChangePreview();
+        updateSaveBtn();
+        showToast('✅ 保存しました！フォームに反映されます（最大30分）');
+
+      } catch (err) {
+        console.error(err);
+        showToast('保存失敗: ' + err.message, true);
+        btn.disabled = false;
+        btn.textContent = '💾 変更を保存する';
+      }
+    }
+
+    // ========================================
+    // ユーティリティ
+    // ========================================
+    function updateConnectionStatus(msg, color) {
+      const el = document.getElementById('connectionStatus');
+      el.textContent = msg;
+      el.style.color = color;
+    }
+
+    function formatDate(date) {
+      return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function showToast(msg, isError = false) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast' + (isError ? ' error' : '') + ' show';
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+  </script>
+</body>
+
+</html>
