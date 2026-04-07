@@ -158,7 +158,7 @@
     "adminNotificationSubject": ""
   },
   "configJsonUrl": "",
-  "gasUrl": "",
+  "gasUrl": "https://script.google.com/macros/s/AKfycbyjRqc2fnCVZ8NnjTXM6lPuscK7Qixh5CYKKj18XPWJlKHvgqNvngRGNzSFLOAwKi1NMw/exec",
   "workerUrl": "",
   "spreadsheetId": "1kWTSrjxZ6APUGVdjs4XtKiVTUcfHrvMfbDY0MIRwpqQ",
   "driveFolderUrl": "https://drive.google.com/drive/folders/1FYWLjo-o7cNLknT0SS2OdFLyRcGzVtng?usp=sharing"
