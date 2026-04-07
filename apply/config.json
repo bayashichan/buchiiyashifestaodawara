@@ -10,7 +10,7 @@
     "name": "第一回テストイベント",
     "date": "2026年５月３０日",
     "location": "小田原",
-    "earlyBirdDeadline": "2026-5-30 24:00:00"
+    "earlyBirdDeadline": "2026-05-30 23:59:59"
   },
   "features": {
     "earlyBird": true,
@@ -151,6 +151,6 @@
   "configJsonUrl": "",
   "gasUrl": "",
   "workerUrl": "",
-  "spreadsheetId": "https://docs.google.com/spreadsheets/d/1kWTSrjxZ6APUGVdjs4XtKiVTUcfHrvMfbDY0MIRwpqQ/edit?gid=0#gid=0",
+  "spreadsheetId": "1kWTSrjxZ6APUGVdjs4XtKiVTUcfHrvMfbDY0MIRwpqQ",
   "driveFolderUrl": "https://drive.google.com/drive/folders/1ORpPeH9LFlQcUl3n8WSLzYSn9zbq3qHv?usp=drive_link"
 }
