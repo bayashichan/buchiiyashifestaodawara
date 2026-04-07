@@ -288,63 +288,72 @@ function selectCategory(category, btn) {
 }
 
 // ========================================
-// ブースアコーディオン
+// ブース表示
 // ========================================
 function initBoothAccordion() {
   const container = document.getElementById('boothAccordion');
   if (!container) return;
 
-  const locations = [...new Set((CONFIG.booths || []).map(b => b.location))];
+  const booths = CONFIG.booths || [];
 
-  locations.forEach(location => {
-    const booths = CONFIG.booths.filter(b => b.location === location);
+  // 空でない location の種類が 2 以上のときだけアコーディオン表示
+  const nonEmptyLocations = [...new Set(booths.map(b => b.location).filter(Boolean))];
+  const useAccordion = nonEmptyLocations.length >= 2;
 
-    const header = document.createElement('div');
-    header.className = 'accordion-header';
-    header.innerHTML = `<span class="font-bold">${location}</span><span class="accordion-icon">▼</span>`;
-
-    const content = document.createElement('div');
-    content.className = 'accordion-content';
-
-    booths.forEach(booth => {
-      const earlyPrice   = booth.prices.earlyBird;
-      const regularPrice = booth.prices.regular;
-      let priceDisplay;
-
-      if (isEarlyBird()) {
-        priceDisplay = earlyPrice === regularPrice
-          ? `¥${earlyPrice.toLocaleString()}`
-          : `¥${earlyPrice.toLocaleString()} <span class="booth-price-early">（通常¥${regularPrice.toLocaleString()}）</span>`;
-      } else {
-        priceDisplay = `¥${regularPrice.toLocaleString()}`;
+  if (useAccordion) {
+    const locations = [...new Set(booths.map(b => b.location))];
+    locations.forEach(location => {
+      const groupBooths = booths.filter(b => b.location === location);
+      if (!location) {
+        // location が空 → ヘッダーなしで直接追加
+        groupBooths.forEach(booth => container.appendChild(createBoothOption(booth)));
+        return;
       }
-
-      const option = document.createElement('label');
-      option.className = 'booth-option' + (booth.soldOut ? ' sold-out' : '');
-
-      if (booth.soldOut) {
-        option.innerHTML = `
-          <input type="radio" name="boothRadio" value="${booth.id}" disabled>
-          <span style="flex:1">${booth.name}</span>
-          <span class="sold-out-badge">満枠</span>`;
-      } else {
-        option.innerHTML = `
-          <input type="radio" name="boothRadio" value="${booth.id}" onchange="selectBooth('${booth.id}')">
-          <span style="flex:1">${booth.name}</span>
-          <span class="booth-price">${priceDisplay}</span>`;
-      }
-
-      content.appendChild(option);
+      const header = document.createElement('div');
+      header.className = 'accordion-header';
+      header.innerHTML = `<span class="font-bold">${location}</span><span class="accordion-icon">▼</span>`;
+      const content = document.createElement('div');
+      content.className = 'accordion-content';
+      groupBooths.forEach(booth => content.appendChild(createBoothOption(booth)));
+      header.onclick = () => {
+        header.classList.toggle('active');
+        content.classList.toggle('open');
+      };
+      container.appendChild(header);
+      container.appendChild(content);
     });
+  } else {
+    // フラット表示（アコーディオンなし）
+    booths.forEach(booth => container.appendChild(createBoothOption(booth)));
+  }
+}
 
-    header.onclick = () => {
-      header.classList.toggle('active');
-      content.classList.toggle('open');
-    };
-
-    container.appendChild(header);
-    container.appendChild(content);
-  });
+// ブースオプション要素を生成するヘルパー
+function createBoothOption(booth) {
+  const earlyPrice   = booth.prices.earlyBird;
+  const regularPrice = booth.prices.regular;
+  let priceDisplay;
+  if (isEarlyBird()) {
+    priceDisplay = earlyPrice === regularPrice
+      ? `¥${earlyPrice.toLocaleString()}`
+      : `¥${earlyPrice.toLocaleString()} <span class="booth-price-early">（通常¥${regularPrice.toLocaleString()}）</span>`;
+  } else {
+    priceDisplay = `¥${regularPrice.toLocaleString()}`;
+  }
+  const option = document.createElement('label');
+  option.className = 'booth-option' + (booth.soldOut ? ' sold-out' : '');
+  if (booth.soldOut) {
+    option.innerHTML = `
+      <input type="radio" name="boothRadio" value="${booth.id}" disabled>
+      <span style="flex:1">${booth.name}</span>
+      <span class="sold-out-badge">満枠</span>`;
+  } else {
+    option.innerHTML = `
+      <input type="radio" name="boothRadio" value="${booth.id}" onchange="selectBooth('${booth.id}')">
+      <span style="flex:1">${booth.name}</span>
+      <span class="booth-price">${priceDisplay}</span>`;
+  }
+  return option;
 }
 
 // ========================================
