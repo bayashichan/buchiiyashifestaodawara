@@ -150,7 +150,7 @@
   },
   "configJsonUrl": "",
   "gasUrl": "https://script.google.com/macros/s/AKfycbzdEcorQyVCAfOTmtYhWSRBVp020nBYFI8fezNUt6GRWbpTw3ZeYLG9Vs5DhslZ4i2Y/exec",
-  "workerUrl": "",
+  "workerUrl": "https://buchiiyashiodawara-proxy.wakaossan2001.workers.dev/",
   "spreadsheetId": "1-KFjFMYIwvWqrg8hW-vvl0gHmTCnSvjS-adopfVlw0E",
   "driveFolderUrl": "https://drive.google.com/drive/folders/1Yr2nO-FYygBZefYbOn9qGTNzapa8CbnX"
 }
