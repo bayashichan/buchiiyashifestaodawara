@@ -65,7 +65,7 @@
       "limits": {
         "maxStaff": 0,
         "maxChairs": 0,
-        "allowPower": false
+        "allowPower": true
       },
       "soldOut": false,
       "prohibitSession": false
