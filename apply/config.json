@@ -127,7 +127,7 @@
       "placeholder": "例：タロット占い 20分 2,000円",
       "required": true,
       "showCounter": true,
-      "maxLength": 200
+      "maxLength": 100
     },
     {
       "id": "cq_intro",
