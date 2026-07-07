@@ -1031,7 +1031,10 @@ async function submitForm() {
     }
     clearTimeout(timeoutId);
 
-    if (!response.ok) throw new Error('サーバーとの通信に失敗しました。');
+    if (!response.ok) {
+      console.error('Submit failed:', response.status, await response.text().catch(() => ''));
+      throw new Error('サーバーとの通信に失敗しました。(状態コード: ' + response.status + ')');
+    }
 
     const result = await response.json().catch(() => { throw new Error('サーバーからの応答が不正です。'); });
 
@@ -1359,18 +1362,38 @@ function convertFileToBase64(file) {
       img.src = e.target.result;
       img.onload = () => {
         try {
-          const canvas = document.createElement('canvas');
-          const ctx    = canvas.getContext('2d');
-          if (!ctx) { reject(new Error('Canvas初期化失敗')); return; }
-          const MAX = 1200;
-          let { width, height } = img;
-          if (width > height) { if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; } }
-          else                { if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; } }
-          canvas.width = width; canvas.height = height;
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-          const base64  = dataUrl.split(',')[1];
+          // 送信先の GAS(Google)は大きすぎる POST を 403 で弾くため、
+          // 送信データが確実に上限を下回るよう、目標サイズに収まるまで段階的に再圧縮する。
+          // 実績: base64 約1.3MB は成功、約1.9MB は 403。余裕を見て目標は約1MB。
+          const TARGET_BASE64_LEN = 1_000_000; // base64 文字数 ≒ 送信バイト数
+          const MAX_DIMS    = [1200, 1000, 800, 640];
+          const MIN_QUALITY = 0.5;
+
+          const encodeAt = (maxDim, quality) => {
+            const canvas = document.createElement('canvas');
+            const ctx    = canvas.getContext('2d');
+            if (!ctx) throw new Error('Canvas初期化失敗');
+            let { width, height } = img;
+            if (width > height) { if (width > maxDim) { height = Math.round(height * maxDim / width); width = maxDim; } }
+            else                { if (height > maxDim) { width = Math.round(width * maxDim / height); height = maxDim; } }
+            canvas.width = width; canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            return dataUrl.split(',')[1] || '';
+          };
+
+          // 寸法を段階的に下げつつ、各寸法で品質を 0.8→0.5 まで下げて目標以下を探す
+          let base64 = '';
+          outer:
+          for (const maxDim of MAX_DIMS) {
+            for (let q = 0.8; q >= MIN_QUALITY - 1e-9; q -= 0.1) {
+              base64 = encodeAt(maxDim, Math.round(q * 10) / 10);
+              if (base64 && base64.length <= TARGET_BASE64_LEN) break outer;
+            }
+          }
+
           if (!base64) { reject(new Error('画像変換結果が空')); return; }
+          // 目標まで下げ切れなくても最小設定の結果を送る（従来の固定圧縮より必ず小さい）
           resolve({ base64, mimeType: 'image/jpeg', name: file.name.replace(/\.[^/.]+$/, '') + '.jpg' });
         } catch (e) { reject(new Error('画像圧縮処理に失敗: ' + e.message)); }
       };
