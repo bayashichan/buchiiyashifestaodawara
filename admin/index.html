@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>イベント管理</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ログイン -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h2>イベント管理</h2>
+    <p>管理パスワードを入力してください。</p>
+    <div class="field">
+      <label for="passwordInput">パスワード</label>
+      <input type="password" id="passwordInput" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <label class="check" style="margin-bottom:1rem">
+      <input type="checkbox" id="rememberPassword" checked>
+      <span>この端末にパスワードを保存する</span>
+    </label>
+    <button class="btn btn-primary btn-block" id="loginBtn">ログイン</button>
+    <p class="hint" id="loginError" style="color:#dc2626"></p>
+  </div>
+</div>
+
+<!-- 本体 -->
+<div id="mainScreen" class="hidden">
+
+  <div class="app-bar">
+    <div style="min-width:0">
+      <h1>イベント管理<span class="event-name" id="barEventName"></span></h1>
+    </div>
+    <span class="quota-chip" id="quotaChip" title="本日あと何通メールを送れるか">メール —</span>
+  </div>
+
+  <div class="container">
+
+    <!-- 点検結果 -->
+    <div class="issues" id="issuesBox"></div>
+
+    <!-- 開催回のセットアップ -->
+    <div class="card">
+      <button class="card-head" data-card="setup" aria-expanded="false">
+        <span>🚀 開催回のセットアップ</span>
+        <span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="setup">
+        <p class="hint" style="margin-bottom:0.75rem">
+          申込データのスプレッドシートと画像の保存フォルダを作ります。
+          作られるものは主催者のGoogleアカウントの所有になります。
+        </p>
+        <div class="grid-2">
+          <button class="btn btn-secondary" id="previewSetupBtn">作成内容を確認</button>
+          <button class="btn btn-primary" id="setupBtn">新規開催回を始める</button>
+        </div>
+        <div id="setupResult"></div>
+
+        <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px dashed var(--border)">
+          <div class="field-label">保存先</div>
+          <div id="storageInfo" class="hint">読み込み中…</div>
+        </div>
+
+        <div style="margin-top:1rem">
+          <div class="field-label">過去データの移送</div>
+          <p class="hint">以前のスプレッドシートから、この回のマスターDBへ申込履歴を取り込みます。移送元は読み取るだけで変更しません。</p>
+          <div class="field" style="margin-top:0.5rem">
+            <input type="text" id="legacyId" placeholder="移送元スプレッドシートのID">
+          </div>
+          <div class="grid-2">
+            <button class="btn btn-secondary" id="migratePreviewBtn">対応表を確認</button>
+            <button class="btn btn-secondary" id="migrateBtn">移送を実行</button>
+          </div>
+          <div id="migrateResult"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- イベント情報 -->
+    <div class="card">
+      <button class="card-head" data-card="event" aria-expanded="false">
+        <span>📅 イベント情報</span><span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="event">
+        <div class="field">
+          <label for="eventName">イベント名</label>
+          <input type="text" id="eventName" data-bind="event.name" placeholder="第2回◯◯フェスタ">
+          <p class="hint">申込フォームのヘッダーと、確認メールの件名に使われます。</p>
+        </div>
+        <div class="field">
+          <label for="eventDate">開催日時</label>
+          <input type="text" id="eventDate" data-bind="event.date" placeholder="2026年11月1日（日）11:00〜16:30">
+        </div>
+        <div class="field">
+          <label for="eventLocation">開催場所</label>
+          <input type="text" id="eventLocation" data-bind="event.location" placeholder="◯◯市民会館 3階">
+        </div>
+        <div class="field">
+          <label for="eventNote">ヘッダーの補足</label>
+          <input type="text" id="eventNote" data-bind="event.headerNote" placeholder="出展者募集中！">
+        </div>
+      </div>
+    </div>
+
+    <!-- テーマ -->
+    <div class="card">
+      <button class="card-head" data-card="theme" aria-expanded="false">
+        <span>🎨 見た目・画像</span><span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="theme">
+        <div class="grid-2">
+          <div class="field">
+            <label for="primaryColor">テーマカラー</label>
+            <input type="color" id="primaryColor" data-bind="theme.primaryColor">
+          </div>
+          <div class="field">
+            <label for="accentColor">アクセントカラー</label>
+            <input type="color" id="accentColor" data-bind="theme.accentColor">
+          </div>
+          <div class="field">
+            <label for="headerBgColor">ヘッダー背景</label>
+            <input type="color" id="headerBgColor" data-bind="theme.headerBgColor">
+          </div>
+          <div class="field">
+            <label for="headerTextColor">ヘッダー文字</label>
+            <input type="color" id="headerTextColor" data-bind="theme.headerTextColor">
+          </div>
+        </div>
+        <div class="field">
+          <label for="headerImageUrl">ヘッダー背景画像のURL</label>
+          <input type="url" id="headerImageUrl" data-bind="theme.headerImageUrl" placeholder="https://...">
+        </div>
+        <div class="field">
+          <label for="logoImageUrl">ロゴ画像のURL</label>
+          <input type="url" id="logoImageUrl" data-bind="theme.logoImageUrl" placeholder="https://...">
+        </div>
+
+        <div class="field-label" style="margin-top:1rem">フォーム内に差し込む画像</div>
+        <p class="hint">チラシや会場図などを、フォームの指定した位置に表示できます。</p>
+        <div id="mediaList"></div>
+        <button class="btn-add" id="addMediaBtn">＋ 画像を追加</button>
+      </div>
+    </div>
+
+    <!-- 早割 -->
+    <div class="card">
+      <button class="card-head" data-card="earlybird" aria-expanded="false">
+        <span>🎉 早割</span><span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="earlybird">
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="name">早割を使う</div>
+            <div class="sub" id="earlyBirdStatus">—</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="earlyBirdEnabled" data-bind="earlyBird.enabled">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="earlyBirdDetail">
+          <div class="field">
+            <label for="earlyBirdDeadline">早割の締切日時</label>
+            <input type="datetime-local" id="earlyBirdDeadline">
+            <p class="hint">この日時を過ぎると自動的に通常価格になります。日本時間で判定されます。</p>
+          </div>
+          <div class="field">
+            <label for="earlyBirdBanner">バナーの文言（空欄なら自動）</label>
+            <input type="text" id="earlyBirdBanner" data-bind="earlyBird.bannerText" placeholder="🎉 早割受付中！">
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="name">会員は早割の対象外にする</div>
+              <div class="sub">会員割引と早割の重複を防ぎたい場合</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="excludeMembers" data-bind="earlyBird.excludeMembers">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ブース -->
+    <div class="card">
+      <button class="card-head" data-card="booths" aria-expanded="false">
+        <span>🏪 ブースと料金</span>
+        <span class="badge" id="boothCount">0</span><span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="booths">
+        <p class="hint" style="margin-bottom:0.75rem">
+          ブースを開くと、そのブースで使えるオプションを設定できます。
+        </p>
+        <div id="boothList"></div>
+        <button class="btn-add" id="addBoothBtn">＋ ブースを追加</button>
+
+        <div class="field-label" style="margin-top:1.25rem">オプション可否の一覧</div>
+        <p class="hint">設定の確認用です。横にスクロールできます。</p>
+        <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
+      </div>
+    </div>
+
+    <!-- オプション -->
+    <div class="card">
+      <button class="card-head" data-card="options" aria-expanded="false">
+        <span>⚙️ オプション</span>
+        <span class="badge" id="optionCount">0</span><span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="options">
+        <p class="hint" style="margin-bottom:0.75rem">
+          コンセント使用や懇親会など、追加料金のかかる項目です。
+          「ブースごとに設定」を選ぶと、ブースの種類によって使える／使えないを分けられます。
+        </p>
+        <div id="optionList"></div>
+        <button class="btn-add" id="addOptionBtn">＋ オプションを追加</button>
+
+        <div class="field" style="margin-top:1.25rem;padding-top:1rem;border-top:1px dashed var(--border)">
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="name">会員割引を使う</div>
+              <div class="sub">申込者が会員かどうかを選べるようにします</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="memberDiscountEnabled" data-bind="pricing.memberDiscount.enabled">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="memberDiscountLabel">質問文</label>
+              <input type="text" id="memberDiscountLabel" data-bind="pricing.memberDiscount.label">
+            </div>
+            <div class="field">
+              <label for="memberDiscountAmount">割引額（円）</label>
+              <input type="number" id="memberDiscountAmount" min="0">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 申込項目 -->
+    <div class="card">
+      <button class="card-head" data-card="fields" aria-expanded="false">
+        <span>📋 申込フォームの項目</span>
+        <span class="badge" id="fieldCount">0</span><span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="fields">
+        <p class="hint" style="margin-bottom:0.75rem">
+          質問文・説明書き・入力の種類・必須かどうか・文字数の上限を設定できます。
+          ▲▼ で並び順を変えられます。
+        </p>
+        <div class="field">
+          <label for="categoryList">出展カテゴリ（1行に1つ）</label>
+          <textarea id="categoryList" rows="4" placeholder="占い・スピリチュアル&#10;物販"></textarea>
+        </div>
+        <div id="fieldList"></div>
+        <button class="btn-add" id="addFieldBtn">＋ 項目を追加</button>
+      </div>
+    </div>
+
+    <!-- 規約 -->
+    <div class="card">
+      <button class="card-head" data-card="terms" aria-expanded="false">
+        <span>📜 出展規約</span><span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="terms">
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="name">同意を必須にする</div>
+            <div class="sub">チェックしないと申し込めなくなります</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="termsRequire" data-bind="terms.requireAgree">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="field">
+          <label for="termsTitle">見出し</label>
+          <input type="text" id="termsTitle" data-bind="terms.title" placeholder="出展規約">
+        </div>
+        <div class="field">
+          <label for="termsBody">本文</label>
+          <textarea id="termsBody" data-bind="terms.body" rows="14"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- メール -->
+    <div class="card">
+      <button class="card-head" data-card="email" aria-expanded="false">
+        <span>📧 自動返信メール</span><span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="email">
+        <div class="field">
+          <label for="senderName">差出人の表示名</label>
+          <input type="text" id="senderName" data-bind="email.adminSenderName" placeholder="◯◯フェスタ事務局">
+        </div>
+        <div class="field">
+          <label for="mailSubject">件名</label>
+          <input type="text" id="mailSubject" data-bind="email.confirmationSubject"
+                 placeholder="【{{eventName}}】お申込みを受け付けました">
+        </div>
+        <div class="field">
+          <label for="mailBody">本文</label>
+          <textarea id="mailBody" data-bind="email.confirmationBodyTemplate" rows="16"></textarea>
+          <p class="hint">
+            使える差し込み: <code>{{name}}</code> <code>{{email}}</code> <code>{{eventName}}</code>
+            <code>{{eventDate}}</code> <code>{{eventLocation}}</code> <code>{{boothName}}</code>
+            <code>{{breakdown}}</code>（料金の内訳） <code>{{totalFee}}</code>（合計）
+            <code>{{answers}}</code>（申込内容の一覧）<br>
+            特定の項目だけ差し込むには <code>{{field:項目ID}}</code> と書きます。
+          </p>
+        </div>
+
+        <div style="padding-top:1rem;border-top:1px dashed var(--border)">
+          <div class="field-label">管理者への通知</div>
+          <p class="hint">
+            1件ごとには送らず、1日1回まとめてお送りします。
+            無料のGmailは1日100通までのため、申込者への確認メールを優先する設計です。
+          </p>
+          <div class="grid-2" style="margin-top:0.6rem">
+            <button class="btn btn-secondary" id="sendDigestBtn">今すぐダイジェストを送る</button>
+            <button class="btn btn-secondary" id="processQueueBtn">送信待ちを処理する</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- リピーター -->
+    <div class="card">
+      <button class="card-head" data-card="repeater" aria-expanded="false">
+        <span>🔄 過去申込の呼び出し</span><span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="repeater">
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="name">この機能を使う</div>
+            <div class="sub">本名とメールで照合し、認証コードを送って前回内容を読み込めます</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="repeaterEnabled" data-bind="repeater.enabled">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <p class="hint">
+          金額に関わるブース・オプション・懇親会は復元されません。
+          前回のブースが今回は無い、満枠、値上げ、といったときに誤った金額で
+          申し込まれるのを防ぐためです。
+        </p>
+        <div class="grid-2" style="margin-top:0.75rem">
+          <div class="field">
+            <label for="codeDigits">認証コードの桁数</label>
+            <input type="number" id="codeDigits" min="4" max="8">
+          </div>
+          <div class="field">
+            <label for="maxAttempts">入力できる回数</label>
+            <input type="number" id="maxAttempts" min="1" max="20">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 連携 -->
+    <div class="card">
+      <button class="card-head" data-card="integration" aria-expanded="false">
+        <span>🔧 連携設定</span><span class="caret">▼</span>
+      </button>
+      <div class="card-body hidden" data-body="integration">
+        <div class="field">
+          <label for="gasUrl">送信先（Apps ScriptのURL）</label>
+          <input type="url" id="gasUrl" data-bind="integration.gasUrl" placeholder="https://script.google.com/macros/s/.../exec">
+          <p class="hint">主催者のGoogleアカウントでデプロイしたウェブアプリのURLです。</p>
+        </div>
+        <div class="field">
+          <label for="liffId">LIFF ID（LINEから開く場合）</label>
+          <input type="url" id="liffId" data-bind="integration.liffId" placeholder="任意">
+        </div>
+        <div class="field-label" style="margin-top:1rem">スクリプト側の設定状況</div>
+        <div id="propStatus" class="hint">読み込み中…</div>
+        <p class="hint" style="margin-top:0.75rem">
+          スプレッドシートIDやトークンなどは、公開される config.json ではなく
+          Apps Script のスクリプトプロパティに保存されています。
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 保存バー -->
+  <div class="save-bar">
+    <div class="save-bar-inner">
+      <span class="status" id="saveStatus">変更はありません</span>
+      <button class="btn btn-secondary btn-sm" id="previewBtn">プレビュー</button>
+      <button class="btn btn-primary" id="saveBtn">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- モーダル -->
+<div class="modal hidden" id="modal">
+  <div class="modal-box">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="previewModal">
+  <div class="modal-box" style="max-width:420px">
+    <h3>フォームのプレビュー</h3>
+    <p class="hint" style="margin-bottom:0.6rem">保存前の内容で表示しています。</p>
+    <iframe class="preview-frame" id="previewFrame" title="フォームのプレビュー"></iframe>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="closePreviewBtn">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="../apply/config-schema.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

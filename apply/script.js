@@ -22,6 +22,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
 async function loadConfig() {
   var raw;
+
+  // 管理画面のプレビュー：保存前の設定を sessionStorage 経由で受け取る
+  if (new URLSearchParams(location.search).has('preview')) {
+    var draft = sessionStorage.getItem('formPreviewConfig');
+    if (draft) {
+      try {
+        CONFIG = normalizeConfig(JSON.parse(draft));
+        initApp();
+        return;
+      } catch (e) {
+        console.error('プレビュー設定の読み込みに失敗:', e);
+      }
+    }
+  }
+
   try {
     var res = await fetch('./config.json?t=' + Date.now());
     if (!res.ok) throw new Error('HTTP ' + res.status);
