@@ -1,1166 +1,760 @@
 /**
- * イベント申込フォーム テンプレート
- * メインスクリプト
- * config.json から全設定を読み込み、動的にフォームを構築します
+ * 申込フォーム メインスクリプト
+ *
+ * 役割は「組み立てと進行」だけです。
+ *   - 入力欄の生成          → form-renderer.js
+ *   - オプションの生成       → option-renderer.js
+ *   - 料金計算と可否判定     → config-schema.js（computeQuote）
+ *   - リピーター認証         → repeater.js
  */
 
-// ========================================
-// グローバル状態
-// ========================================
-let CONFIG = null;
-let selectedBooth = null;
-let selectedCategory = null;
-let optionValues = {
-  staff: 0,
-  chairs: 0,
-  power: false,
-  partyCount: 0,
-  secondaryPartyCount: 0
-};
-let snsLinkCount = 1;
+var CONFIG = null;
+var selectedBoothId = null;
+var selectedCategory = null;
+var lastQuote = null;
 
 // ========================================
-// SNS判別パターン
+// 起動
 // ========================================
-const SNS_PATTERNS = [
-  { pattern: /instagram\.com|instagr\.am/i,   name: 'Instagram',   color: '#E4405F' },
-  { pattern: /youtube\.com|youtu\.be/i,        name: 'YouTube',     color: '#FF0000' },
-  { pattern: /tiktok\.com/i,                   name: 'TikTok',      color: '#000000' },
-  { pattern: /ameblo\.jp|ameba\.jp/i,          name: 'Ameblo',      color: '#1F8742' },
-  { pattern: /line\.me|lin\.ee/i,              name: '公式LINE',    color: '#00B900' },
-  { pattern: /twitter\.com|x\.com/i,           name: 'X(Twitter)',  color: '#1DA1F2' },
-  { pattern: /facebook\.com|fb\.com/i,         name: 'Facebook',    color: '#1877F2' },
-  { pattern: /lit\.link/i,                     name: 'lit.link',    color: '#28A0FF' },
-  { pattern: /linktr\.ee/i,                    name: 'Linktree',    color: '#43E55E' }
-];
+document.addEventListener('DOMContentLoaded', function () {
+  loadConfig();
+});
 
-// ========================================
-// 設定読み込み & 初期化
-// ========================================
 async function loadConfig() {
+  var raw;
   try {
-    const res = await fetch(`./config.json?t=${Date.now()}`);
-    if (!res.ok) throw new Error('config.json の読み込みに失敗しました');
-    CONFIG = await res.json();
+    var res = await fetch('./config.json?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    raw = await res.json();
   } catch (err) {
     console.error('Config load error:', err);
-    alert('設定ファイルの読み込みに失敗しました。ページを再読み込みしてください。');
+    document.getElementById('configError').classList.remove('hidden');
+    document.querySelector('.form-container').classList.add('hidden');
+    document.querySelector('.price-footer').classList.add('hidden');
     return;
   }
+
+  CONFIG = normalizeConfig(raw);
   initApp();
 }
 
 function initApp() {
   applyTheme();
   applyEventInfo();
-  applyFeatures();
-  initCategories();
-  initBoothAccordion();
-  renderCustomQuestions();
-  initCharCounters();
-  initSnsInputs();
-  initPostalCodeSearch();
-  initEmailConfirmation();
-  initFileSizeCheck();
-  updateEarlyBirdBanner();
-  updateOptionsUI();
-  calculatePrice();
+  applyEarlyBirdBanner();
+  applySectionTitles();
+  renderMedia();
+
+  FormFields.render(CONFIG, {
+    basic:   document.getElementById('fields-basic'),
+    exhibit: document.getElementById('fields-exhibit'),
+    sns:     document.getElementById('fields-sns'),
+    options: document.getElementById('fields-options'),
+    terms:   document.getElementById('fields-terms')
+  });
+
+  renderCategories();
+  renderBooths();
+
+  OptionFields.render(CONFIG, document.getElementById('optionsContainer'), recalculate);
+  OptionFields.setBooth(null);
+
+  initTerms();
+  initPriceBar();
+  initSubmit();
   initLiff();
 
-  if (CONFIG.features?.repeaterSearch) {
-    initRepeaterSearch();
+  if (CONFIG.repeater && CONFIG.repeater.enabled) {
+    Repeater.init(CONFIG, onRepeaterRestore);
   }
 
-  // 規約モーダルにテキストを注入
-  const termsContent = document.getElementById('termsContent');
-  if (termsContent && CONFIG.terms) {
-    termsContent.textContent = CONFIG.terms;
-  }
+  recalculate();
 }
 
-document.addEventListener('DOMContentLoaded', loadConfig);
-
 // ========================================
-// テーマ適用
+// テーマ・イベント情報
 // ========================================
 function applyTheme() {
-  if (!CONFIG?.theme) return;
-  const root = document.documentElement;
-  const { primaryColor, accentColor, headerBgColor, headerTextColor } = CONFIG.theme;
+  var t = CONFIG.theme || {};
+  var root = document.documentElement;
 
-  if (primaryColor)    root.style.setProperty('--color-primary',      primaryColor);
-  if (accentColor)     root.style.setProperty('--color-accent',       accentColor);
-  if (headerBgColor)   root.style.setProperty('--color-header-bg',    headerBgColor);
-  if (headerTextColor) root.style.setProperty('--color-header-txt',   headerTextColor);
+  if (t.primaryColor)    root.style.setProperty('--color-primary', t.primaryColor);
+  if (t.accentColor)     root.style.setProperty('--color-accent', t.accentColor);
+  if (t.headerBgColor)   root.style.setProperty('--color-header-bg', t.headerBgColor);
+  if (t.headerTextColor) root.style.setProperty('--color-header-txt', t.headerTextColor);
 
-  // primaryColor から light/dark バリエーションを生成
-  // （簡易版：color-mix が使えないブラウザ向けに手動設定）
-  if (primaryColor) {
-    root.style.setProperty('--color-primary-light', hexToRgba(primaryColor, 0.12));
-    root.style.setProperty('--color-primary-dark',  shiftColor(primaryColor, -20));
+  if (t.primaryColor) {
+    root.style.setProperty('--color-primary-light', hexToRgba(t.primaryColor, 0.12));
+    root.style.setProperty('--color-primary-dark', shiftColor(t.primaryColor, -20));
   }
 
-  // ヘッダー画像
-  const header = document.getElementById('appHeader');
-  if (header && CONFIG.theme.headerImageUrl) {
-    header.style.backgroundImage = `url('${CONFIG.theme.headerImageUrl}')`;
+  var header = document.getElementById('appHeader');
+  if (header && t.headerImageUrl) {
+    header.style.backgroundImage = "url('" + t.headerImageUrl + "')";
     header.classList.add('has-image');
+  }
+
+  var logo = document.getElementById('headerLogo');
+  if (logo && t.logoImageUrl) {
+    logo.src = t.logoImageUrl;
+    logo.classList.remove('hidden');
   }
 }
 
 function hexToRgba(hex, alpha) {
-  const r = parseInt(hex.slice(1,3), 16);
-  const g = parseInt(hex.slice(3,5), 16);
-  const b = parseInt(hex.slice(5,7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
+  var r = parseInt(hex.slice(1, 3), 16);
+  var g = parseInt(hex.slice(3, 5), 16);
+  var b = parseInt(hex.slice(5, 7), 16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
 }
 
 function shiftColor(hex, amount) {
-  let r = Math.min(255, Math.max(0, parseInt(hex.slice(1,3), 16) + amount));
-  let g = Math.min(255, Math.max(0, parseInt(hex.slice(3,5), 16) + amount));
-  let b = Math.min(255, Math.max(0, parseInt(hex.slice(5,7), 16) + amount));
-  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+  var clamp = function (n) { return Math.min(255, Math.max(0, n)); };
+  var r = clamp(parseInt(hex.slice(1, 3), 16) + amount);
+  var g = clamp(parseInt(hex.slice(3, 5), 16) + amount);
+  var b = clamp(parseInt(hex.slice(5, 7), 16) + amount);
+  var hx = function (n) { return n.toString(16).padStart(2, '0'); };
+  return '#' + hx(r) + hx(g) + hx(b);
 }
 
-// ========================================
-// イベント情報表示
-// ========================================
 function applyEventInfo() {
-  if (!CONFIG?.event) return;
+  var ev = CONFIG.event || {};
+  var title = document.getElementById('eventTitle');
+  if (title && ev.name) title.textContent = ev.name;
+  document.title = '出展申込フォーム' + (ev.name ? ' | ' + ev.name : '');
 
-  const titleEl    = document.getElementById('eventTitle');
-  const dateEl     = document.getElementById('headerEventDate');
-  const locationEl = document.getElementById('headerEventLocation');
-  const infoBox    = document.getElementById('eventInfoBox');
+  var box = document.getElementById('eventInfoBox');
+  var shown = false;
 
-  if (titleEl)    titleEl.textContent = CONFIG.event.name;
-  document.title = `出展申込フォーム | ${CONFIG.event.name}`;
+  shown = setTextIfPresent('headerEventDate', ev.date) || shown;
+  shown = setTextIfPresent('headerEventLocation', ev.location) || shown;
+  shown = setTextIfPresent('headerEventNote', ev.headerNote) || shown;
 
-  const hasDate     = CONFIG.event.date?.trim();
-  const hasLocation = CONFIG.event.location?.trim();
-
-  if (hasDate || hasLocation) {
-    if (infoBox) infoBox.classList.remove('hidden');
-    if (dateEl && hasDate) {
-      dateEl.textContent = CONFIG.event.date;
-      dateEl.classList.remove('hidden');
-    }
-    if (locationEl && hasLocation) {
-      locationEl.textContent = CONFIG.event.location;
-      locationEl.classList.remove('hidden');
-    }
-  }
+  if (box && shown) box.classList.remove('hidden');
 }
 
-// ========================================
-// 早割バナー
-// ========================================
-function updateEarlyBirdBanner() {
-  const banner = document.getElementById('earlyBirdBanner');
+function setTextIfPresent(elId, value) {
+  var el = document.getElementById(elId);
+  if (!el || !value || !String(value).trim()) return false;
+  el.textContent = value;
+  el.classList.remove('hidden');
+  return true;
+}
+
+function applyEarlyBirdBanner() {
+  var banner = document.getElementById('earlyBirdBanner');
   if (!banner) return;
 
-  if (!CONFIG.features?.earlyBird) {
+  if (!isEarlyBirdActive(CONFIG)) {
     banner.classList.add('hidden');
     return;
   }
 
-  const deadline = new Date(CONFIG.event?.earlyBirdDeadline);
-  if (!CONFIG.event?.earlyBirdDeadline || isNaN(deadline.getTime()) || new Date() > deadline) {
-    banner.classList.add('hidden');
-    return;
-  }
-
-  const m = deadline.getMonth() + 1;
-  const d = deadline.getDate();
-  const badge = banner.querySelector('.early-bird-badge');
-  if (badge) badge.textContent = `🎉 早割期間中！${m}/${d}まで`;
-}
-
-function isEarlyBird() {
-  if (!CONFIG.features?.earlyBird) return false;
-  if (!CONFIG.event?.earlyBirdDeadline) return false;
-  return new Date() <= new Date(CONFIG.event.earlyBirdDeadline);
-}
-
-// ========================================
-// features による表示/非表示制御
-// ========================================
-function applyFeatures() {
-  if (!CONFIG?.features) return;
-  const f = CONFIG.features;
-
-  setFeatureVisible('repeaterSearch',  f.repeaterSearch);
-  setFeatureVisible('stampRally',      f.stampRally);
-  setFeatureVisible('secondaryParty',  f.secondaryParty);
-  setFeatureVisible('memberDiscount',  f.memberDiscount);
-  setFeatureVisible('party',           CONFIG.pricing?.options?.party?.enabled);
-  setFeatureVisible('bodyEquipment',   false); // 初期は非表示（ブース選択後に制御）
-
-  // 会員割引ラベル
-  const memberLabel = document.getElementById('memberDiscountLabel');
-  if (memberLabel && f.memberDiscountLabel) {
-    memberLabel.textContent = f.memberDiscountLabel;
-  }
-
-  // カテゴリセクション（カテゴリが空なら非表示）
-  const catSection = document.getElementById('categorySection');
-  if (catSection) {
-    catSection.style.display = CONFIG.categories?.length ? '' : 'none';
-  }
-
-  // オプションラベル更新
-  updateOptionLabels();
-
-  // exhibitorName ラベル
-  const enLabel = document.getElementById('exhibitorNameLabel');
-  if (enLabel && CONFIG.standardFields?.exhibitorNameLabel) {
-    enLabel.textContent = CONFIG.standardFields.exhibitorNameLabel;
-  }
-  const enInput = document.getElementById('exhibitorNameInput');
-  if (enInput && CONFIG.standardFields?.exhibitorNamePlaceholder) {
-    enInput.placeholder = CONFIG.standardFields.exhibitorNamePlaceholder;
-  }
-
-  // standardFields によるフィールド表示
-  const sf = CONFIG.standardFields || {};
-  if (sf.showPhoneNumber === false) hideById('phoneSection');
-  if (sf.showAddress    === false) hideById('addressSection');
-  if (sf.showPhotoUpload === false) hideById('photoSection');
-  if (sf.showSnsLinks    === false) hideById('snsSection');
-  if (sf.showPhotoPermission === false) hideById('photoPermissionSection');
-  if (sf.showNotes       === false) hideById('notesSection');
-}
-
-function setFeatureVisible(featureName, isVisible) {
-  document.querySelectorAll(`[data-feature="${featureName}"]`).forEach(el => {
-    if (isVisible) {
-      el.classList.remove('hidden');
+  var eb = CONFIG.earlyBird || {};
+  var badge = banner.querySelector('.early-bird-badge');
+  if (badge) {
+    if (eb.bannerText) {
+      badge.textContent = eb.bannerText;
     } else {
-      el.classList.add('hidden');
+      var d = parseDeadline(eb.deadline);
+      badge.textContent = d
+        ? '🎉 ' + (eb.label || '早割') + '期間中！' + (d.getMonth() + 1) + '/' + d.getDate() + 'まで'
+        : '🎉 ' + (eb.label || '早割') + '期間中！';
+    }
+  }
+  banner.classList.remove('hidden');
+}
+
+function applySectionTitles() {
+  SECTIONS.forEach(function (s) {
+    var section = document.querySelector('.form-section[data-section="' + s.id + '"]');
+    if (!section) return;
+    var icon = section.querySelector('.section-icon');
+    var label = section.querySelector('.section-label');
+    if (icon) icon.textContent = s.icon + ' ';
+    if (label) label.textContent = s.title;
+  });
+}
+
+/** media[] を position に従って各スロットへ差し込む */
+function renderMedia() {
+  (CONFIG.media || []).forEach(function (m) {
+    if (!m.url) return;
+    var slotId = 'media-' + String(m.position || 'footer').replace(':', '-');
+    var slot = document.getElementById(slotId);
+    if (!slot) return;
+
+    var img = document.createElement('img');
+    img.className = 'media-image';
+    img.src = m.url;
+    img.alt = m.alt || '';
+    img.loading = 'lazy';
+    slot.appendChild(img);
+
+    if (m.caption) {
+      var cap = document.createElement('p');
+      cap.className = 'media-caption';
+      cap.textContent = m.caption;
+      slot.appendChild(cap);
     }
   });
 }
 
-function hideById(id) {
-  const el = document.getElementById(id);
-  if (el) el.classList.add('hidden');
-}
-
-// オプションラベルを config から適用
-function updateOptionLabels() {
-  const opts = CONFIG.pricing?.options || {};
-  updateOptionLabel('powerLabel',  opts.power);
-  updateOptionLabel('chairLabel',  opts.chair);
-  updateOptionLabel('staffLabel',  opts.staff);
-  updateOptionLabel('partyLabel',  opts.party);
-}
-
-function updateOptionLabel(elId, opt) {
-  const el = document.getElementById(elId);
-  if (!el || !opt) return;
-  const price = opt.price.toLocaleString();
-  el.textContent = `${opt.label}（¥${price}）`;
-}
-
 // ========================================
-// カテゴリ選択
+// カテゴリ
 // ========================================
-function initCategories() {
-  const container = document.getElementById('categoryButtons');
-  if (!container) return;
+function renderCategories() {
+  var host = document.getElementById('categoryButtons');
+  if (!host) return;
 
-  (CONFIG.categories || []).forEach(category => {
-    const btn = document.createElement('button');
+  (CONFIG.categories || []).forEach(function (category) {
+    var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'category-btn';
     btn.textContent = category;
-    btn.onclick = () => selectCategory(category, btn);
-    container.appendChild(btn);
+    btn.addEventListener('click', function () { selectCategory(category, btn); });
+    host.appendChild(btn);
   });
 }
 
 function selectCategory(category, btn) {
-  document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.category-btn').forEach(function (b) {
+    b.classList.remove('selected');
+  });
   btn.classList.add('selected');
   selectedCategory = category;
-  document.getElementById('categoryInput').value = category;
+
+  var hidden = document.getElementById(FormFields.inputId('category'));
+  if (hidden) hidden.value = category;
+
+  FormFields.clearError('category');
   updateSessionWarning();
 }
 
 // ========================================
-// ブース表示
+// ブース
 // ========================================
-function initBoothAccordion() {
-  const container = document.getElementById('boothAccordion');
-  if (!container) return;
+function renderBooths() {
+  var host = document.getElementById('boothAccordion');
+  if (!host) return;
 
-  const booths = CONFIG.booths || [];
-
-  // 空でない location の種類が 2 以上のときだけアコーディオン表示
-  const nonEmptyLocations = [...new Set(booths.map(b => b.location).filter(Boolean))];
-  const useAccordion = nonEmptyLocations.length >= 2;
-
-  if (useAccordion) {
-    const locations = [...new Set(booths.map(b => b.location))];
-    locations.forEach(location => {
-      const groupBooths = booths.filter(b => b.location === location);
-      if (!location) {
-        // location が空 → ヘッダーなしで直接追加
-        groupBooths.forEach(booth => container.appendChild(createBoothOption(booth)));
-        return;
-      }
-      const header = document.createElement('div');
-      header.className = 'accordion-header';
-      header.innerHTML = `<span class="font-bold">${location}</span><span class="accordion-icon">▼</span>`;
-      const content = document.createElement('div');
-      content.className = 'accordion-content';
-      groupBooths.forEach(booth => content.appendChild(createBoothOption(booth)));
-      header.onclick = () => {
-        header.classList.toggle('active');
-        content.classList.toggle('open');
-      };
-      container.appendChild(header);
-      container.appendChild(content);
-    });
-  } else {
-    // フラット表示（アコーディオンなし）
-    booths.forEach(booth => container.appendChild(createBoothOption(booth)));
-  }
-}
-
-// ブースオプション要素を生成するヘルパー
-function createBoothOption(booth) {
-  const earlyPrice   = booth.prices.earlyBird;
-  const regularPrice = booth.prices.regular;
-  let priceDisplay;
-  if (isEarlyBird()) {
-    priceDisplay = earlyPrice === regularPrice
-      ? `¥${earlyPrice.toLocaleString()}`
-      : `¥${earlyPrice.toLocaleString()} <span class="booth-price-early">（通常¥${regularPrice.toLocaleString()}）</span>`;
-  } else {
-    priceDisplay = `¥${regularPrice.toLocaleString()}`;
-  }
-  const option = document.createElement('label');
-  option.className = 'booth-option' + (booth.soldOut ? ' sold-out' : '');
-  if (booth.soldOut) {
-    option.innerHTML = `
-      <input type="radio" name="boothRadio" value="${booth.id}" disabled>
-      <span style="flex:1">${booth.name}</span>
-      <span class="sold-out-badge">満枠</span>`;
-  } else {
-    option.innerHTML = `
-      <input type="radio" name="boothRadio" value="${booth.id}" onchange="selectBooth('${booth.id}')">
-      <span style="flex:1">${booth.name}</span>
-      <span class="booth-price">${priceDisplay}</span>`;
-  }
-  return option;
-}
-
-// ========================================
-// ブース選択処理
-// ========================================
-function selectBooth(boothId) {
-  selectedBooth = (CONFIG.booths || []).find(b => b.id === boothId);
-  document.getElementById('boothIdInput').value = boothId;
-
-  document.querySelectorAll('.booth-option').forEach(opt => {
-    opt.classList.remove('selected');
-    if (opt.querySelector(`input[value="${boothId}"]`)) opt.classList.add('selected');
+  var booths = CONFIG.booths || [];
+  var locations = [];
+  booths.forEach(function (b) {
+    if (b.location && locations.indexOf(b.location) < 0) locations.push(b.location);
   });
 
-  // オプション値リセット
-  optionValues.staff  = 0;
-  optionValues.chairs = 0;
-  const staffVal  = document.getElementById('staffValue');
-  const chairsVal = document.getElementById('chairsValue');
-  const staffInp  = document.getElementById('extraStaffInput');
-  const chairsInp = document.getElementById('extraChairsInput');
-  if (staffVal)  staffVal.textContent  = '1';
-  if (chairsVal) chairsVal.textContent = '1';
-  if (staffInp)  staffInp.value  = '0';
-  if (chairsInp) chairsInp.value = '0';
+  // 場所が2種類以上あるときだけアコーディオンでまとめる
+  if (locations.length >= 2) {
+    var seen = [];
+    booths.forEach(function (b) {
+      var loc = b.location || '';
+      if (seen.indexOf(loc) >= 0) return;
+      seen.push(loc);
 
-  const wantStaffNo  = document.querySelector('input[name="wantStaff"][value="0"]');
-  const wantChairsNo = document.querySelector('input[name="wantChairs"][value="0"]');
-  if (wantStaffNo)  wantStaffNo.checked  = true;
-  if (wantChairsNo) wantChairsNo.checked = true;
-  const staffCountSec  = document.getElementById('staffCountSection');
-  const chairsCountSec = document.getElementById('chairsCountSection');
-  if (staffCountSec)  staffCountSec.classList.add('hidden');
-  if (chairsCountSec) chairsCountSec.classList.add('hidden');
+      var group = booths.filter(function (x) { return (x.location || '') === loc; });
+      if (!loc) {
+        group.forEach(function (b2) { host.appendChild(createBoothOption(b2)); });
+        return;
+      }
 
-  // BodyEquipment セクション
-  if (CONFIG.features?.bodyEquipment) {
-    const equipSection = document.getElementById('equipmentSection');
-    if (equipSection) {
-      equipSection.classList.toggle('hidden', !boothId.startsWith('body_'));
-    }
+      var header = document.createElement('div');
+      header.className = 'accordion-header';
+      header.innerHTML = '<span>' + escapeHtml(loc) + '</span><span class="accordion-icon">▼</span>';
+
+      var content = document.createElement('div');
+      content.className = 'accordion-content';
+      group.forEach(function (b2) { content.appendChild(createBoothOption(b2)); });
+
+      header.addEventListener('click', function () {
+        header.classList.toggle('active');
+        content.classList.toggle('open');
+      });
+
+      host.appendChild(header);
+      host.appendChild(content);
+    });
+  } else {
+    booths.forEach(function (b) { host.appendChild(createBoothOption(b)); });
+  }
+}
+
+function createBoothOption(booth) {
+  var label = document.createElement('label');
+  label.className = 'booth-option' + (booth.soldOut ? ' sold-out' : '');
+
+  var input = document.createElement('input');
+  input.type = 'radio';
+  input.name = 'boothRadio';
+  input.value = booth.id;
+  input.disabled = !!booth.soldOut;
+  if (!booth.soldOut) {
+    input.addEventListener('change', function () { selectBooth(booth.id); });
   }
 
-  updateOptionsUI();
+  var name = document.createElement('span');
+  name.style.flex = '1';
+  name.textContent = booth.name;
+
+  label.appendChild(input);
+  label.appendChild(name);
+
+  if (booth.description) {
+    name.appendChild(document.createElement('br'));
+    var d = document.createElement('small');
+    d.className = 'field-description';
+    d.textContent = booth.description;
+    name.appendChild(d);
+  }
+
+  if (booth.soldOut) {
+    var badge = document.createElement('span');
+    badge.className = 'sold-out-badge';
+    badge.textContent = '満枠';
+    label.appendChild(badge);
+  } else {
+    var price = document.createElement('span');
+    price.className = 'booth-price';
+    price.innerHTML = boothPriceHtml(booth);
+    label.appendChild(price);
+  }
+  return label;
+}
+
+function boothPriceHtml(booth) {
+  var regular = booth.prices.regular || 0;
+  var early = booth.prices.earlyBird;
+  if (!isEarlyBirdActive(CONFIG) || early == null || early === regular) {
+    return formatYen(regular);
+  }
+  return formatYen(early) +
+    ' <span class="booth-price-early">（通常' + formatYen(regular) + '）</span>';
+}
+
+function selectBooth(boothId) {
+  selectedBoothId = boothId;
+
+  document.querySelectorAll('.booth-option').forEach(function (opt) {
+    var input = opt.querySelector('input[type="radio"]');
+    opt.classList.toggle('selected', !!input && input.value === boothId);
+  });
+
+  var hidden = document.getElementById(FormFields.inputId('booth'));
+  if (hidden) hidden.value = boothId;
+
+  FormFields.clearError('booth');
+  OptionFields.setBooth(boothId);
+  FormFields.applyConditionalVisibility(boothId);
   updateSessionWarning();
-  calculatePrice();
+  recalculate();
 }
 
-// ========================================
-// オプション UI 更新
-// ========================================
-function updateOptionsUI() {
-  const staffSection = document.getElementById('optionStaff');
-  const chairsSection = document.getElementById('optionChairs');
-  const powerSection  = document.getElementById('optionPower');
-  const noOptMsg      = document.getElementById('noOptionsMessage');
-  const opts = CONFIG.pricing?.options || {};
-
-  if (!selectedBooth) {
-    if (staffSection)  staffSection.classList.add('hidden');
-    if (chairsSection) chairsSection.classList.add('hidden');
-    if (powerSection)  powerSection.classList.add('hidden');
-    if (noOptMsg)      noOptMsg.classList.remove('hidden');
-    return;
-  }
-
-  const limits = selectedBooth.limits;
-  let hasAny = false;
-
-  if (staffSection) {
-    const show = limits.maxStaff > 0 && opts.staff?.enabled;
-    staffSection.classList.toggle('hidden', !show);
-    if (show) {
-      const maxEl = document.getElementById('staffMax');
-      if (maxEl) maxEl.textContent = limits.maxStaff;
-      hasAny = true;
-    }
-  }
-
-  if (chairsSection) {
-    const show = limits.maxChairs > 0 && opts.chair?.enabled;
-    chairsSection.classList.toggle('hidden', !show);
-    if (show) {
-      const maxEl = document.getElementById('chairsMax');
-      if (maxEl) maxEl.textContent = limits.maxChairs;
-      hasAny = true;
-    }
-  }
-
-  if (powerSection) {
-    const show = limits.allowPower && opts.power?.enabled;
-    powerSection.classList.toggle('hidden', !show);
-    if (show) hasAny = true;
-  }
-
-  if (noOptMsg) noOptMsg.classList.toggle('hidden', hasAny);
-}
-
-// ========================================
-// セッション禁止警告
-// ========================================
+/** 物販系ブースでセッション系カテゴリを選んだときの注意喚起 */
 function updateSessionWarning() {
-  const warning = document.getElementById('sessionWarning');
+  var warning = document.getElementById('sessionWarning');
   if (!warning) return;
 
-  if (!selectedBooth || !selectedCategory) {
-    warning.classList.remove('visible'); return;
+  var booth = findBooth(selectedBoothId);
+  var targets = CONFIG.sessionCategories || [];
+  var hit = booth && booth.prohibitSession && selectedCategory &&
+            targets.indexOf(selectedCategory) >= 0;
+
+  warning.textContent = hit
+    ? '⚠️ ご注意: 選択されたブースではセッション・体験型の出展ができません。物販・飲食のみの出展となります。'
+    : '';
+  warning.classList.toggle('visible', !!hit);
+}
+
+function findBooth(boothId) {
+  var booths = CONFIG.booths || [];
+  for (var i = 0; i < booths.length; i++) {
+    if (booths[i].id === boothId) return booths[i];
   }
-
-  if (selectedBooth.prohibitSession &&
-      ['占い・スピリチュアル', 'ボディケア・美容'].includes(selectedCategory)) {
-    warning.classList.add('visible');
-  } else {
-    warning.classList.remove('visible');
-  }
-}
-
-// ========================================
-// オプション切り替え
-// ========================================
-function toggleStaffCount() {
-  const section  = document.getElementById('staffCountSection');
-  const wantStaff = document.querySelector('input[name="wantStaff"]:checked')?.value === '1';
-  if (section) section.classList.toggle('hidden', !wantStaff);
-  optionValues.staff = wantStaff ? 1 : 0;
-  const staffVal = document.getElementById('staffValue');
-  const staffInp = document.getElementById('extraStaffInput');
-  if (staffVal) staffVal.textContent = wantStaff ? '1' : '0';
-  if (staffInp) staffInp.value = wantStaff ? '1' : '0';
-  calculatePrice();
-}
-
-function toggleChairsCount() {
-  const section    = document.getElementById('chairsCountSection');
-  const wantChairs = document.querySelector('input[name="wantChairs"]:checked')?.value === '1';
-  if (section) section.classList.toggle('hidden', !wantChairs);
-  optionValues.chairs = wantChairs ? 1 : 0;
-  const chairsVal = document.getElementById('chairsValue');
-  const chairsInp = document.getElementById('extraChairsInput');
-  if (chairsVal) chairsVal.textContent = wantChairs ? '1' : '0';
-  if (chairsInp) chairsInp.value = wantChairs ? '1' : '0';
-  calculatePrice();
-}
-
-function adjustQuantity(type, delta) {
-  if (!selectedBooth) return;
-  const limits = selectedBooth.limits;
-  let max, current, valueEl, inputEl;
-
-  if (type === 'staff') {
-    max = limits.maxStaff; current = optionValues.staff;
-    valueEl = document.getElementById('staffValue');
-    inputEl = document.getElementById('extraStaffInput');
-  } else {
-    max = limits.maxChairs; current = optionValues.chairs;
-    valueEl = document.getElementById('chairsValue');
-    inputEl = document.getElementById('extraChairsInput');
-  }
-
-  const newVal = Math.max(1, Math.min(max, current + delta));
-  optionValues[type] = newVal;
-  if (valueEl) valueEl.textContent = newVal;
-  if (inputEl) inputEl.value = newVal;
-  calculatePrice();
-}
-
-// ========================================
-// 懇親会・二次会
-// ========================================
-function togglePartyCount() {
-  const section   = document.getElementById('partyCountSection');
-  const attending = document.querySelector('input[name="partyAttend"]:checked')?.value === '出席';
-  if (section) section.classList.toggle('hidden', !attending);
-  optionValues.partyCount = attending ? 1 : 0;
-  const partyVal = document.getElementById('partyValue');
-  const partyInp = document.getElementById('partyCountInput');
-  if (partyVal) partyVal.textContent = '1';
-  if (partyInp) partyInp.value = attending ? '1' : '0';
-  calculatePrice();
-}
-
-function toggleSecondaryPartyCount() {
-  const section   = document.getElementById('secondaryPartyCountSection');
-  const attending = document.querySelector('input[name="secondaryPartyAttend"]:checked')?.value === '出席';
-  if (section) section.classList.toggle('hidden', !attending);
-  optionValues.secondaryPartyCount = attending ? 1 : 0;
-  const secVal = document.getElementById('secondaryValue');
-  const secInp = document.getElementById('secondaryPartyCountInput');
-  if (secVal) secVal.textContent = '1';
-  if (secInp) secInp.value = attending ? '1' : '0';
-}
-
-function adjustPartyCount(type, delta) {
-  let current, valueEl, inputEl;
-  if (type === 'party') {
-    current = optionValues.partyCount;
-    valueEl = document.getElementById('partyValue');
-    inputEl = document.getElementById('partyCountInput');
-  } else {
-    current = optionValues.secondaryPartyCount;
-    valueEl = document.getElementById('secondaryValue');
-    inputEl = document.getElementById('secondaryPartyCountInput');
-  }
-  const newVal = Math.max(1, current + delta);
-  if (type === 'party') optionValues.partyCount = newVal;
-  else                  optionValues.secondaryPartyCount = newVal;
-  if (valueEl) valueEl.textContent = newVal;
-  if (inputEl) inputEl.value = newVal;
-  if (type === 'party') calculatePrice();
-}
-
-// ========================================
-// スタンプラリー
-// ========================================
-function togglePrizeInput() {
-  const section  = document.getElementById('prizeInputSection');
-  const hasPrize = document.querySelector('input[name="stampRallyPrize"]:checked')?.value === 'ある';
-  if (section) section.classList.toggle('hidden', !hasPrize);
-}
-
-// ========================================
-// 規約モーダル
-// ========================================
-function showTerms() {
-  document.getElementById('termsModal')?.classList.remove('hidden');
-}
-function hideTerms() {
-  document.getElementById('termsModal')?.classList.add('hidden');
+  return null;
 }
 
 // ========================================
 // 料金計算
 // ========================================
-function calculatePrice() {
-  const breakdown = [];
-  let total = 0;
-  const opts = CONFIG?.pricing?.options || {};
 
-  if (selectedBooth) {
-    const boothPrice = isEarlyBird()
-      ? selectedBooth.prices.earlyBird
-      : selectedBooth.prices.regular;
-    breakdown.push(`${selectedBooth.name}: ¥${boothPrice.toLocaleString()}`);
-    total += boothPrice;
+/**
+ * 選択内容から見積もりを作り直し、UI に反映する。
+ * computeQuote が値を補正した場合は、その理由を必ず画面に出す。
+ */
+function recalculate() {
+  var quote = computeQuote(CONFIG, {
+    boothId: selectedBoothId,
+    options: OptionFields.getValues(),
+    isMember: OptionFields.getIsMember()
+  });
 
-    if (optionValues.staff > 0 && opts.staff?.enabled) {
-      const cost = optionValues.staff * opts.staff.price;
-      breakdown.push(`${opts.staff.label}×${optionValues.staff}: ¥${cost.toLocaleString()}`);
-      total += cost;
-    }
+  // 補正された値を UI に書き戻し、理由を提示する
+  OptionFields.applyResolved(quote.options);
+  OptionFields.showNotices(quote.notices);
 
-    if (optionValues.chairs > 0 && opts.chair?.enabled) {
-      const cost = optionValues.chairs * opts.chair.price;
-      breakdown.push(`${opts.chair.label}×${optionValues.chairs}: ¥${cost.toLocaleString()}`);
-      total += cost;
-    }
-
-    const usePower = document.querySelector('input[name="usePower"]:checked')?.value === '1';
-    if (usePower && selectedBooth.limits.allowPower && opts.power?.enabled) {
-      breakdown.push(`${opts.power.label}: ¥${opts.power.price.toLocaleString()}`);
-      total += opts.power.price;
-      optionValues.power = true;
-    } else {
-      optionValues.power = false;
-    }
-  }
-
-  if (optionValues.partyCount > 0 && opts.party?.enabled) {
-    const cost = optionValues.partyCount * opts.party.price;
-    breakdown.push(`${opts.party.label}×${optionValues.partyCount}: ¥${cost.toLocaleString()}`);
-    total += cost;
-  }
-
-  const isMember = CONFIG.features?.memberDiscount &&
-    document.querySelector('input[name="isMember"]:checked')?.value === '1';
-  if (isMember && CONFIG.pricing?.memberDiscount) {
-    const disc = CONFIG.pricing.memberDiscount;
-    breakdown.push(`${CONFIG.features.memberDiscountLabel || '会員割引'}: -¥${disc.toLocaleString()}`);
-    total -= disc;
-  }
-
-  const bdEl    = document.getElementById('priceBreakdown');
-  const totalEl = document.getElementById('totalPrice');
-  if (bdEl)    bdEl.textContent = breakdown.length ? breakdown.join(' + ') : 'ブースを選択してください';
-  if (totalEl) totalEl.textContent = `¥${Math.max(0, total).toLocaleString()}`;
+  renderPriceBar(quote);
+  lastQuote = quote;
+  return quote;
 }
 
-// 電源変更時も再計算
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('input[name="usePower"]').forEach(r =>
-    r.addEventListener('change', calculatePrice));
-  document.querySelectorAll('input[name="isMember"]').forEach(r =>
-    r.addEventListener('change', calculatePrice));
-});
+function renderPriceBar(quote) {
+  var totalEl = document.getElementById('totalPrice');
+  var labelEl = document.getElementById('priceSummaryLabel');
+  var listEl = document.getElementById('priceLineItems');
 
-// ========================================
-// カスタム質問レンダリング
-// ========================================
-function renderCustomQuestions() {
-  const container = document.getElementById('customQuestionsSection');
-  if (!container) return;
-  container.innerHTML = '';
+  if (totalEl) totalEl.textContent = formatYen(quote.total);
 
-  const questions = CONFIG.customQuestions || [];
-  if (!questions.length) {
-    container.style.display = 'none';
-    return;
+  if (labelEl) {
+    labelEl.textContent = quote.lineItems.length
+      ? quote.lineItems.length + '件の内訳を見る'
+      : 'ブースを選択してください';
   }
 
-  questions.forEach(q => {
-    const wrapper = document.createElement('div');
-    wrapper.style.marginBottom = '1rem';
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  quote.lineItems.forEach(function (item) {
+    var li = document.createElement('li');
+    if (item.amount < 0) li.className = 'is-discount';
 
-    const label = document.createElement('label');
-    label.className = 'input-label';
-    label.setAttribute('for', q.id);
-    label.innerHTML = `${q.label}${q.required ? '<span class="required">*</span>' : ''}`;
-    wrapper.appendChild(label);
+    var name = document.createElement('span');
+    name.textContent = item.label;
 
-    let input;
-    if (q.type === 'textarea') {
-      input = document.createElement('textarea');
-      input.rows = 4;
-    } else if (q.type === 'select') {
-      input = document.createElement('select');
-      input.className = 'input-field';
-      const defaultOpt = document.createElement('option');
-      defaultOpt.value = '';
-      defaultOpt.textContent = '選択してください';
-      input.appendChild(defaultOpt);
-      (q.options || []).forEach(opt => {
-        const o = document.createElement('option');
-        o.value = opt;
-        o.textContent = opt;
-        input.appendChild(o);
-      });
-    } else if (q.type === 'number') {
-      input = document.createElement('input');
-      input.type = 'number';
-      input.min = '0';
-    } else {
-      input = document.createElement('input');
-      input.type = 'text';
-    }
+    var amount = document.createElement('span');
+    amount.className = 'amount';
+    amount.textContent = formatYen(item.amount);
 
-    input.id = q.id;
-    input.name = q.id;
-    if (input.tagName !== 'SELECT') input.className = 'input-field';
-    if (q.placeholder) input.placeholder = q.placeholder;
-    if (q.maxLength)   input.maxLength   = q.maxLength;
-    if (q.required)    input.required    = true;
-    wrapper.appendChild(input);
+    li.appendChild(name);
+    li.appendChild(amount);
+    listEl.appendChild(li);
+  });
+}
 
-    // 文字数カウンター
-    if (q.showCounter && q.maxLength) {
-      const counter = document.createElement('div');
-      counter.className = 'char-counter';
-      counter.id = `counter_${q.id}`;
-      counter.innerHTML = `<span id="count_${q.id}">0</span>/${q.maxLength}`;
-      wrapper.appendChild(counter);
+/** スマホでは内訳が長くなるので、タップで開閉できるようにする */
+function initPriceBar() {
+  var toggle = document.getElementById('priceToggle');
+  var details = document.getElementById('priceDetails');
+  if (!toggle || !details) return;
 
-      input.addEventListener('input', () => {
-        const len = input.value.length;
-        const countEl = document.getElementById(`count_${q.id}`);
-        if (countEl) countEl.textContent = len;
-        counter.classList.toggle('over', len > q.maxLength);
-      });
-    }
-
-    container.appendChild(wrapper);
+  toggle.addEventListener('click', function () {
+    var open = details.classList.toggle('hidden') === false;
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
 }
 
 // ========================================
-// SNS 入力
+// 規約
 // ========================================
-function initSnsInputs() {
-  const container = document.getElementById('snsLinksContainer');
-  const addBtn    = document.getElementById('addSnsBtn');
-  if (!container) return;
+function initTerms() {
+  var terms = CONFIG.terms || {};
+  var box = document.getElementById('termsBox');
+  var link = document.getElementById('termsLink');
+  var content = document.getElementById('termsContent');
+  var titleEl = document.getElementById('termsTitle');
+  var modal = document.getElementById('termsModal');
+  var closeBtn = document.getElementById('closeTermsBtn');
 
-  container.querySelectorAll('.sns-input').forEach(input =>
-    input.addEventListener('input', handleSnsInput));
-
-  addBtn?.addEventListener('click', () => {
-    if (snsLinkCount >= 6) return;
-    snsLinkCount++;
-    const row = document.createElement('div');
-    row.className = 'sns-link-row';
-    row.innerHTML = `
-      <span class="sns-badge" data-index="${snsLinkCount - 1}">未入力</span>
-      <input type="url" name="snsLink${snsLinkCount}" class="input-field" style="flex:1"
-        data-index="${snsLinkCount - 1}" placeholder="https://...">
-      <button type="button" style="color:#ef4444;padding:0 0.5rem;border:none;background:none;cursor:pointer;font-size:1.2rem" onclick="removeSnsRow(this)">✕</button>`;
-    container.appendChild(row);
-    row.querySelector('.sns-input')?.addEventListener('input', handleSnsInput);
-    if (snsLinkCount >= 6) addBtn.style.display = 'none';
-  });
-}
-
-function handleSnsInput(e) {
-  const url   = e.target.value;
-  const index = e.target.dataset.index;
-  const badge = document.querySelector(`.sns-badge[data-index="${index}"]`);
-  if (!badge) return;
-
-  if (!url) {
-    badge.textContent = '未入力';
-    badge.style.cssText = '';
+  if (terms.requireAgree === false) {
+    if (box) box.classList.add('hidden');
     return;
   }
 
-  let detected = null;
-  for (const sns of SNS_PATTERNS) {
-    if (sns.pattern.test(url)) { detected = sns; break; }
-  }
-
-  if (detected) {
-    badge.textContent = detected.name;
-    badge.style.background = detected.color;
-    badge.style.color = '#fff';
-  } else {
-    badge.textContent = 'HP';
-    badge.style.background = '#6366f1';
-    badge.style.color = '#fff';
-  }
-}
-
-function removeSnsRow(btn) {
-  btn.closest('.sns-link-row')?.remove();
-  snsLinkCount--;
-  const addBtn = document.getElementById('addSnsBtn');
-  if (addBtn) addBtn.style.display = 'block';
-}
-
-function addSnsLinkInput(url = '') {
-  const container = document.getElementById('snsLinksContainer');
-  const addBtn    = document.getElementById('addSnsBtn');
-  if (!container || snsLinkCount >= 6) return;
-
-  snsLinkCount++;
-  const row = document.createElement('div');
-  row.className = 'sns-link-row';
-  row.innerHTML = `
-    <span class="sns-badge" data-index="${snsLinkCount - 1}">未入力</span>
-    <input type="url" name="snsLink${snsLinkCount}" class="input-field" style="flex:1"
-      data-index="${snsLinkCount - 1}" placeholder="https://..." value="${url}">
-    <button type="button" style="color:#ef4444;padding:0 0.5rem;border:none;background:none;cursor:pointer;font-size:1.2rem" onclick="removeSnsRow(this)">✕</button>`;
-  container.appendChild(row);
-
-  const inp = row.querySelector('.sns-input');
-  inp?.addEventListener('input', handleSnsInput);
-  if (url) inp?.dispatchEvent(new Event('input'));
-  if (snsLinkCount >= 6 && addBtn) addBtn.style.display = 'none';
-}
-
-// ========================================
-// 文字数カウンター初期化（既存HMTLフィールド用）
-// ========================================
-function initCharCounters() {
-  document.querySelectorAll('[data-maxlength]').forEach(input => {
-    const max = parseInt(input.dataset.maxlength);
-    const counterId = input.dataset.counter;
-    const counter   = counterId ? document.getElementById(counterId) : null;
-    if (!counter) return;
-    input.addEventListener('input', () => {
-      const len = input.value.length;
-      counter.textContent = len;
-      counter.parentElement?.classList.toggle('over', len > max);
+  if (content) content.textContent = terms.body || '';
+  if (titleEl) titleEl.textContent = terms.title || '出展規約';
+  if (link) {
+    link.textContent = terms.title || '出展規約';
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (modal) modal.classList.remove('hidden');
     });
-  });
+  }
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', function () { modal.classList.add('hidden'); });
+  }
+
+  var cb = document.getElementById('agreeTerms');
+  if (cb) {
+    cb.addEventListener('change', function () {
+      if (cb.checked) hideAgreeError();
+    });
+  }
+}
+
+function showAgreeError(message) {
+  var el = document.getElementById('err_agreeTerms');
+  if (el) { el.textContent = message; el.classList.remove('hidden'); }
+}
+function hideAgreeError() {
+  var el = document.getElementById('err_agreeTerms');
+  if (el) el.classList.add('hidden');
 }
 
 // ========================================
-// バリデーション
+// 送信
 // ========================================
-function validateForm() {
-  const form = document.getElementById('applicationForm');
-  const errors = [];
+function initSubmit() {
+  var btn = document.getElementById('submitBtn');
+  if (btn) btn.addEventListener('click', submitForm);
+}
 
-  // 固定必須フィールド
-  const fixedFields = [
-    { name: 'name',          label: 'お名前'    },
-    { name: 'furigana',      label: 'ふりがな'  },
-    { name: 'email',         label: 'メールアドレス' },
-    { name: 'exhibitorName', label: CONFIG.standardFields?.exhibitorNameLabel || '出展名' }
-  ];
-  const sf = CONFIG.standardFields || {};
-  if (sf.showAddress    !== false) fixedFields.push(
-    { name: 'postalCode', label: '郵便番号' },
-    { name: 'address',    label: 'ご住所'   }
-  );
-  if (sf.showPhoneNumber !== false) fixedFields.push({ name: 'phoneNumber', label: '電話番号' });
-
-  fixedFields.forEach(f => {
-    const input = form.querySelector(`[name="${f.name}"]`);
-    if (!input) return;
-    if (!input.value.trim()) {
-      errors.push(`${f.label}を入力してください`);
-      input.classList.add('border-red-500');
-    } else {
-      input.classList.remove('border-red-500');
-    }
-  });
-
-  // カテゴリ
-  if ((CONFIG.categories?.length) && !selectedCategory) {
-    errors.push('出展カテゴリを選択してください');
-  }
-
-  // ブース
-  if (!selectedBooth) errors.push('出展ブースを選択してください');
-
-  // カスタム質問
-  (CONFIG.customQuestions || []).forEach(q => {
-    if (!q.required) return;
-    const input = document.getElementById(q.id);
-    if (!input || !input.value.trim()) {
-      errors.push(`${q.label}を入力してください`);
-      if (input) input.classList.add('border-red-500');
-    } else {
-      input.classList.remove('border-red-500');
-      if (q.maxLength && input.value.length > q.maxLength) {
-        errors.push(`${q.label}は${q.maxLength}文字以内で入力してください`);
-      }
-    }
-  });
-
-  // 写真
-  if (sf.showPhotoUpload !== false) {
-    const photoInput = form.querySelector('[name="profileImage"]');
-    const usePrevious = form.querySelector('[name="usePreviousPhoto"]')?.checked;
-    if (!usePrevious) {
-      if (!photoInput?.files?.length) {
-        errors.push('プロフィール写真をアップロードしてください');
-      } else if (photoInput.files[0].size > 8 * 1024 * 1024) {
-        errors.push('画像ファイルは8MB以下にしてください');
-      }
-    }
-  }
-
-  // 写真掲載可否
-  if (sf.showPhotoPermission !== false) {
-    if (!form.querySelector('input[name="photoPermission"]:checked')) {
-      errors.push('写真のSNS投稿への掲載可否を選択してください');
-    }
-  }
-
-  // メールアドレス形式
-  const emailInput = form.querySelector('[name="email"]');
-  if (emailInput?.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value)) {
-    errors.push('メールアドレスの形式が正しくありません');
-  }
-
-  // メールアドレス一致
-  const emailConf = form.querySelector('[name="emailConfirm"]');
-  if (emailInput && emailConf && emailInput.value !== emailConf.value) {
-    errors.push('メールアドレスが一致しません');
-  }
+async function submitForm() {
+  var errors = FormFields.validate();
 
   // 規約同意
-  if (!form.querySelector('[name="agreeTerms"]')?.checked) {
-    errors.push('出展規約への同意が必要です');
+  hideAgreeError();
+  var terms = CONFIG.terms || {};
+  var agreeCb = document.getElementById('agreeTerms');
+  if (terms.requireAgree !== false && agreeCb && !agreeCb.checked) {
+    showAgreeError((terms.title || '出展規約') + 'への同意が必要です');
+    errors.push({ fieldId: 'agreeTerms', message: '規約への同意が必要です' });
   }
 
-  return errors;
-}
-
-// ========================================
-// フォーム送信
-// ========================================
-async function submitForm() {
-  const errors = validateForm();
   if (errors.length) {
-    alert('入力エラー:\n\n' + errors.join('\n'));
+    // alert は使わず、最初のエラー項目まで送る
+    var first = errors[0];
+    if (first.fieldId === 'agreeTerms') {
+      document.getElementById('termsBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      FormFields.focusError(first.fieldId);
+    }
     return;
   }
 
-  // セッション禁止警告
-  if (document.getElementById('sessionWarning')?.classList.contains('visible')) {
-    if (!confirm('⚠️ 選択されたブースではセッション系の出展ができません。物販・飲食のみの出展となりますがよろしいですか？')) {
-      return;
-    }
+  var quote = recalculate();
+
+  // 直前の再計算でオプションが自動解除された場合は、金額を確認してもらってから送る
+  if (quote.notices.length) {
+    var ok = confirm(
+      '選択内容の一部が調整されました。\n\n' +
+      quote.notices.map(function (n) { return '・' + n.message; }).join('\n') +
+      '\n\n合計 ' + formatYen(quote.total) + ' で申し込みますか？');
+    if (!ok) return;
   }
 
-  document.getElementById('loadingOverlay')?.classList.add('visible');
-  document.getElementById('submitBtn').disabled = true;
+  var booth = findBooth(quote.boothId);
+  var overlay = document.getElementById('loadingOverlay');
+  var btn = document.getElementById('submitBtn');
+  overlay.classList.add('visible');
+  btn.disabled = true;
 
   try {
-    const form = document.getElementById('applicationForm');
-    const formData = new FormData(form);
+    var fd = new FormData();
 
-    // ブース・カテゴリ情報
-    formData.set('boothId',    selectedBooth.id);
-    formData.set('boothName',  selectedBooth.name);
-    if (selectedCategory) formData.set('category', selectedCategory);
-    formData.set('isEarlyBird', isEarlyBird() ? '1' : '0');
+    fd.set('action', 'submit');
+    fd.set('eventName', (CONFIG.event || {}).name || '');
+    fd.set('submittedAt', new Date().toISOString());
 
-    const boothPrice = isEarlyBird()
-      ? selectedBooth.prices.earlyBird
-      : selectedBooth.prices.regular;
-    formData.set('boothPrice',          String(boothPrice));
-    formData.set('extraStaff',          String(optionValues.staff));
-    formData.set('extraChairs',         String(optionValues.chairs));
-    formData.set('usePower',            optionValues.power ? '1' : '0');
-    formData.set('partyCount',          String(optionValues.partyCount));
-    formData.set('secondaryPartyCount', String(optionValues.secondaryPartyCount));
+    fd.set('answers', JSON.stringify(FormFields.getValues()));
+    fd.set('fieldDefs', JSON.stringify(FormFields.getFieldDefs()));
+    fd.set('selectedOptions', JSON.stringify(quote.options));
+    fd.set('optionDefs', JSON.stringify(OptionFields.getOptionDefs()));
 
-    // カスタム質問の回答（JSON形式で送信）
-    const customAnswers = {};
-    (CONFIG.customQuestions || []).forEach(q => {
-      const el = document.getElementById(q.id);
-      customAnswers[q.id] = el ? el.value : '';
-    });
-    formData.set('customAnswers', JSON.stringify(customAnswers));
+    fd.set('boothId', quote.boothId || '');
+    fd.set('boothName', booth ? booth.name : '');
+    fd.set('category', selectedCategory || '');
+    fd.set('isMember', OptionFields.getIsMember() ? '1' : '0');
+    fd.set('isEarlyBird', quote.earlyBird ? '1' : '0');
 
-    // カスタム質問のラベルも送信（スプシのHeader自動生成用）
-    const customQuestionDefs = (CONFIG.customQuestions || []).map(q => ({
-      id: q.id, label: q.label
-    }));
-    formData.set('customQuestionDefs', JSON.stringify(customQuestionDefs));
+    // 金額はサーバ側が再計算する。これは突合用の参考値。
+    fd.set('clientTotal', String(quote.total));
 
-    // SNS リンク収集
-    const snsLinks = [];
-    document.querySelectorAll('.sns-input').forEach((input, index) => {
-      if (input.value) {
-        const badge = document.querySelector(`.sns-badge[data-index="${index}"]`);
-        snsLinks.push({ type: badge?.textContent || 'HP', url: input.value });
-      }
-    });
-    formData.set('snsLinks', JSON.stringify(snsLinks));
+    fd.set('lineUserId', document.getElementById('lineUserId').value || '');
+    fd.set('lineDisplayName', document.getElementById('lineDisplayName').value || '');
 
-    // スプレッドシートID
-    if (CONFIG.spreadsheetId) formData.set('spreadsheetId', CONFIG.spreadsheetId);
+    await attachImages(fd);
 
-    // イベント名
-    formData.set('eventName', CONFIG.event?.name || '');
+    var target = (CONFIG.integration || {}).gasUrl || (CONFIG.integration || {}).workerUrl;
+    if (!target) throw new Error('送信先URLが設定されていません（config.json の integration.gasUrl）。');
 
-    // 写真処理
-    const photoInput = form.querySelector('[name="profileImage"]');
-    if (photoInput?.files?.length) {
-      try {
-        const b64 = await convertFileToBase64(photoInput.files[0]);
-        formData.set('profileImageBase64',  b64.base64);
-        formData.set('profileImageMimeType', b64.mimeType);
-        formData.set('profileImageName',     b64.name);
-      } catch (e) {
-        throw new Error('画像の処理に失敗しました。別の画像を選択してください。');
-      }
+    var result = await postForm(target, fd);
+    if (!result || result.success === false) {
+      throw new Error((result && result.error) || 'サーバー側で受付に失敗しました。');
     }
 
-    // LINE情報
-    formData.set('lineUserId',      document.getElementById('lineUserId')?.value || '');
-    formData.set('lineDisplayName', document.getElementById('lineDisplayName')?.value || '');
-
-    // 送信先
-    const targetUrl = CONFIG.workerUrl || CONFIG.gasUrl;
-    if (!targetUrl) throw new Error('送信先URLが設定されていません（config.json を確認してください）');
-
-    const controller = new AbortController();
-    const timeoutId  = setTimeout(() => controller.abort(), 90000);
-
-    let response;
-    try {
-      response = await fetch(targetUrl, {
-        method: 'POST',
-        body:   formData,
-        signal: controller.signal
-      });
-    } catch (e) {
-      clearTimeout(timeoutId);
-      throw e.name === 'AbortError'
-        ? new Error('通信がタイムアウトしました。再度お試しください。')
-        : new Error('ネットワークエラーが発生しました。接続を確認してください。');
-    }
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.error('Submit failed:', response.status, await response.text().catch(() => ''));
-      throw new Error('サーバーとの通信に失敗しました。(状態コード: ' + response.status + ')');
-    }
-
-    const result = await response.json().catch(() => { throw new Error('サーバーからの応答が不正です。'); });
-
-    if (result.success) {
-      document.getElementById('completeModal')?.classList.remove('hidden');
-    } else {
-      throw new Error(result.error || '送信に失敗しました。再度お試しください。');
-    }
+    showComplete(result);
 
   } catch (err) {
     console.error('Submit error:', err);
-    alert(`送信エラー:\n\n${err.message}\n\n解決しない場合は、主催者へお問合せください。`);
+    alert('送信に失敗しました。\n\n' + err.message + '\n\nお手数ですが、通信環境をご確認のうえ再度お試しください。');
   } finally {
-    document.getElementById('loadingOverlay')?.classList.remove('visible');
-    document.getElementById('submitBtn').disabled = false;
+    overlay.classList.remove('visible');
+    btn.disabled = false;
   }
 }
 
-// ========================================
-// 郵便番号検索
-// ========================================
-function initPostalCodeSearch() {
-  const postalInput = document.getElementById('postalCode');
-  if (!postalInput) return;
+/**
+ * 画像フィールドをすべて Base64 にして添付する。
+ * 「前回の写真を使う」が選ばれている場合はURLだけ送り、再アップロードしない。
+ */
+async function attachImages(fd) {
+  var fields = FormFields.getAllFields();
+  var imageFieldIds = [];
 
-  postalInput.addEventListener('input', e => {
-    let v = e.target.value.replace(/[^0-9]/g, '');
-    if (v.length > 3) v = v.slice(0,3) + '-' + v.slice(3,7);
-    e.target.value = v;
-    document.getElementById('postalCodeError')?.classList.add('hidden');
-    if (v.replace('-','').length === 7) searchAddress();
-  });
+  for (var id in fields) {
+    if (fields[id].type !== 'image') continue;
+    var st = FormFields.getImageState(id) || {};
+    imageFieldIds.push(id);
+
+    if (st.usePrevious && st.previousUrl) {
+      fd.set('image_' + id + '_existingUrl', st.previousUrl);
+      continue;
+    }
+    var file = FormFields.getImageFile(id);
+    if (!file) continue;
+
+    var encoded = await encodeImage(file);
+    fd.set('image_' + id + '_base64', encoded.base64);
+    fd.set('image_' + id + '_mime', encoded.mimeType);
+    fd.set('image_' + id + '_name', encoded.name);
+  }
+  fd.set('imageFieldIds', JSON.stringify(imageFieldIds));
 }
 
-async function searchAddress() {
-  const postalInput = document.getElementById('postalCode');
-  const addressInput = document.getElementById('addressInput');
-  const searchBtn   = document.getElementById('searchAddressBtn');
-  const errorEl     = document.getElementById('postalCodeError');
-  if (!postalInput) return;
+async function postForm(url, formData) {
+  var controller = new AbortController();
+  var timeoutId = setTimeout(function () { controller.abort(); }, 90000);
 
-  const code = postalInput.value.replace(/[^0-9]/g, '');
-  if (code.length !== 7) {
-    if (errorEl) { errorEl.textContent = '郵便番号は7桁で入力してください'; errorEl.classList.remove('hidden'); }
-    return;
-  }
-
-  if (searchBtn) { searchBtn.classList.add('loading'); searchBtn.textContent = '検索中...'; }
-  errorEl?.classList.add('hidden');
-
+  var response;
   try {
-    const res  = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${code}`);
-    const data = await res.json();
-    if (data.status === 200 && data.results?.length) {
-      const r = data.results[0];
-      if (addressInput) { addressInput.value = r.address1 + r.address2 + r.address3; addressInput.focus(); }
-      if (searchBtn) { searchBtn.textContent = '✓ 反映済み'; setTimeout(() => { searchBtn.textContent = '住所検索'; }, 2000); }
-    } else {
-      if (errorEl) { errorEl.textContent = '郵便番号が見つかりません'; errorEl.classList.remove('hidden'); }
-      if (searchBtn) searchBtn.textContent = '住所検索';
-    }
-  } catch {
-    if (errorEl) { errorEl.textContent = '検索に失敗しました'; errorEl.classList.remove('hidden'); }
-    if (searchBtn) searchBtn.textContent = '住所検索';
+    // multipart/form-data はプリフライトが発生しない単純リクエストなので、
+    // 公開した GAS ウェブアプリへブラウザから直接 POST できる。
+    response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+      redirect: 'follow'
+    });
+  } catch (e) {
+    throw e.name === 'AbortError'
+      ? new Error('通信がタイムアウトしました。')
+      : new Error('ネットワークエラーが発生しました。');
   } finally {
-    searchBtn?.classList.remove('loading');
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    throw new Error('サーバーとの通信に失敗しました（状態コード ' + response.status + '）。');
+  }
+  var text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error('サーバーからの応答が不正です。');
   }
 }
 
-// ========================================
-// メールアドレス一致チェック
-// ========================================
-function initEmailConfirmation() {
-  const emailInput = document.getElementById('emailInput');
-  const emailConf  = document.getElementById('emailConfirmInput');
-  const errorEl    = document.getElementById('emailMatchError');
-  if (!emailInput || !emailConf) return;
-
-  const check = () => {
-    if (!emailConf.value) { errorEl?.classList.add('hidden'); return; }
-    const match = emailInput.value === emailConf.value;
-    errorEl?.classList.toggle('hidden', match);
-    emailConf.classList.toggle('border-red-500', !match);
-    emailConf.classList.toggle('border-green-500', match);
-  };
-  emailInput.addEventListener('input', check);
-  emailConf.addEventListener('input', check);
+function showComplete(result) {
+  var msg = document.getElementById('completeMessage');
+  if (msg) {
+    // メール送信枠が尽きているときは、その旨を正直に伝える
+    msg.innerHTML = result && result.mailQueued
+      ? 'お申込みを受け付けました。<br>確認メールは順次お送りしますので、しばらくお待ちください。'
+      : 'ご登録のメールアドレスに確認メールをお送りしました。<br>内容をご確認ください。';
+  }
+  document.getElementById('completeModal').classList.remove('hidden');
 }
 
 // ========================================
-// ファイルサイズチェック
+// 画像のエンコード（段階圧縮）
 // ========================================
-function initFileSizeCheck() {
-  const photoInput = document.getElementById('profileImage');
-  if (!photoInput) return;
 
-  photoInput.addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const name = file.name.toLowerCase();
-    if (name.endsWith('.heic') || name.endsWith('.heif')) {
-      alert('HEIC形式はサポートされていません。JPGまたはPNG形式でアップロードしてください。');
-      e.target.value = ''; return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      alert(`画像は8MB以下にしてください。\n現在: ${(file.size/1024/1024).toFixed(2)}MB`);
-      e.target.value = '';
-    }
+/**
+ * GAS は大きすぎる POST を 403 で弾くため、目標サイズに収まるまで段階的に再圧縮する。
+ * 実績: base64 約1.3MB は成功、約1.9MB は 403。余裕を見て目標は約1MB。
+ */
+function encodeImage(file) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onerror = function () { reject(new Error('画像の読み込みに失敗しました')); };
+    reader.onload = function (e) {
+      var img = new Image();
+      img.onerror = function () { reject(new Error('画像を読み込めませんでした')); };
+      img.onload = function () {
+        try {
+          var TARGET_BASE64_LEN = 1000000;
+          var MAX_DIMS = [1600, 1200, 1000, 800, 640];
+          var MIN_QUALITY = 0.5;
+
+          var encodeAt = function (maxDim, quality) {
+            var canvas = document.createElement('canvas');
+            var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg', quality);
+          };
+
+          var dataUrl = null;
+          for (var i = 0; i < MAX_DIMS.length; i++) {
+            for (var q = 0.85; q >= MIN_QUALITY; q -= 0.15) {
+              dataUrl = encodeAt(MAX_DIMS[i], q);
+              if (dataUrl.length <= TARGET_BASE64_LEN) {
+                return resolve(toEncoded(dataUrl, file));
+              }
+            }
+          }
+          resolve(toEncoded(dataUrl, file));
+        } catch (err) {
+          reject(new Error('画像の変換に失敗しました'));
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
   });
 }
 
+function toEncoded(dataUrl, file) {
+  var base = String(file.name || 'image').replace(/\.[^.]+$/, '');
+  return {
+    base64: dataUrl.split(',')[1],
+    mimeType: 'image/jpeg',
+    name: base + '.jpg'
+  };
+}
+
 // ========================================
-// LIFF 初期化
+// リピーター復元
+// ========================================
+
+/**
+ * 過去の申込内容をフォームへ反映する。
+ * ブース・オプション・懇親会は復元しない（前回のブースが今回は無い・満枠・
+ * 値上げ、というときに誤った金額で申し込まれるのを防ぐため）。
+ */
+function onRepeaterRestore(record) {
+  if (!record) return;
+
+  var answers = record.answers || {};
+  var restoreIds = (CONFIG.repeater && CONFIG.repeater.restoreFieldIds) || [];
+  var fields = FormFields.getAllFields();
+
+  var values = {};
+  Object.keys(answers).forEach(function (id) {
+    var f = fields[id];
+    if (!f) return;
+    if (f.type === 'booth' || f.type === 'category') return;
+    if (restoreIds.length && restoreIds.indexOf(id) < 0) return;
+    values[id] = answers[id];
+  });
+
+  FormFields.setValues(values);
+  recalculate();
+}
+
+// ========================================
+// LIFF
 // ========================================
 async function initLiff() {
-  const liffId = CONFIG.features?.liffId;
+  var liffId = (CONFIG.integration || {}).liffId;
   if (!liffId || typeof liff === 'undefined') return;
 
   try {
-    await liff.init({ liffId });
+    await liff.init({ liffId: liffId });
     if (liff.isLoggedIn()) {
-      const profile = await liff.getProfile();
-      const uidEl  = document.getElementById('lineUserId');
-      const nameEl = document.getElementById('lineDisplayName');
-      if (uidEl)  uidEl.value  = profile.userId;
-      if (nameEl) nameEl.value = profile.displayName;
+      var profile = await liff.getProfile();
+      document.getElementById('lineUserId').value = profile.userId;
+      document.getElementById('lineDisplayName').value = profile.displayName;
     }
   } catch (err) {
     console.error('LIFF init error:', err);
@@ -1168,237 +762,10 @@ async function initLiff() {
 }
 
 // ========================================
-// リピーター検索
+// ユーティリティ
 // ========================================
-function initRepeaterSearch() {
-  const toggleBtn   = document.getElementById('toggleRepeaterSearchBtn');
-  const searchArea  = document.getElementById('repeaterSearchArea');
-  const sendAuthBtn = document.getElementById('sendAuthCodeBtn');
-  const verifyBtn   = document.getElementById('verifyAuthCodeBtn');
-  const authCodeArea = document.getElementById('authCodeArea');
-  const statusEl    = document.getElementById('repeaterSearchStatus');
-
-  toggleBtn?.addEventListener('click', () => searchArea?.classList.toggle('hidden'));
-
-  sendAuthBtn?.addEventListener('click', async () => {
-    const name  = document.getElementById('repeaterName')?.value;
-    const email = document.getElementById('repeaterEmail')?.value;
-    if (!name || !email) {
-      setStatus(statusEl, '❌ お名前とメールアドレスを入力してください', 'red'); return;
-    }
-    setStatus(statusEl, '📧 認証コードを送信中...', 'blue');
-    sendAuthBtn.disabled = true;
-    try {
-      const url = new URL(`${CONFIG.workerUrl || CONFIG.gasUrl}`);
-      url.searchParams.set('action', 'send_auth_code');
-      url.searchParams.set('name',   name);
-      url.searchParams.set('email',  email);
-      const res = await fetch(url); const data = await res.json();
-      if (data.success) {
-        setStatus(statusEl, '✅ 認証コードをメールに送信しました', 'green');
-        authCodeArea?.classList.remove('hidden');
-        sendAuthBtn.classList.add('hidden');
-      } else {
-        setStatus(statusEl, `⚠️ ${data.error || '該当データが見つかりませんでした'}`, 'amber');
-        sendAuthBtn.disabled = false;
-      }
-    } catch {
-      setStatus(statusEl, '❌ エラーが発生しました', 'red');
-      sendAuthBtn.disabled = false;
-    }
-  });
-
-  verifyBtn?.addEventListener('click', async () => {
-    const name  = document.getElementById('repeaterName')?.value;
-    const email = document.getElementById('repeaterEmail')?.value;
-    const code  = document.getElementById('repeaterAuthCode')?.value;
-    if (!code || code.length < 4) {
-      setStatus(statusEl, '❌ 4桁の認証コードを入力してください', 'red'); return;
-    }
-    setStatus(statusEl, '🔍 認証中...', 'blue');
-    verifyBtn.disabled = true;
-    try {
-      const url = new URL(`${CONFIG.workerUrl || CONFIG.gasUrl}`);
-      url.searchParams.set('action', 'verify_auth_code');
-      url.searchParams.set('name',   name);
-      url.searchParams.set('email',  email);
-      url.searchParams.set('code',   code);
-      const res = await fetch(url); const data = await res.json();
-      if (data.success && data.list?.length) {
-        setStatus(statusEl, '✅ 認証成功！データを選択してください', 'green');
-        showRepeaterSelectionModal(data.list, statusEl, searchArea);
-      } else {
-        setStatus(statusEl, `❌ ${data.error || '認証に失敗しました'}`, 'red');
-        verifyBtn.disabled = false;
-      }
-    } catch {
-      setStatus(statusEl, '❌ エラーが発生しました', 'red');
-      verifyBtn.disabled = false;
-    }
-  });
-}
-
-function setStatus(el, msg, color) {
-  if (!el) return;
-  const colors = { red: '#dc2626', blue: '#2563eb', green: '#16a34a', amber: '#d97706' };
-  el.textContent = msg;
-  el.style.color = colors[color] || '#374151';
-}
-
-function showRepeaterSelectionModal(list, statusEl, searchArea) {
-  const modal     = document.getElementById('repeaterSelectModal');
-  const listBox   = document.getElementById('repeaterList');
-  const closeBtn  = document.getElementById('closeRepeaterModalBtn');
-  if (!modal || !listBox) return;
-
-  listBox.innerHTML = '';
-  list.forEach(data => {
-    const item = document.createElement('div');
-    item.style.cssText = 'border:1.5px solid #e5e7eb;border-radius:0.5rem;padding:1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;';
-    item.innerHTML = `
-      <div>
-        <p style="font-weight:700">${data.eventName || '過去のイベント'}</p>
-        <p style="font-size:0.8rem;color:#6b7280">${data.submittedAt || ''}</p>
-        <p style="font-size:0.85rem;color:#374151">出展名: ${data.exhibitorName || ''}</p>
-      </div>
-      <button type="button" style="background:var(--color-primary);color:#fff;padding:0.4rem 1rem;border:none;border-radius:0.5rem;font-weight:700;cursor:pointer;font-size:0.85rem">選択</button>`;
-    item.addEventListener('click', () => {
-      fillFormWithData(data);
-      modal.classList.add('hidden');
-      setStatus(statusEl, '✅ データを自動入力しました', 'green');
-      setTimeout(() => searchArea?.classList.add('hidden'), 1500);
-    });
-    listBox.appendChild(item);
-  });
-
-  closeBtn && (closeBtn.onclick = () => {
-    modal.classList.add('hidden');
-    setStatus(statusEl, '⚠️ キャンセルしました', 'amber');
-  });
-  modal.classList.remove('hidden');
-}
-
-function fillFormWithData(data) {
-  const setVal = (sel, val) => { const el = document.querySelector(sel); if (el && val) el.value = val; };
-  setVal('#nameInput',             data.name);
-  setVal('[name="furigana"]',      data.furigana);
-  setVal('[name="phoneNumber"]',   data.phone);
-  setVal('#postalCode',            data.postalCode);
-  setVal('#addressInput',          data.address);
-  setVal('#emailInput',            data.email);
-  setVal('#emailConfirmInput',     data.email);
-  setVal('[name="exhibitorName"]', data.exhibitorName);
-
-  // カテゴリ復元
-  if (data.category) {
-    document.addEventListener('configLoaded', () => {}, { once: true });
-    document.querySelectorAll('.category-btn').forEach(btn => {
-      if (btn.textContent === data.category) btn.click();
-    });
-  }
-
-  // 写真再利用
-  const imageUrl = data.profileImageUrl || data.photoUrl;
-  if (imageUrl) {
-    const reuseOpt = document.getElementById('reusePhotoOption');
-    const prevImg  = document.getElementById('prevPhotoImg');
-    const hiddenUrl = document.getElementById('profileImageUrl');
-    if (reuseOpt && prevImg && hiddenUrl) {
-      reuseOpt.classList.remove('hidden');
-      const idMatch = imageUrl.match(/(?:\/d\/|id=)([\w-]+)/);
-      prevImg.src = idMatch ? `https://lh3.googleusercontent.com/d/${idMatch[1]}` : imageUrl;
-      prevImg.onerror = () => { prevImg.style.display = 'none'; };
-      hiddenUrl.value = imageUrl;
-    }
-  }
-
-  // SNS リンク復元
-  const container = document.getElementById('snsLinksContainer');
-  if (container) { container.innerHTML = ''; snsLinkCount = 0; }
-  const snsData = data.snsLinks || data.sns;
-  const snsList = [];
-  if (snsData) {
-    if (snsData.hp)    snsList.push(snsData.hp);
-    if (snsData.insta) snsList.push(snsData.insta);
-    if (snsData.blog)  snsList.push(snsData.blog);
-    if (snsData.fb)    snsList.push(snsData.fb);
-    if (snsData.line)  snsList.push(snsData.line);
-    if (snsData.other) snsList.push(snsData.other);
-  }
-  snsList.filter(Boolean).forEach(url => addSnsLinkInput(url));
-  if (!snsList.length) addSnsLinkInput();
-
-  document.querySelectorAll('textarea, input[type="text"]').forEach(el =>
-    el.dispatchEvent(new Event('input')));
-}
-
-function togglePhotoUpload() {
-  const checkbox  = document.getElementById('usePreviousPhoto');
-  const fileInput = document.getElementById('profileImage');
-  const preview   = document.getElementById('previousPhotoPreview');
-  const reqTag    = document.getElementById('photoRequiredTag');
-  if (!checkbox || !fileInput) return;
-
-  if (checkbox.checked) {
-    fileInput.disabled = true; fileInput.required = false; fileInput.value = '';
-    preview?.classList.remove('hidden');
-    if (reqTag) reqTag.style.display = 'none';
-  } else {
-    fileInput.disabled = false; fileInput.required = true;
-    preview?.classList.add('hidden');
-    if (reqTag) reqTag.style.display = 'inline';
-  }
-}
-
-// ========================================
-// 画像 Base64 変換
-// ========================================
-function convertFileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = e => {
-      const img = new Image();
-      img.src = e.target.result;
-      img.onload = () => {
-        try {
-          // 送信先の GAS(Google)は大きすぎる POST を 403 で弾くため、
-          // 送信データが確実に上限を下回るよう、目標サイズに収まるまで段階的に再圧縮する。
-          // 実績: base64 約1.3MB は成功、約1.9MB は 403。余裕を見て目標は約1MB。
-          const TARGET_BASE64_LEN = 1_000_000; // base64 文字数 ≒ 送信バイト数
-          const MAX_DIMS    = [1200, 1000, 800, 640];
-          const MIN_QUALITY = 0.5;
-
-          const encodeAt = (maxDim, quality) => {
-            const canvas = document.createElement('canvas');
-            const ctx    = canvas.getContext('2d');
-            if (!ctx) throw new Error('Canvas初期化失敗');
-            let { width, height } = img;
-            if (width > height) { if (width > maxDim) { height = Math.round(height * maxDim / width); width = maxDim; } }
-            else                { if (height > maxDim) { width = Math.round(width * maxDim / height); height = maxDim; } }
-            canvas.width = width; canvas.height = height;
-            ctx.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL('image/jpeg', quality);
-            return dataUrl.split(',')[1] || '';
-          };
-
-          // 寸法を段階的に下げつつ、各寸法で品質を 0.8→0.5 まで下げて目標以下を探す
-          let base64 = '';
-          outer:
-          for (const maxDim of MAX_DIMS) {
-            for (let q = 0.8; q >= MIN_QUALITY - 1e-9; q -= 0.1) {
-              base64 = encodeAt(maxDim, Math.round(q * 10) / 10);
-              if (base64 && base64.length <= TARGET_BASE64_LEN) break outer;
-            }
-          }
-
-          if (!base64) { reject(new Error('画像変換結果が空')); return; }
-          // 目標まで下げ切れなくても最小設定の結果を送る（従来の固定圧縮より必ず小さい）
-          resolve({ base64, mimeType: 'image/jpeg', name: file.name.replace(/\.[^/.]+$/, '') + '.jpg' });
-        } catch (e) { reject(new Error('画像圧縮処理に失敗: ' + e.message)); }
-      };
-      img.onerror = () => reject(new Error('画像読み込み失敗'));
-    };
-    reader.onerror = () => reject(new Error('ファイル読み取り失敗'));
-  });
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }

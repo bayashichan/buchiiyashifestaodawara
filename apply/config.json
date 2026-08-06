@@ -1,4 +1,5 @@
 {
+  "schemaVersion": 2,
   "theme": {
     "primaryColor": "#650133",
     "accentColor": "#ffa3da",
@@ -10,147 +11,420 @@
     "name": "第1回ぶち癒しフェスタin小田原",
     "date": "2026年11月1日（日）11:00〜16:30",
     "location": "おだわら市民交流センター UMECO 　神奈川県小田原市栄町一丁目1番27号",
-    "earlyBirdDeadline": ""
+    "headerNote": "",
+    "applicationDeadline": ""
   },
-  "features": {
-    "earlyBird": false,
-    "repeaterSearch": false,
-    "memberDiscount": true,
-    "memberDiscountLabel": "アーキハピネス協会会員ですか？",
-    "stampRally": true,
-    "party": true,
-    "secondaryParty": true,
-    "bodyEquipment": true,
-    "liffId": ""
+  "earlyBird": {
+    "enabled": false,
+    "deadline": "",
+    "label": "早割",
+    "bannerText": "",
+    "excludeMembers": false
   },
-  "pricing": {
-    "memberDiscount": 2000,
-    "options": {
-      "power": {
-        "label": "コンセント使用",
-        "price": 500,
-        "enabled": true
-      },
-      "chair": {
-        "label": "椅子追加",
-        "price": 100,
-        "enabled": false
-      },
-      "staff": {
-        "label": "参加人数追加",
-        "price": 1000,
-        "enabled": false
-      },
-      "party": {
-        "label": "懇親会参加費",
-        "price": 5000,
-        "enabled": true
-      },
-      "secondaryParty": {
-        "label": "二次会参加費",
-        "price": 3000,
-        "enabled": false
-      }
-    }
-  },
-  "booths": [
-    {
-      "id": "booth_s",
-      "name": "内側半テーブル",
-      "location": "",
-      "prices": {
-        "regular": 8000,
-        "earlyBird": 9000
-      },
-      "limits": {
-        "maxStaff": 0,
-        "maxChairs": 0,
-        "allowPower": false
-      },
-      "soldOut": false,
-      "prohibitSession": false
-    },
-    {
-      "id": "booth_m",
-      "name": "壁側半テーブル",
-      "location": "",
-      "prices": {
-        "regular": 9000,
-        "earlyBird": 17000
-      },
-      "limits": {
-        "maxStaff": 0,
-        "maxChairs": 0,
-        "allowPower": true
-      },
-      "soldOut": false,
-      "prohibitSession": false
-    },
-    {
-      "id": "booth_1",
-      "name": "ボディ",
-      "location": "",
-      "prices": {
-        "regular": 13000,
-        "earlyBird": 9000
-      },
-      "limits": {
-        "maxStaff": 0,
-        "maxChairs": 0,
-        "allowPower": true
-      },
-      "soldOut": false,
-      "prohibitSession": false
-    }
-  ],
+  "media": [],
   "categories": [
     "占い・スピリチュアル",
     "ボディケア・美容",
     "物販",
     "飲食・その他"
   ],
-  "standardFields": {
-    "exhibitorNameLabel": "出展名（セラピスト名・屋号）",
-    "exhibitorNamePlaceholder": "ヒーリングサロン〇〇",
-    "showPhoneNumber": true,
-    "showAddress": true,
-    "showPhotoUpload": true,
-    "showSnsLinks": true,
-    "showPhotoPermission": true,
-    "showNotes": true
+  "sessionCategories": [
+    "占い・スピリチュアル",
+    "ボディケア・美容"
+  ],
+  "booths": [
+    {
+      "id": "booth_s",
+      "name": "内側半テーブル",
+      "description": "",
+      "location": "",
+      "imageUrl": "",
+      "prices": {
+        "regular": 8000,
+        "earlyBird": 9000
+      },
+      "soldOut": false,
+      "prohibitSession": false,
+      "options": {
+        "power": {
+          "available": false
+        },
+        "chair": {
+          "available": false,
+          "max": 0
+        },
+        "staff": {
+          "available": false,
+          "max": 0
+        }
+      }
+    },
+    {
+      "id": "booth_m",
+      "name": "壁側半テーブル",
+      "description": "",
+      "location": "",
+      "imageUrl": "",
+      "prices": {
+        "regular": 9000,
+        "earlyBird": 17000
+      },
+      "soldOut": false,
+      "prohibitSession": false,
+      "options": {
+        "power": {
+          "available": true
+        },
+        "chair": {
+          "available": false,
+          "max": 0
+        },
+        "staff": {
+          "available": false,
+          "max": 0
+        }
+      }
+    },
+    {
+      "id": "booth_1",
+      "name": "ボディ",
+      "description": "",
+      "location": "",
+      "imageUrl": "",
+      "prices": {
+        "regular": 13000,
+        "earlyBird": 9000
+      },
+      "soldOut": false,
+      "prohibitSession": false,
+      "options": {
+        "power": {
+          "available": true
+        },
+        "chair": {
+          "available": false,
+          "max": 0
+        },
+        "staff": {
+          "available": false,
+          "max": 0
+        }
+      }
+    }
+  ],
+  "pricing": {
+    "memberDiscount": {
+      "enabled": true,
+      "label": "アーキハピネス協会会員ですか？",
+      "amount": 2000
+    },
+    "options": [
+      {
+        "id": "power",
+        "label": "コンセント使用",
+        "description": "",
+        "inputType": "toggle",
+        "scope": "booth",
+        "defaultAvailable": true,
+        "price": 500,
+        "max": 1,
+        "unit": "",
+        "enabled": true,
+        "order": 10,
+        "choices": []
+      },
+      {
+        "id": "chair",
+        "label": "椅子追加",
+        "description": "",
+        "inputType": "quantity",
+        "scope": "booth",
+        "defaultAvailable": true,
+        "price": 100,
+        "max": 99,
+        "unit": "脚",
+        "enabled": false,
+        "order": 20,
+        "choices": []
+      },
+      {
+        "id": "staff",
+        "label": "参加人数追加",
+        "description": "",
+        "inputType": "quantity",
+        "scope": "booth",
+        "defaultAvailable": true,
+        "price": 1000,
+        "max": 99,
+        "unit": "名",
+        "enabled": false,
+        "order": 30,
+        "choices": []
+      },
+      {
+        "id": "party",
+        "label": "懇親会参加費",
+        "description": "",
+        "inputType": "quantity",
+        "scope": "global",
+        "defaultAvailable": true,
+        "price": 5000,
+        "max": 99,
+        "unit": "名",
+        "enabled": true,
+        "order": 40,
+        "choices": []
+      },
+      {
+        "id": "secondaryParty",
+        "label": "二次会参加費",
+        "description": "",
+        "inputType": "quantity",
+        "scope": "global",
+        "defaultAvailable": true,
+        "price": 3000,
+        "max": 99,
+        "unit": "名",
+        "enabled": false,
+        "order": 50,
+        "choices": []
+      }
+    ]
   },
-  "customQuestions": [
+  "fields": [
+    {
+      "id": "name",
+      "section": "basic",
+      "type": "text",
+      "label": "お名前（本名）",
+      "placeholder": "山田 太郎",
+      "required": true,
+      "maxLength": 50,
+      "system": "name",
+      "order": 10,
+      "choices": []
+    },
+    {
+      "id": "furigana",
+      "section": "basic",
+      "type": "text",
+      "label": "ふりがな",
+      "placeholder": "やまだ たろう",
+      "required": true,
+      "maxLength": 50,
+      "system": "furigana",
+      "order": 20,
+      "choices": []
+    },
+    {
+      "id": "email",
+      "section": "basic",
+      "type": "email",
+      "label": "メールアドレス",
+      "placeholder": "example@example.com",
+      "required": true,
+      "confirm": true,
+      "system": "email",
+      "order": 30,
+      "choices": []
+    },
+    {
+      "id": "phoneNumber",
+      "section": "basic",
+      "type": "tel",
+      "label": "電話番号",
+      "placeholder": "09012345678",
+      "required": true,
+      "system": "phone",
+      "order": 40,
+      "choices": []
+    },
+    {
+      "id": "postalCode",
+      "section": "basic",
+      "type": "postal",
+      "label": "郵便番号",
+      "placeholder": "1234567",
+      "required": true,
+      "linkTo": "address",
+      "system": "postalCode",
+      "order": 50,
+      "choices": []
+    },
+    {
+      "id": "address",
+      "section": "basic",
+      "type": "address",
+      "label": "ご住所",
+      "required": true,
+      "system": "address",
+      "order": 60,
+      "choices": []
+    },
+    {
+      "id": "exhibitorName",
+      "section": "exhibit",
+      "type": "text",
+      "label": "出展名（セラピスト名・屋号）",
+      "placeholder": "ヒーリングサロン〇〇",
+      "required": true,
+      "maxLength": 60,
+      "system": "exhibitorName",
+      "order": 70,
+      "choices": []
+    },
+    {
+      "id": "category",
+      "section": "exhibit",
+      "type": "category",
+      "label": "出展カテゴリ",
+      "required": true,
+      "system": "category",
+      "order": 80,
+      "choices": []
+    },
+    {
+      "id": "booth",
+      "section": "exhibit",
+      "type": "booth",
+      "label": "出展ブース",
+      "required": true,
+      "system": "booth",
+      "order": 90,
+      "choices": []
+    },
     {
       "id": "cq_menu",
+      "section": "exhibit",
       "type": "textarea",
       "label": "出展メニュー名",
+      "description": "",
       "placeholder": "例：タロット占い 20分 2,000円",
       "required": true,
+      "maxLength": 100,
       "showCounter": true,
-      "maxLength": 100
+      "choices": [],
+      "order": 100
     },
     {
       "id": "cq_intro",
+      "section": "exhibit",
       "type": "textarea",
       "label": "自己紹介",
+      "description": "",
       "placeholder": "200文字以内でご記入ください",
       "required": true,
+      "maxLength": 200,
       "showCounter": true,
-      "maxLength": 200
+      "choices": [],
+      "order": 110
+    },
+    {
+      "id": "profileImage",
+      "section": "exhibit",
+      "type": "image",
+      "label": "プロフィール写真",
+      "description": "正方形に近い画像がきれいに表示されます。",
+      "required": true,
+      "maxFileSizeMB": 8,
+      "accept": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ],
+      "maxCount": 1,
+      "system": "profileImage",
+      "order": 120,
+      "choices": []
+    },
+    {
+      "id": "photoPermission",
+      "section": "exhibit",
+      "type": "radio",
+      "label": "写真のSNS投稿への掲載可否",
+      "required": true,
+      "choices": [
+        "可",
+        "不可"
+      ],
+      "order": 130
+    },
+    {
+      "id": "snsLinks",
+      "section": "sns",
+      "type": "snsLinks",
+      "label": "SNS・ホームページのリンク",
+      "description": "URLを貼ると種類を自動判別します。",
+      "required": false,
+      "system": "snsLinks",
+      "order": 140,
+      "choices": []
+    },
+    {
+      "id": "stampRallyPrize",
+      "section": "terms",
+      "type": "radio",
+      "label": "スタンプラリーの景品をご提供いただけますか？",
+      "required": true,
+      "choices": [
+        "ある",
+        "ない"
+      ],
+      "order": 150
+    },
+    {
+      "id": "prizeContent",
+      "section": "terms",
+      "type": "textarea",
+      "label": "景品の内容",
+      "required": false,
+      "maxLength": 200,
+      "showIf": {
+        "fieldId": "stampRallyPrize",
+        "equals": "ある"
+      },
+      "order": 160,
+      "choices": []
+    },
+    {
+      "id": "notes",
+      "section": "terms",
+      "type": "textarea",
+      "label": "備考・ご質問",
+      "required": false,
+      "maxLength": 500,
+      "order": 170,
+      "choices": []
     }
   ],
-  "terms": "ぶち癒しフェスタin小田原 【出展規約】\n【出展に関する注意点とお願い】\n＊体験型イベントになりますので各メニューの料金はイベント価格でお願いします。\n＊料金は、はっきりお客様にわかるように提示してください。\n＊記載された料金以外に料金が発生する時（延長など）には、事前にお客様に確認をとってからにしてください。\n＊お申込みは先着順とさせて頂きます。\n＊ブース場所の指定はできません。ご了承ください。\n＊出展者様についてはInstagram、HP、Facebook等でご紹介させて頂きます。\n\n＊会場（UMECO）の壁や柱などに釘、画鋲、テープなどの張り付けは禁止です。\n＊床などを汚してしまった場合は、各自でお掃除をお願い致します。\n＊電源をご利用の方は延長コードをお持ちください。\n＊会場内は完全火気厳禁です。お香、セージ、キャンドルなど火気を使うものは絶対に使用しないでください。\n＊ゴミは各自責任を持って、全てお持ち帰り下さい。\n＊終了後、使用した机・椅子などの片づけ・原状回復のご協力をお願い致します。\n＊館内施設、及び備品を破損した場合は、出展者様の実費負担となります。\n＊施設内での怪我、盗難及び事故に関しましては、主催者側では一切の責任を負いかねますのでご了承ください。\n\n＊本イベントは、皆様が楽しんで頂きながら癒しを体験していただくことを目的としています。特定のサービスや高額な商品に関する契約や、強引な勧誘はお断りをさせていただいております。\n＊ご出展内容によっては、小田原実行委員会の主旨と合わないと判断された場合、お断りさせて頂く場合もございますのでご了承下さい。\n＊お客様はもちろんのこと、出展者さま同士でも強引な勧誘などはされませんようによろしくお願いいたします。\n＊お客様や出展者様に不快感を与える商法・宗教勧誘などは禁止致します。当日そのような行為をされた場合は直ちに退場頂き、次回の出展はお断りさせて頂きますのでご了承ください。\n＊本イベントは出展者様とお客様の個別契約で成り立っており、主催者側はトラブルに一切関与いたしません。\n\n＊一般的な常識ある行動をお願いします。\n＊お客様を最高の笑顔でお迎えください。\n\n【出展料の支払】\n・お支払いは銀行振込みになります。（お申し込み後、詳細をお知らせいたします。）\n・お申し込みをいただきましてから、2週間以内にお振り込みをお願いいたします。\n・お振込み手数料は各自ご負担をお願いいたします。\n・2週間以内のご入金をお願いしておりますが、ご事情によりどうしても遅れる場合は必ず入金予定日をご連絡ください。\n・なお、イベントを1か月切ってからのお申し込みの場合は、3日以内のお振込みをお願いいたします。\n・金融機関の振込明細書または振込完了画面をもって領収書に代えさせていただきます。別途、個別の領収書の発行は行っておりませんのでご了承ください。\n\n【出展料について】\n⚠️重要⚠️\n基本、一度ご入金いただきました出展料はご返金致しかねます。ご了承頂きご確認の上ご入金を宜しくお願い致します。\nなお、お振込手数料はご負担いただけますようお願い致します。\n\n【懇親会について】\n⚠️重要⚠️\n懇親会費につきましては、お席やお料理の予約の都合上、お申し込み完了（お支払い完了）後のキャンセルによる返金は一切いたしかねます。 スケジュールをよくご確認の上、お申し込みください。\n\n※なお、懇親会の詳細につきましては、申込後の自動返信メッセージ等で必ずご確認ください。\n【申込方法】\n・出展をご希望の方は、ページ一番下のお申込みボタンよりお申し込みください。LINE公式アカウントに移動します。\n・LINE公式にご登録後、リッチメニューの「お申込みフォーム」よりお申込みいただき、事務局にて出展料のお振り込みを確認できた段階で【本契約】とさせていただきます。\n\n【募集カテゴリー】\nお申し込みフォームの４つのカテゴリーのうち、どれか１つにチェックをお願いいたします。\n\n① 占い・スピリチュアル\n・霊視鑑定、ヒーリング、チャネリング、各種カードセッション、統計学、その他セラピーなど\n\n② ボディケア・美容\n・フットケア、ハンドケア、整体、エステ、メイクアップなど\n\n③ 物販\n・アクセサリー、ハンドメイド雑貨、実演販売、天然石など\n\n④ 飲食（※条件あり、下記参照）\n・お弁当、焼き菓子、茶葉など\n（※その他、特殊な内容の場合は事前にお問合せください）\n\n🎁 スタンプラリーのご提供について\n景品の提供をしてくださる方は、当日朝、受付横でお渡し下さい。\n\n割引券や無料券でもOKですが、ご提供いただきました店舗様で全ての対応をお願いいたします。\n\n出来ましたら３つほど「物品」のご提供をご協力頂けますと助かります。\n\nお客様にご案内できるよう、テーブルNo.や出展名（セラピスト名）などの入った名刺やチラシなどを同封してください。\n\nお客様が選びやすいよう、中身が見えるような形（透明な袋など）での提供をしていただけましたら嬉しいです。\n\n🍱 飲食（食品・飲料）の販売について\n【基本ルール】\n・会場内での調理行為（盛り付け、カット、飲料を注ぐなど）は全て禁止です。\n・販売する商品は、事前に包装または瓶詰めされたものに限ります。\n・原則として、常温で保存できる商品のみ販売可能です。\n・試食や試飲を希望される場合は、必ず事前に事務局までご連絡ください。提供方法等の条件について確認いたします。\n\n【出展条件】\n以下の条件をすべて満たしている方のみ、食品の出展が可能です。\n\n１．販売する商品は、食品衛生法に基づき、所管の保健所から必要な営業許可を受けた施設で製造・包装されていること。（家庭の台所等で調理されたものは販売できません）\n\n２．商品には、食品表示法に基づく適切な表示（原材料、消費・賞味期限、製造者等）が貼付されていること。\n\n３．食品衛生責任者の資格を保持していること。\n\n４．日持ちのしない食品等の販売にあたって、管轄の小田原保健福祉事務所（保健所）への事前届出や確認等が必要な場合は、各自の責任において適切に処理されていること。\n\n５．過去に食品衛生法や関連法規に基づく処分を受けたことがないこと。\n\n６．反社会的な団体、またはその構成員や関係者でないこと。",
+  "terms": {
+    "title": "出展規約",
+    "body": "ぶち癒しフェスタin小田原 【出展規約】\n【出展に関する注意点とお願い】\n＊体験型イベントになりますので各メニューの料金はイベント価格でお願いします。\n＊料金は、はっきりお客様にわかるように提示してください。\n＊記載された料金以外に料金が発生する時（延長など）には、事前にお客様に確認をとってからにしてください。\n＊お申込みは先着順とさせて頂きます。\n＊ブース場所の指定はできません。ご了承ください。\n＊出展者様についてはInstagram、HP、Facebook等でご紹介させて頂きます。\n\n＊会場（UMECO）の壁や柱などに釘、画鋲、テープなどの張り付けは禁止です。\n＊床などを汚してしまった場合は、各自でお掃除をお願い致します。\n＊電源をご利用の方は延長コードをお持ちください。\n＊会場内は完全火気厳禁です。お香、セージ、キャンドルなど火気を使うものは絶対に使用しないでください。\n＊ゴミは各自責任を持って、全てお持ち帰り下さい。\n＊終了後、使用した机・椅子などの片づけ・原状回復のご協力をお願い致します。\n＊館内施設、及び備品を破損した場合は、出展者様の実費負担となります。\n＊施設内での怪我、盗難及び事故に関しましては、主催者側では一切の責任を負いかねますのでご了承ください。\n\n＊本イベントは、皆様が楽しんで頂きながら癒しを体験していただくことを目的としています。特定のサービスや高額な商品に関する契約や、強引な勧誘はお断りをさせていただいております。\n＊ご出展内容によっては、小田原実行委員会の主旨と合わないと判断された場合、お断りさせて頂く場合もございますのでご了承下さい。\n＊お客様はもちろんのこと、出展者さま同士でも強引な勧誘などはされませんようによろしくお願いいたします。\n＊お客様や出展者様に不快感を与える商法・宗教勧誘などは禁止致します。当日そのような行為をされた場合は直ちに退場頂き、次回の出展はお断りさせて頂きますのでご了承ください。\n＊本イベントは出展者様とお客様の個別契約で成り立っており、主催者側はトラブルに一切関与いたしません。\n\n＊一般的な常識ある行動をお願いします。\n＊お客様を最高の笑顔でお迎えください。\n\n【出展料の支払】\n・お支払いは銀行振込みになります。（お申し込み後、詳細をお知らせいたします。）\n・お申し込みをいただきましてから、2週間以内にお振り込みをお願いいたします。\n・お振込み手数料は各自ご負担をお願いいたします。\n・2週間以内のご入金をお願いしておりますが、ご事情によりどうしても遅れる場合は必ず入金予定日をご連絡ください。\n・なお、イベントを1か月切ってからのお申し込みの場合は、3日以内のお振込みをお願いいたします。\n・金融機関の振込明細書または振込完了画面をもって領収書に代えさせていただきます。別途、個別の領収書の発行は行っておりませんのでご了承ください。\n\n【出展料について】\n⚠️重要⚠️\n基本、一度ご入金いただきました出展料はご返金致しかねます。ご了承頂きご確認の上ご入金を宜しくお願い致します。\nなお、お振込手数料はご負担いただけますようお願い致します。\n\n【懇親会について】\n⚠️重要⚠️\n懇親会費につきましては、お席やお料理の予約の都合上、お申し込み完了（お支払い完了）後のキャンセルによる返金は一切いたしかねます。 スケジュールをよくご確認の上、お申し込みください。\n\n※なお、懇親会の詳細につきましては、申込後の自動返信メッセージ等で必ずご確認ください。\n【申込方法】\n・出展をご希望の方は、ページ一番下のお申込みボタンよりお申し込みください。LINE公式アカウントに移動します。\n・LINE公式にご登録後、リッチメニューの「お申込みフォーム」よりお申込みいただき、事務局にて出展料のお振り込みを確認できた段階で【本契約】とさせていただきます。\n\n【募集カテゴリー】\nお申し込みフォームの４つのカテゴリーのうち、どれか１つにチェックをお願いいたします。\n\n① 占い・スピリチュアル\n・霊視鑑定、ヒーリング、チャネリング、各種カードセッション、統計学、その他セラピーなど\n\n② ボディケア・美容\n・フットケア、ハンドケア、整体、エステ、メイクアップなど\n\n③ 物販\n・アクセサリー、ハンドメイド雑貨、実演販売、天然石など\n\n④ 飲食（※条件あり、下記参照）\n・お弁当、焼き菓子、茶葉など\n（※その他、特殊な内容の場合は事前にお問合せください）\n\n🎁 スタンプラリーのご提供について\n景品の提供をしてくださる方は、当日朝、受付横でお渡し下さい。\n\n割引券や無料券でもOKですが、ご提供いただきました店舗様で全ての対応をお願いいたします。\n\n出来ましたら３つほど「物品」のご提供をご協力頂けますと助かります。\n\nお客様にご案内できるよう、テーブルNo.や出展名（セラピスト名）などの入った名刺やチラシなどを同封してください。\n\nお客様が選びやすいよう、中身が見えるような形（透明な袋など）での提供をしていただけましたら嬉しいです。\n\n🍱 飲食（食品・飲料）の販売について\n【基本ルール】\n・会場内での調理行為（盛り付け、カット、飲料を注ぐなど）は全て禁止です。\n・販売する商品は、事前に包装または瓶詰めされたものに限ります。\n・原則として、常温で保存できる商品のみ販売可能です。\n・試食や試飲を希望される場合は、必ず事前に事務局までご連絡ください。提供方法等の条件について確認いたします。\n\n【出展条件】\n以下の条件をすべて満たしている方のみ、食品の出展が可能です。\n\n１．販売する商品は、食品衛生法に基づき、所管の保健所から必要な営業許可を受けた施設で製造・包装されていること。（家庭の台所等で調理されたものは販売できません）\n\n２．商品には、食品表示法に基づく適切な表示（原材料、消費・賞味期限、製造者等）が貼付されていること。\n\n３．食品衛生責任者の資格を保持していること。\n\n４．日持ちのしない食品等の販売にあたって、管轄の小田原保健福祉事務所（保健所）への事前届出や確認等が必要な場合は、各自の責任において適切に処理されていること。\n\n５．過去に食品衛生法や関連法規に基づく処分を受けたことがないこと。\n\n６．反社会的な団体、またはその構成員や関係者でないこと。",
+    "requireAgree": true,
+    "displayMode": "modal"
+  },
   "email": {
-    "adminEmail": "odawara.buchi@gmail.com",
-    "replyToEmail": "odawara.buchi@gmail.com",
     "adminSenderName": "ぶち癒しフェスタin小田原事務局",
     "confirmationSubject": "",
     "confirmationBodyTemplate": "{{name}} 様\n\nこの度は「{{eventName}}」へのご出展申込みありがとうございます。\n以下の内容でお申込みを受け付けました。\n\n■ お申込み情報\nお名前: {{name}}\nメールアドレス: {{email}}\n出展ブース: {{boothName}}\n{{customAnswers}}\n\n■ お支払い金額\n{{breakdown}}\n合計: ¥{{totalFee}}\n\n■ お振込先\nセブン銀行\n普通口座\nパンジー支店\n店番103\n口座番号5247552\n\n北川阿弥(キタガワ　アミ)\n\n【出展料のお支払いについて】\n・お申し込みから2週間以内にお振込みください。\n　※イベント開催1か月を切ってのお申し込みの場合は、3日以内にお願いいたします。\n・振込手数料はご負担ください。\n・やむを得ず期日を過ぎる場合は、入金予定日を事前にご連絡ください。\n・領収書は振込明細書または振込完了画面をもって代えさせていただきます。\n　個別発行は行っておりません。\n\n⚠️ キャンセル・返金について\n【出展料】\nお振込み完了後の返金はいたしかねます。\nお申し込み内容・スケジュールをよくご確認の上、お振込みください。\n\n【懇親会】\n・お申し込みおよびキャンセルは、開催日の10日前まで承ります。\n・10日前までにキャンセルをお申し出いただいた場合、振込手数料を差し引いた金額をご返金いたします。\n・10日前を過ぎてからのキャンセルは、返金いたしかねます。\nご不明な点は公式LINEにご連絡ください。\n{{eventName}} 運営事務局",
     "adminNotificationSubject": ""
   },
-  "configJsonUrl": "",
-  "gasUrl": "https://script.google.com/macros/s/AKfycbzdEcorQyVCAfOTmtYhWSRBVp020nBYFI8fezNUt6GRWbpTw3ZeYLG9Vs5DhslZ4i2Y/exec",
-  "workerUrl": "https://buchiiyashiodawara-proxy.wakaossan2001.workers.dev/",
-  "spreadsheetId": "1-KFjFMYIwvWqrg8hW-vvl0gHmTCnSvjS-adopfVlw0E",
-  "driveFolderUrl": "https://drive.google.com/drive/folders/1Yr2nO-FYygBZefYbOn9qGTNzapa8CbnX"
+  "repeater": {
+    "enabled": true,
+    "matchFields": [
+      "name",
+      "email"
+    ],
+    "restoreFieldIds": [],
+    "codeDigits": 4,
+    "codeTtlSeconds": 600,
+    "maxAttempts": 5,
+    "resendCooldownSeconds": 60
+  },
+  "integration": {
+    "gasUrl": "https://script.google.com/macros/s/AKfycbzdEcorQyVCAfOTmtYhWSRBVp020nBYFI8fezNUt6GRWbpTw3ZeYLG9Vs5DhslZ4i2Y/exec",
+    "workerUrl": "",
+    "configJsonUrl": "",
+    "liffId": ""
+  }
 }
