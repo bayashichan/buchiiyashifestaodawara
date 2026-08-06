@@ -110,7 +110,11 @@ function ensureColumns(sheet, ss, header, cfg) {
 function styleHeader(sheet, columnCount) {
   var range = sheet.getRange(1, 1, 1, columnCount);
   range.setFontWeight('bold');
-  range.setBackground('#f3f4f6');
+  range.setBackground('#374151');
+  range.setFontColor('#ffffff');
+  tryOrLog('autoResizeColumns', function () {
+    sheet.autoResizeColumns(1, columnCount);
+  });
 }
 
 /**

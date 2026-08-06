@@ -21,10 +21,38 @@ function getOrCreateFolder(parent, name) {
   return folder;
 }
 
+/**
+ * フォルダのURLからIDを取り出す。IDがそのまま渡された場合はそれを返す。
+ * 設定画面でフォルダのURLを貼られることが多いため、どちらでも動くようにする。
+ *
+ *   https://drive.google.com/drive/folders/1ABC…
+ *   https://drive.google.com/drive/u/0/folders/1ABC…
+ *   1ABC…
+ */
+function parseDriveFolderId(urlOrId) {
+  if (!urlOrId) return null;
+  var s = String(urlOrId).trim();
+
+  var m = s.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+
+  m = s.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+
+  if (/^[a-zA-Z0-9_-]+$/.test(s)) return s;
+  return null;
+}
+
 /** ルートフォルダを取得する。一時的な失敗があるためリトライする */
 function getRootFolder() {
-  var id = getProp(PROP.DRIVE_ROOT_FOLDER_ID);
-  if (!id) throw new Error('スクリプトプロパティ ' + PROP.DRIVE_ROOT_FOLDER_ID + ' が未設定です。');
+  var raw = getProp(PROP.DRIVE_ROOT_FOLDER_ID);
+  if (!raw) throw new Error('スクリプトプロパティ ' + PROP.DRIVE_ROOT_FOLDER_ID + ' が未設定です。');
+
+  var id = parseDriveFolderId(raw);
+  if (!id) {
+    throw new Error('画像保存フォルダの指定を解釈できません: ' + raw +
+                    '（フォルダのURLかIDを設定してください）');
+  }
 
   var lastError = null;
   for (var i = 0; i < 3; i++) {

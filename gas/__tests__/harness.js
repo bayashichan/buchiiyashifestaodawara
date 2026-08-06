@@ -17,7 +17,7 @@ const GAS_DIR = path.join(__dirname, '..');
 const FILES = [
   'pricing.gs', 'config.gs', 'sheets.gs', 'drive.gs',
   'mailer.gs', 'repeater.gs', 'setup.gs', 'migrate.gs',
-  'admin.gs', 'code.gs'
+  'admin.gs', 'code.gs', 'tools.gs'
 ];
 
 // ========================================
@@ -47,6 +47,7 @@ class FakeRange {
   setValue(v) { this.sheet._set(this.row, this.col, v); return this; }
   setFontWeight() { return this; }
   setBackground() { return this; }
+  setFontColor() { return this; }
 }
 
 class FakeSheet {
@@ -77,6 +78,7 @@ class FakeSheet {
     return new FakeRange(this, 1, 1, Math.max(1, this.getLastRow()), Math.max(1, this.getLastColumn()));
   }
   setFrozenRows() { return this; }
+  autoResizeColumns() { return this; }
   clear() { this.data = []; return this; }
 }
 
@@ -188,6 +190,10 @@ function createHarness(options = {}) {
     },
 
     MimeType: { GOOGLE_SHEETS: 'application/vnd.google-apps.spreadsheet' },
+
+    Session: {
+      getActiveUser: () => ({ getEmail: () => 'tester@example.com' })
+    },
 
     ScriptApp: {
       getProjectTriggers: () => [],

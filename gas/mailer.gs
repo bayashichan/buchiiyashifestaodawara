@@ -107,12 +107,24 @@ function defaultConfirmationBody() {
 /**
  * 差し込み記法:
  *   {{name}} {{email}} {{eventName}} {{eventDate}} {{eventLocation}}
- *   {{boothName}} {{category}} {{breakdown}} {{totalFee}} {{answers}}
- *   {{field:任意の項目ID}}
+ *   {{boothName}} {{category}} {{submittedAt}} {{exhibitorName}}
+ *   {{breakdown}}  料金の内訳（1行1明細）
+ *   {{totalFee}}   合計金額。円記号なしの「28,500」
+ *   {{totalFeeYen}} 合計金額。円記号つきの「¥28,500」
+ *   {{answers}}    申込内容の一覧
+ *   {{field:項目ID}} または {{項目ID}} で任意の項目
+ *
+ * 解決の順序は「明示マップ → {{field:id}} → 項目IDそのもの → 旧名のエイリアス」。
+ * 旧テンプレートをそのまま使い続けられるようにするため、後方互換を優先する。
  */
 function renderTemplate(template, cfg, record) {
   if (!template) return '';
   var ev = cfg.event || {};
+  var answers = record.answers || {};
+
+  // totalFee は円記号を付けない。既存のテンプレートが「合計: ¥{{totalFee}}」と
+  // 書いており、ここで ¥ を付けると「¥¥28,500」になってしまうため。
+  var total = Math.round(record.total || 0);
 
   var map = {
     name: record.name || '',
@@ -122,32 +134,55 @@ function renderTemplate(template, cfg, record) {
     eventLocation: ev.location || '',
     boothName: record.boothName || '',
     category: record.category || '',
+    submittedAt: record.submittedAt || '',
+    exhibitorName: answers.exhibitorName || '',
     breakdown: record.breakdown || '',
-    totalFee: formatYen(record.total || 0),
-    answers: formatAnswersForMail(cfg, record)
+    totalFee: total.toLocaleString('ja-JP'),
+    totalFeeYen: formatYen(total),
+    answers: formatAnswersForMail(cfg, record, false),
+    // 旧テンプレート互換。氏名やメールは同じ本文の上部で個別に差し込まれている
+    // ことが多いため、二重に出ないよう標準項目を除いた分だけを並べる。
+    customAnswers: formatAnswersForMail(cfg, record, true)
   };
+
+  var aliases = {};
 
   var out = String(template);
 
   // {{field:xxx}} を先に処理する
   out = out.replace(/\{\{\s*field:([^}\s]+)\s*\}\}/g, function (m, fieldId) {
-    var v = record.answers ? record.answers[fieldId] : '';
-    return String(formatAnswer(v));
+    return String(formatAnswer(answers[fieldId]));
   });
 
   out = out.replace(/\{\{\s*(\w+)\s*\}\}/g, function (m, key) {
-    return (key in map) ? String(map[key]) : m;
+    if (key in map) return String(map[key]);
+    if (key in aliases) return String(map[aliases[key]]);
+    // 項目IDを直接書いた場合（旧テンプレートの {{cq_menu}} など）
+    if (key in answers) return String(formatAnswer(answers[key]));
+    // 設定に存在する項目なら、未回答でも空文字にする（記法が残らないように）
+    if (findField(cfg, key)) return '';
+    return m;
   });
 
   return out;
 }
 
-/** 申込内容を「項目名: 値」の一覧にする */
-function formatAnswersForMail(cfg, record) {
+/**
+ * 申込内容を「項目名: 値」の一覧にする。
+ *
+ * @param {boolean} customOnly true なら標準項目（system 指定のあるもの）を除く。
+ *   旧テンプレートの {{customAnswers}} は「管理者が追加した質問」だけを並べる
+ *   ものだったので、その意味に合わせるために使う。
+ */
+function formatAnswersForMail(cfg, record, customOnly) {
   var lines = [];
+  var answers = record.answers || {};
+
   (cfg.fields || []).forEach(function (f) {
     if (DISPLAY_ONLY_TYPES.indexOf(f.type) >= 0) return;
-    var v = record.answers ? record.answers[f.id] : '';
+    if (customOnly && f.system) return;
+
+    var v = answers[f.id];
     if (v == null || v === '') return;
     lines.push((f.label || f.id) + ': ' + formatAnswer(v));
   });

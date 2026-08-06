@@ -39,15 +39,24 @@ const CONFIG = {
         price: 5000, max: 5, unit: '名', enabled: true, order: 30 }
     ]
   },
+  // system を持つ項目は「標準項目」。旧テンプレートの {{customAnswers}} は
+  // これらを除いた「管理者が追加した質問」だけを並べる。
   fields: [
-    { id: 'name', type: 'text', label: 'お名前（本名）', section: 'basic', order: 10, required: true },
-    { id: 'email', type: 'email', label: 'メールアドレス', section: 'basic', order: 20, required: true },
-    { id: 'phoneNumber', type: 'tel', label: '電話番号', section: 'basic', order: 30 },
-    { id: 'exhibitorName', type: 'text', label: '出展名', section: 'exhibit', order: 40 },
-    { id: 'category', type: 'category', label: '出展カテゴリ', section: 'exhibit', order: 50 },
-    { id: 'booth', type: 'booth', label: '出展ブース', section: 'exhibit', order: 60 },
+    { id: 'name', type: 'text', label: 'お名前（本名）', section: 'basic', order: 10,
+      required: true, system: 'name' },
+    { id: 'email', type: 'email', label: 'メールアドレス', section: 'basic', order: 20,
+      required: true, system: 'email' },
+    { id: 'phoneNumber', type: 'tel', label: '電話番号', section: 'basic', order: 30,
+      system: 'phone' },
+    { id: 'exhibitorName', type: 'text', label: '出展名', section: 'exhibit', order: 40,
+      system: 'exhibitorName' },
+    { id: 'category', type: 'category', label: '出展カテゴリ', section: 'exhibit', order: 50,
+      system: 'category' },
+    { id: 'booth', type: 'booth', label: '出展ブース', section: 'exhibit', order: 60,
+      system: 'booth' },
     { id: 'cq_menu', type: 'textarea', label: '出展メニュー', section: 'exhibit', order: 70 },
-    { id: 'snsLinks', type: 'snsLinks', label: 'SNSリンク', section: 'sns', order: 80 },
+    { id: 'snsLinks', type: 'snsLinks', label: 'SNSリンク', section: 'sns', order: 80,
+      system: 'snsLinks' },
     { id: 'note', type: 'heading', label: '（説明のみ）', section: 'terms', order: 90 }
   ],
   terms: { body: '規約', requireAgree: true },
@@ -139,6 +148,7 @@ function submitParams(overrides = {}) {
     boothId: 'wall',
     category: '占い',
     isMember: '0',
+    agreeTerms: '1',
     clientTotal: '27500',
     imageFieldIds: '[]'
   }, overrides);
@@ -228,6 +238,97 @@ test('数量オプションはブース上限まで切り下げられる', () =>
   assert.ok(res.notices.some(n => n.optionId === 'staff'));
 });
 
+// ========================================
+// サーバ側の必須チェック
+//
+// フォーム側でも検証しているが、直接POSTされたときに空の申込が通らないこと。
+// ========================================
+test('必須項目が空なら受け付けない', () => {
+  const { h, current } = makeHarness();
+  const res = h.readResponse(h.ctx.doPost({
+    parameter: submitParams({
+      answers: JSON.stringify({ email: 'taro@example.com' })   // 氏名なし
+    })
+  }));
+
+  assert.strictEqual(res.success, false);
+  assert.strictEqual(res.code, 'VALIDATION');
+  assert.match(res.error, /お名前（本名）が入力されていません/);
+  assert.strictEqual(current.getSheetByName('申込データ'), null, '保存されないこと');
+  assert.strictEqual(h.sentMail.length, 0, 'メールも送らないこと');
+});
+
+test('メールアドレスの形式が不正なら受け付けない', () => {
+  const { h } = makeHarness();
+  const res = h.readResponse(h.ctx.doPost({
+    parameter: submitParams({
+      answers: JSON.stringify({ name: '山田 太郎', email: 'not-an-email' })
+    })
+  }));
+  assert.strictEqual(res.success, false);
+  assert.match(res.error, /形式が正しくありません/);
+});
+
+test('規約に同意していなければ受け付けない', () => {
+  const { h } = makeHarness();
+  const res = h.readResponse(h.ctx.doPost({
+    parameter: submitParams({ agreeTerms: '0' })
+  }));
+  assert.strictEqual(res.success, false);
+  assert.match(res.error, /同意が必要です/);
+});
+
+test('規約同意が不要な設定なら agreeTerms なしでも通る', () => {
+  const { h } = makeHarness({
+    mutateConfig: (c) => { c.terms.requireAgree = false; }
+  });
+  const params = submitParams();
+  delete params.agreeTerms;
+  const res = h.readResponse(h.ctx.doPost({ parameter: params }));
+  assert.strictEqual(res.success, true);
+});
+
+test('必須の画像が添付されていなければ受け付けない', () => {
+  const { h } = makeHarness({
+    mutateConfig: (c) => {
+      c.fields.push({ id: 'photo', type: 'image', label: 'プロフィール写真',
+                      section: 'exhibit', order: 75, required: true });
+    }
+  });
+  const res = h.readResponse(h.ctx.doPost({
+    parameter: submitParams({ imageFieldIds: JSON.stringify(['photo']) })
+  }));
+  assert.strictEqual(res.success, false);
+  assert.match(res.error, /プロフィール写真が添付されていません/);
+});
+
+test('登録の無いカテゴリは受け付けない', () => {
+  const { h } = makeHarness({
+    mutateConfig: (c) => { c.fields.find(f => f.type === 'category').required = true; }
+  });
+  const res = h.readResponse(h.ctx.doPost({
+    parameter: submitParams({ category: '存在しないカテゴリ' })
+  }));
+  assert.strictEqual(res.success, false);
+  assert.match(res.error, /カテゴリの値が不正/);
+});
+
+test('文字数上限を超えていれば受け付けない', () => {
+  const { h } = makeHarness({
+    mutateConfig: (c) => { c.fields.find(f => f.id === 'cq_menu').maxLength = 10; }
+  });
+  const res = h.readResponse(h.ctx.doPost({
+    parameter: submitParams({
+      answers: JSON.stringify({
+        name: '山田 太郎', email: 'taro@example.com',
+        cq_menu: 'あ'.repeat(50)
+      })
+    })
+  }));
+  assert.strictEqual(res.success, false);
+  assert.match(res.error, /10文字を超えています/);
+});
+
 test('満枠ブースの申込は受け付けない', () => {
   const { h } = makeHarness({
     mutateConfig: (c) => { c.booths[1].soldOut = true; }
@@ -290,7 +391,76 @@ test('確認メールにテンプレートが差し込まれる', () => {
   assert.match(mail.body, /ブース: 壁側ブース/);
   assert.match(mail.body, /壁側ブース　¥17,000/, '{{breakdown}} が明細になる');
   assert.match(mail.body, /懇親会参加×2名　¥10,000/);
-  assert.match(mail.body, /合計: ¥28,500/);
+  assert.match(mail.body, /合計: 28,500/);
+});
+
+// ========================================
+// 旧テンプレートとの互換
+//
+// 稼働中のメール文面は {{customAnswers}} と「合計: ¥{{totalFee}}」を使っている。
+// 移行で文面を書き換えずに済むよう、そのまま動くことを保証する。
+// ========================================
+test('旧テンプレートの {{customAnswers}} と ¥{{totalFee}} がそのまま使える', () => {
+  const { h } = makeHarness({
+    mutateConfig: (c) => {
+      c.email.confirmationBodyTemplate = [
+        '{{name}} 様', '',
+        '■ お申込み情報',
+        'お名前: {{name}}',
+        'メールアドレス: {{email}}',
+        '出展ブース: {{boothName}}',
+        '{{customAnswers}}', '',
+        '■ お支払い金額',
+        '{{breakdown}}',
+        '合計: ¥{{totalFee}}'
+      ].join('\n');
+    }
+  });
+
+  h.ctx.doPost({ parameter: submitParams() });
+  const body = h.sentMail[0].body;
+
+  // 円記号が二重にならない
+  assert.match(body, /合計: ¥28,500/);
+  assert.ok(!/¥¥/.test(body), '¥¥ にならないこと');
+
+  // {{customAnswers}} が展開され、記法が残らない
+  assert.ok(!/\{\{/.test(body), '展開されない差し込み記法が残らないこと');
+  assert.match(body, /出展メニュー: タロット占い/, 'カスタム質問が展開される');
+
+  // 標準項目は上部で個別に差し込まれているので重複させない
+  const nameCount = (body.match(/山田 太郎/g) || []).length;
+  assert.strictEqual(nameCount, 2, '氏名は「様」と「お名前:」の2箇所だけ');
+  assert.ok(!/お名前（本名）: 山田 太郎/.test(body),
+    '{{customAnswers}} 側に標準項目を含めない');
+});
+
+test('項目IDを直接書いた差し込み {{cq_menu}} も展開される', () => {
+  const { h } = makeHarness({
+    mutateConfig: (c) => {
+      c.email.confirmationBodyTemplate = 'メニュー: {{cq_menu}} / 出展名: {{exhibitorName}}';
+    }
+  });
+  h.ctx.doPost({ parameter: submitParams() });
+  const body = h.sentMail[0].body;
+  assert.match(body, /メニュー: タロット占い/);
+  assert.match(body, /出展名: サロン太郎/);
+});
+
+test('{{totalFeeYen}} は円記号つきで出る', () => {
+  const { h } = makeHarness({
+    mutateConfig: (c) => { c.email.confirmationBodyTemplate = '合計 {{totalFeeYen}}'; }
+  });
+  h.ctx.doPost({ parameter: submitParams() });
+  assert.match(h.sentMail[0].body, /合計 ¥28,500/);
+});
+
+test('設定に無い差し込みは記法のまま残す（誤字に気づけるように）', () => {
+  const { h } = makeHarness({
+    mutateConfig: (c) => { c.email.confirmationBodyTemplate = '{{typo_here}}'; }
+  });
+  h.ctx.doPost({ parameter: submitParams() });
+  assert.match(h.sentMail[0].body, /\{\{typo_here\}\}/);
 });
 
 test('送信枠が尽きても申込は保存され、確認メールはキューに積まれる', () => {
@@ -645,6 +815,63 @@ test('同じデータを二重に移送しない', () => {
   assert.strictEqual(second.migrated, 0);
   assert.strictEqual(second.skipped, 1);
   assert.strictEqual(master.getSheetByName('申込データ').getLastRow(), 2, '増えていない');
+});
+
+// ========================================
+// Drive フォルダの指定
+// ========================================
+test('フォルダのURLからIDを取り出せる', () => {
+  const { h } = makeHarness();
+  const p = h.ctx.parseDriveFolderId;
+
+  assert.strictEqual(p('https://drive.google.com/drive/folders/1ABCxyz_-9'), '1ABCxyz_-9');
+  assert.strictEqual(p('https://drive.google.com/drive/u/0/folders/1ABCxyz_-9'), '1ABCxyz_-9');
+  assert.strictEqual(p('https://drive.google.com/open?id=1ABCxyz_-9'), '1ABCxyz_-9');
+  assert.strictEqual(p('1ABCxyz_-9'), '1ABCxyz_-9', 'IDのみでもそのまま使える');
+  assert.strictEqual(p('  1ABCxyz_-9  '), '1ABCxyz_-9', '前後の空白を無視する');
+  assert.strictEqual(p(''), null);
+  assert.strictEqual(p('これは違う値です'), null);
+});
+
+test('フォルダをURLで指定していても画像を保存できる', () => {
+  const { h } = makeHarness({
+    properties: { DRIVE_ROOT_FOLDER_ID: 'https://drive.google.com/drive/folders/ROOT' }
+  });
+  const folder = h.ctx.getRootFolder();
+  assert.ok(folder, 'URL指定でもフォルダを開ける');
+});
+
+test('フォルダの指定が解釈できなければ理由の分かるエラーになる', () => {
+  const { h } = makeHarness({ properties: { DRIVE_ROOT_FOLDER_ID: '不正な値' } });
+  assert.throws(() => h.ctx.getRootFolder(), /解釈できません/);
+});
+
+// ========================================
+// 運用補助
+// ========================================
+test('メール文面のプレビューが差し込み後の本文を返す', () => {
+  const { h } = makeHarness();
+  const text = h.ctx.previewConfirmationMail();
+  assert.match(text, /=== 件名 ===/);
+  assert.match(text, /=== 本文 ===/);
+  assert.ok(!/展開されなかった差し込み/.test(text),
+    '既定のテンプレートに未展開の記法が残らないこと');
+  assert.strictEqual(h.sentMail.length, 0, 'プレビューでは送信しない');
+});
+
+test('プレビューは未展開の差し込みを警告する', () => {
+  const { h } = makeHarness({
+    mutateConfig: (c) => { c.email.confirmationBodyTemplate = '{{typo}}'; }
+  });
+  assert.match(h.ctx.previewConfirmationMail(), /展開されなかった差し込み: \{\{typo\}\}/);
+});
+
+test('設定確認が状態を一覧で返す', () => {
+  const { h } = makeHarness();
+  const text = h.ctx.checkSetup();
+  assert.match(text, /config\.json を取得できました/);
+  assert.match(text, /第1回テストフェスタ/);
+  assert.match(text, /本日あと \d+ 宛先/);
 });
 
 test('移送先が未設定なら分かるエラーを返す', () => {

@@ -568,6 +568,8 @@ async function submitForm() {
     fd.set('category', selectedCategory || '');
     fd.set('isMember', OptionFields.getIsMember() ? '1' : '0');
     fd.set('isEarlyBird', quote.earlyBird ? '1' : '0');
+    // 規約同意はサーバ側でも確認するので必ず送る
+    fd.set('agreeTerms', agreeCb && agreeCb.checked ? '1' : '0');
 
     // 金額はサーバ側が再計算する。これは突合用の参考値。
     fd.set('clientTotal', String(quote.total));

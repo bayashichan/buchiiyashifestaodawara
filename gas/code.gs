@@ -65,6 +65,80 @@ function route(action, params) {
 }
 
 // ========================================
+// 入力の検証
+// ========================================
+
+/**
+ * 必須項目・形式・規約同意をサーバ側で確認する。
+ * 項目の定義は config から読むので、管理者が必須の有無を変えれば追従する。
+ *
+ * @returns {Array<string>} エラーメッセージ。空配列なら問題なし。
+ */
+function validateSubmission(cfg, answers, params) {
+  var errors = [];
+  answers = answers || {};
+
+  (cfg.fields || []).forEach(function (f) {
+    if (DISPLAY_ONLY_TYPES.indexOf(f.type) >= 0) return;
+    // ブースとカテゴリは answers ではなく専用のパラメータで送られる
+    if (f.type === 'booth' || f.type === 'category') return;
+
+    var label = f.label || f.id;
+
+    // 画像は answers の文字列ではなく、実際に添付が届いているかで判定する
+    if (f.type === 'image') {
+      var hasImage = !!(params['image_' + f.id + '_base64'] ||
+                        params['image_' + f.id + '_existingUrl']);
+      if (f.required && !hasImage) errors.push(label + 'が添付されていません');
+      return;
+    }
+
+    var v = answers[f.id];
+    var empty = (v == null) || (Array.isArray(v) ? !v.length : !String(v).trim());
+
+    if (f.required && empty) {
+      errors.push(label + 'が入力されていません');
+      return;
+    }
+    if (empty) return;
+
+    if (f.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v))) {
+      errors.push(label + 'の形式が正しくありません');
+    }
+    if (f.maxLength > 0 && typeof v === 'string' && v.length > f.maxLength) {
+      errors.push(label + 'が' + f.maxLength + '文字を超えています');
+    }
+  });
+
+  // カテゴリは config に登録がある場合のみ必須扱いにする
+  var categoryField = findFieldByType(cfg, 'category');
+  if (categoryField && categoryField.required && (cfg.categories || []).length) {
+    if (!String(params.category || '').trim()) {
+      errors.push('出展カテゴリが選択されていません');
+    } else if ((cfg.categories || []).indexOf(params.category) < 0) {
+      errors.push('出展カテゴリの値が不正です');
+    }
+  }
+
+  // 規約同意
+  if ((cfg.terms || {}).requireAgree !== false) {
+    if (params.agreeTerms !== '1' && params.agreeTerms !== 'true' && params.agreeTerms !== 'on') {
+      errors.push(((cfg.terms || {}).title || '出展規約') + 'への同意が必要です');
+    }
+  }
+
+  return errors;
+}
+
+function findFieldByType(cfg, type) {
+  var fields = (cfg && cfg.fields) || [];
+  for (var i = 0; i < fields.length; i++) {
+    if (fields[i].type === type) return fields[i];
+  }
+  return null;
+}
+
+// ========================================
 // 申込の受付
 // ========================================
 
@@ -85,6 +159,19 @@ function handleSubmit(params) {
   var answers = safeJsonParse(params.answers, {});
   var selected = safeJsonParse(params.selectedOptions, {});
   var isMember = params.isMember === '1';
+
+  // --- 0. 入力の検証 ---
+  // フォーム側でも検証しているが、直接POSTされた場合に空の申込が通らないよう
+  // サーバ側でも必ず確認する。
+  var invalid = validateSubmission(cfg, answers, params);
+  if (invalid.length) {
+    return jsonResponse({
+      success: false,
+      code: 'VALIDATION',
+      error: invalid[0],
+      errors: invalid
+    });
+  }
 
   // --- 1. サーバ側で再計算 ---
   // ブース別のオプション可否・上限もここで再判定されるため、
