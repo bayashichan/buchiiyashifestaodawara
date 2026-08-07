@@ -677,15 +677,46 @@ test('正しいパスワードなら状態を返す', () => {
   assert.strictEqual(typeof res.mailQuotaRemaining, 'number');
 });
 
-test('パスワード誤りが続くとロックされる', () => {
+test('打ち間違いが数回続いてもロックされない', () => {
   const { h } = makeHarness();
-  for (let i = 0; i < 5; i++) {
+  // スマホでの打ち間違いを想定。9回目までは通常のエラーで、締め出さない。
+  for (let i = 0; i < 9; i++) {
+    const res = h.readResponse(h.ctx.doPost({
+      parameter: { action: 'admin_status', password: 'wrong' }
+    }));
+    assert.strictEqual(res.code, 'BAD_PASSWORD', (i + 1) + '回目はまだロックしない');
+  }
+  const ok = h.readResponse(h.ctx.doPost({
+    parameter: { action: 'admin_status', password: 'secret' }
+  }));
+  assert.strictEqual(ok.success, true, '9回誤っても正しく入れればログインできる');
+});
+
+test('パスワード誤りが10回続くとロックされる', () => {
+  const { h } = makeHarness();
+  for (let i = 0; i < 10; i++) {
     h.ctx.doPost({ parameter: { action: 'admin_status', password: 'wrong' } });
   }
   const res = h.readResponse(h.ctx.doPost({
     parameter: { action: 'admin_status', password: 'secret' }
   }));
-  assert.strictEqual(res.code, 'LOCKED', '正しいパスワードでもロック中は拒否');
+  assert.strictEqual(res.code, 'LOCKED');
+});
+
+test('ログインに成功すると失敗カウンタがリセットされる', () => {
+  const { h } = makeHarness();
+  for (let i = 0; i < 9; i++) {
+    h.ctx.doPost({ parameter: { action: 'admin_status', password: 'wrong' } });
+  }
+  h.ctx.doPost({ parameter: { action: 'admin_status', password: 'secret' } });
+
+  // カウンタが戻っているので、また9回まで猶予がある
+  for (let i = 0; i < 9; i++) {
+    const res = h.readResponse(h.ctx.doPost({
+      parameter: { action: 'admin_status', password: 'wrong' }
+    }));
+    assert.strictEqual(res.code, 'BAD_PASSWORD');
+  }
 });
 
 test('設定に致命的な誤りがあれば保存を止める', () => {
