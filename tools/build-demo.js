@@ -498,62 +498,85 @@ function buildShell(formDoc, adminDoc, config) {
 <meta name="robots" content="noindex,nofollow">
 <title>【デモ】出展申込フォーム／管理画面</title>
 <style>
-  :root { color-scheme: light dark; }
+  /*
+   * この外枠は「足場」であって作品ではない。配色はアプリ側のワインとピンクに
+   * 寄せた中間色で、暗い枠に明るいアプリという対比そのものが
+   * 「囲みの中は実物ではない」という境界線になる。
+   * 閲覧側のテーマに追随せず常に暗いのは、その境界を消さないための選択。
+   */
+  :root {
+    --ground:  #1a1016;   /* プラム寄りの黒 */
+    --surface: #251722;
+    --rule:    #3d2a33;
+    --muted:   #c9b8c0;
+    --bright:  #f5eef1;
+    --accent:  #ffa3da;   /* アプリの accentColor */
+    --warn:    #8f1d1d;
+    --flag:    #ffd166;
+  }
   * { box-sizing: border-box; }
-  html, body {
-    margin: 0; height: 100%;
+  html, body { margin: 0; height: 100%; }
+  body {
+    display: flex; flex-direction: column;
+    background: var(--ground); color: var(--bright);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP",
                  "Yu Gothic UI", sans-serif;
-    background: #1c1917; color: #fafaf9;
   }
-  body { display: flex; flex-direction: column; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
   .demo-banner {
-    background: #b91c1c; color: #fff;
+    flex: 0 0 auto;
+    background: var(--warn); color: #fff;
     padding: 0.4rem 0.7rem;
-    font-size: 0.76rem; line-height: 1.35; text-align: center;
-    font-weight: 700; flex: 0 0 auto;
+    font-size: 0.76rem; line-height: 1.35; font-weight: 700; text-align: center;
+    text-wrap: balance;
   }
 
-  .tabs { display: flex; flex: 0 0 auto; background: #292524; }
+  .tabs { display: flex; flex: 0 0 auto; background: var(--surface); }
   .tabs button {
     flex: 1; appearance: none; border: 0; background: transparent;
-    color: #a8a29e; font: inherit; font-size: 0.9rem; font-weight: 600;
+    color: var(--muted); font: inherit; font-size: 0.9rem; font-weight: 600;
     padding: 0.7rem 0.4rem; cursor: pointer;
     border-bottom: 3px solid transparent;
   }
-  .tabs button[aria-selected="true"] { color: #fff; border-bottom-color: #f59e0b; }
+  .tabs button[aria-selected="true"] {
+    color: var(--bright); border-bottom-color: var(--accent);
+  }
 
-  .hint { flex: 0 0 auto; background: #292524; border-top: 1px solid #44403c; }
+  .hint { flex: 0 0 auto; background: var(--surface); border-top: 1px solid var(--rule); }
   .hint > summary {
     list-style: none; cursor: pointer;
-    color: #d6d3d1; font-size: 0.74rem; padding: 0.35rem 0.9rem;
-    display: flex; justify-content: space-between; align-items: center;
+    color: var(--muted); font-size: 0.74rem; padding: 0.35rem 0.9rem;
+    display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
   }
   .hint > summary::-webkit-details-marker { display: none; }
   .hint > summary::after { content: '▼'; font-size: 0.6rem; opacity: 0.7; }
   .hint[open] > summary::after { content: '▲'; }
+
   .hint-body {
-    color: #d6d3d1; font-size: 0.74rem; line-height: 1.65;
+    color: var(--muted); font-size: 0.74rem; line-height: 1.65;
     padding: 0 0.9rem 0.6rem;
+    display: flex; flex-direction: column; gap: 0.4rem;
   }
+  .hint-body p { margin: 0; }
   .hint-body code {
-    background: #44403c; color: #fde68a; padding: 0.05rem 0.35rem;
-    border-radius: 3px; font-size: 0.76rem;
+    background: var(--rule); color: var(--accent);
+    padding: 0.05rem 0.35rem; border-radius: 3px; font-size: 0.76rem;
   }
   .hint-body button {
-    appearance: none; border: 1px solid #57534e; background: #1c1917;
-    color: #e7e5e4; font: inherit; font-size: 0.72rem;
-    padding: 0.25rem 0.6rem; border-radius: 5px; cursor: pointer; margin-top: 0.4rem;
+    align-self: flex-start;
+    appearance: none; border: 1px solid var(--rule); background: var(--ground);
+    color: var(--bright); font: inherit; font-size: 0.72rem;
+    padding: 0.3rem 0.7rem; border-radius: 5px; cursor: pointer;
   }
-  .stale-flag { color: #fbbf24; font-weight: 700; }
+  .stale-flag { color: var(--flag); font-weight: 700; }
 
   .panes { position: relative; flex: 1 1 auto; min-height: 0; background: #fff; }
-  iframe {
+  .panes iframe {
     position: absolute; inset: 0;
     width: 100%; height: 100%; border: 0; background: #fff;
   }
-  iframe[hidden] { display: none; }
+  .panes iframe[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -642,23 +665,23 @@ function buildShell(formDoc, adminDoc, config) {
     if (current === 'admin') {
       summary.textContent = '使い方とデモの制約（管理画面）';
       body.innerHTML =
-        'パスワードは <code>' + window.__DEMO__.password + '</code>（入力済み）。' +
+        '<p>パスワードは <code>' + window.__DEMO__.password + '</code>（入力済み）。' +
         '保存してもGitHubには書き込まず、このページ上の設定だけが変わります。' +
-        'ページを開き直せば元に戻ります。' +
-        '<br>スプレッドシートやフォルダの作成、メール送信、過去データの移送は行いません。' +
-        'メール文面の振込先の数字はデモ用に伏せてあります。';
+        'ページを開き直せば元に戻ります。</p>' +
+        '<p>スプレッドシートやフォルダの作成、メール送信、過去データの移送は行いません。' +
+        'メール文面の振込先の数字はデモ用に伏せてあります。</p>';
     } else {
       summary.innerHTML = '使い方とデモの制約（申込フォーム）' +
         (formStale ? ' <span class="stale-flag">・未反映の変更あり</span>' : '');
       body.innerHTML =
-        '料金計算・必須チェック・ブース別のオプション可否は本番と同じコードで動きます。' +
+        '<p>料金計算・必須チェック・ブース別のオプション可否は本番と同じコードで動きます。' +
         '郵便番号は <code>2500011</code> などで住所検索を試せます。' +
-        'リピーター認証の確認コードは <code>' + window.__DEMO__.authCode + '</code>。' +
-        '<br>送信しても実際には送られません。画像もどこにも保存されません。' +
+        'リピーター認証の確認コードは <code>' + window.__DEMO__.authCode + '</code>。</p>' +
+        '<p>送信しても実際には送られません。画像もどこにも保存されません。</p>' +
         (formStale
-          ? '<br><span class="stale-flag">管理画面の変更はまだ反映されていません。</span>'
+          ? '<p class="stale-flag">管理画面の変更はまだ反映されていません。</p>'
           : '') +
-        '<br><button type="button" id="reloadForm">フォームを再読込</button>';
+        '<button type="button" id="reloadForm">フォームを再読込</button>';
       var btn = document.getElementById('reloadForm');
       if (btn) btn.addEventListener('click', loadForm);
     }
@@ -676,6 +699,21 @@ function buildShell(formDoc, adminDoc, config) {
 }
 
 // ========================================
+
+/**
+ * 外側の <html>/<head>/<body> を取り除き、中身だけにする。
+ *
+ * 公開ページとして配る場合、置き場所側が doctype と head/body を用意するため、
+ * こちらが重ねて持つと入れ子になって崩れる。<title> は置き場所側で付けられるので落とす。
+ * 埋め込んだフォーム・管理画面の文書は JSON 内で < を \\u003c に逃がしてあるので、
+ * ここでの境界検出には引っかからない。
+ */
+function toFragment(doc) {
+  const head = doc.slice(doc.indexOf('<head>') + 6, doc.indexOf('</head>'));
+  const body = doc.slice(doc.indexOf('<body>') + 6, doc.indexOf('</body>'));
+  const style = head.slice(head.indexOf('<style>'), head.indexOf('</style>') + 8);
+  return style.trim() + '\n\n' + body.trim() + '\n';
+}
 
 /**
  * 差し込みが実際に効いたかを確かめる。
@@ -706,20 +744,24 @@ function verify(formDoc, adminDoc) {
 }
 
 function main() {
-  const out = process.argv[2] || path.join(ROOT, 'demo', 'index.html');
-  const config = demoConfig();
+  const args = process.argv.slice(2);
+  const fragment = args.includes('--fragment');
+  const out = args.filter((a) => !a.startsWith('--'))[0]
+    || path.join(ROOT, 'demo', 'index.html');
 
   const formDoc = buildFormDoc();
   const adminDoc = buildAdminDoc();
   verify(formDoc, adminDoc);
 
-  const html = buildShell(formDoc, adminDoc, config);
+  const shell = buildShell(formDoc, adminDoc, demoConfig());
+  const html = fragment ? toFragment(shell) : shell;
 
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, html);
 
   const kb = (Buffer.byteLength(html) / 1024).toFixed(0);
-  console.log('デモを生成しました: ' + path.relative(ROOT, out) + '（' + kb + ' KB）');
+  console.log('デモを生成しました: ' + path.relative(ROOT, out) + '（' + kb + ' KB）'
+    + (fragment ? '（外側のタグなし）' : ''));
   console.log('管理パスワード: ' + DEMO_PASSWORD + ' / 認証コード: ' + DEMO_AUTH_CODE);
 }
 
