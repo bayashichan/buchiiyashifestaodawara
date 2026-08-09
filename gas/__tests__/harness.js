@@ -80,6 +80,7 @@ class FakeSheet {
   setFrozenRows() { return this; }
   autoResizeColumns() { return this; }
   clear() { this.data = []; return this; }
+  deleteRow(row) { this.data.splice(row - 1, 1); return this; }
 }
 
 class FakeSpreadsheet {
@@ -101,6 +102,8 @@ function createHarness(options = {}) {
   const properties = new Map(Object.entries(options.properties || {}));
   const sentMail = [];
   const createdFolders = [];
+  const triggers = [];
+  const activeUser = options.activeUser || 'tester@example.com';
   let quota = options.quota === undefined ? 100 : options.quota;
   let idCounter = 0;
 
@@ -186,20 +189,45 @@ function createHarness(options = {}) {
       Access: { ANYONE_WITH_LINK: 'ANYONE_WITH_LINK' },
       Permission: { VIEW: 'VIEW' },
       getFolderById: (id) => makeFolder(id, 'root'),
-      getFilesByName: () => ({ hasNext: () => false, next: () => null })
+      // options.driveFiles で「Drive にあることにするファイル」を差し込める。
+      // 共有されただけの他人のファイルを掴まないかを確かめるために使う。
+      getFilesByName: (name) => {
+        const hits = (options.driveFiles || [])
+          .filter((f) => f.name === name)
+          .map((f) => ({
+            getId: () => f.id,
+            getName: () => f.name,
+            getMimeType: () => f.mimeType || 'application/vnd.google-apps.spreadsheet',
+            isTrashed: () => !!f.trashed,
+            getOwner: () => (f.owner === null
+              ? null
+              : { getEmail: () => f.owner || activeUser })
+          }));
+        let i = 0;
+        return { hasNext: () => i < hits.length, next: () => hits[i++] };
+      }
     },
 
     MimeType: { GOOGLE_SHEETS: 'application/vnd.google-apps.spreadsheet' },
 
     Session: {
-      getActiveUser: () => ({ getEmail: () => 'tester@example.com' })
+      getActiveUser: () => ({ getEmail: () => activeUser }),
+      getEffectiveUser: () => ({ getEmail: () => activeUser })
     },
 
     ScriptApp: {
-      getProjectTriggers: () => [],
-      newTrigger: () => ({
+      getProjectTriggers: () => triggers.slice(),
+      deleteTrigger: (t) => {
+        const i = triggers.indexOf(t);
+        if (i >= 0) triggers.splice(i, 1);
+      },
+      newTrigger: (fn) => ({
         timeBased: () => ({
-          atHour: () => ({ everyDays: () => ({ create: () => {} }) })
+          atHour: () => ({
+            everyDays: () => ({
+              create: () => { triggers.push({ getHandlerFunction: () => fn }); }
+            })
+          })
         })
       })
     },
@@ -247,6 +275,8 @@ function createHarness(options = {}) {
     cache,
     sentMail,
     createdFolders,
+    triggers,
+    activeUser,
     newSpreadsheet,
     setQuota: (n) => { quota = n; },
     getQuota: () => quota,

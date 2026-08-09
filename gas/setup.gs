@@ -157,14 +157,39 @@ function renameFirstSheet(ss) {
   }
 }
 
-/** 同名のスプレッドシートを探す（二重作成を防ぐ） */
+/**
+ * 同名のスプレッドシートを探す（二重作成を防ぐ）。
+ *
+ * 自分が所有するものだけを対象にする。DriveApp.getFilesByName は
+ * 「共有されただけの他人のファイル」も返すため、旧スプレッドシートを
+ * 閲覧用に共有されている状態で同名だと、稼働中の本番データへ
+ * テスト行を書き込んでしまう。
+ *
+ * 所有者を確認できない場合は再利用しない。重複して作るのは後から直せるが、
+ * 本番へ書き込むのは取り返しがつかないため。
+ */
 function findSpreadsheetByName(name) {
+  var me = null;
+  try {
+    me = Session.getEffectiveUser().getEmail();
+  } catch (e) {
+    console.warn('実行ユーザーを取得できません: ' + e.message);
+  }
+  if (!me) return null;
+
   var it = DriveApp.getFilesByName(name);
   while (it.hasNext()) {
     var file = it.next();
-    if (file.getMimeType() === MimeType.GOOGLE_SHEETS) {
-      return SpreadsheetApp.openById(file.getId());
+    if (file.getMimeType() !== MimeType.GOOGLE_SHEETS) continue;
+    if (file.isTrashed()) continue;
+
+    var owner = null;
+    try { owner = file.getOwner(); } catch (e) { owner = null; }
+    if (!owner || owner.getEmail() !== me) {
+      console.log('同名だが自分の所有ではないため使いません: ' + name);
+      continue;
     }
+    return SpreadsheetApp.openById(file.getId());
   }
   return null;
 }

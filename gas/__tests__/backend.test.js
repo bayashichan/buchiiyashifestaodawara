@@ -915,3 +915,150 @@ test('移送先が未設定なら分かるエラーを返す', () => {
     /マスターDBが未作成/
   );
 });
+
+// ========================================
+// 本番へ書き込まないための守り
+// ========================================
+
+test('所有者が自分なら再利用する / 他人なら再利用しない', () => {
+  const cfg = JSON.parse(JSON.stringify(CONFIG));
+
+  const mine = createHarness({
+    activeUser: 'owner@example.com',
+    properties: { CONFIG_JSON_URL: 'https://example.com/config.json' },
+    fetchHandler: () => ({ code: 200, text: JSON.stringify(cfg) }),
+    driveFiles: [{ id: 'SS_MINE', name: '申込データ', owner: 'owner@example.com' }]
+  });
+  mine.newSpreadsheet('申込データ');
+  // newSpreadsheet が採番した ID ではなく、driveFiles の ID で開けるようにする
+  mine.spreadsheets.set('SS_MINE', mine.spreadsheets.values().next().value);
+  assert.ok(mine.ctx.findSpreadsheetByName('申込データ'), '自分の所有なら再利用する');
+
+  const theirs = createHarness({
+    activeUser: 'owner@example.com',
+    properties: { CONFIG_JSON_URL: 'https://example.com/config.json' },
+    fetchHandler: () => ({ code: 200, text: JSON.stringify(cfg) }),
+    driveFiles: [{ id: 'SS_STAFF', name: '申込データ', owner: 'staff@example.com' }]
+  });
+  assert.strictEqual(
+    theirs.ctx.findSpreadsheetByName('申込データ'), null,
+    '他人所有（共有されただけ）なら再利用しない');
+});
+
+test('所有者を確認できないファイルは再利用しない', () => {
+  const cfg = JSON.parse(JSON.stringify(CONFIG));
+  const h = createHarness({
+    properties: { CONFIG_JSON_URL: 'https://example.com/config.json' },
+    fetchHandler: () => ({ code: 200, text: JSON.stringify(cfg) }),
+    driveFiles: [{ id: 'SS_X', name: '申込データ', owner: null }]
+  });
+  assert.strictEqual(h.ctx.findSpreadsheetByName('申込データ'), null);
+});
+
+test('GITHUB_BRANCH が未設定なら設定を保存しない', () => {
+  // 既定を main にしていると、検証用プロジェクトの保存が本番を書き換える。
+  const { h } = makeHarness({
+    properties: { GITHUB_TOKEN: 'tok', GITHUB_REPO: 'owner/repo' }
+  });
+  const res = h.readResponse(h.ctx.handleAdmin('admin_save_config', {
+    password: 'secret',
+    config: JSON.stringify(CONFIG)
+  }));
+  assert.strictEqual(res.success, false);
+  assert.match(res.error, /GITHUB_BRANCH/);
+});
+
+// ========================================
+// フル機能テスト（runFullTest 自体の検証）
+// ========================================
+
+test('runFullTest が申込・転記・メール・照合を通しで確認する', () => {
+  const { h } = makeHarness({ properties: { DRIVE_ROOT_FOLDER_ID: 'ROOT' } });
+
+  const report = h.ctx.runFullTest();
+
+  assert.ok(!/❌/.test(report), '失敗項目が出ていない:\n' + report);
+  assert.match(report, /申込を受け付けました/);
+  assert.match(report, /金額が計算どおりです/);
+  assert.match(report, /合計金額の列が正しく入っています/);
+  assert.match(report, /マスターDBにも転記されました/);
+  assert.match(report, /確認メールを送信しました/);
+  assert.match(report, /メール本文の差し込みはすべて展開されました/);
+  assert.match(report, /認証コードで過去の申込を読み出せました/);
+
+  // setupNewEvent が保存先を作り直すので、実行後のプロパティを見る
+  const current = h.spreadsheets.get(h.properties.get('CURRENT_SPREADSHEET_ID'));
+  const master = h.spreadsheets.get(h.properties.get('DATABASE_SPREADSHEET_ID'));
+
+  assert.strictEqual(current.getSheetByName('申込データ').getLastRow(), 2, 'ヘッダー + 申込1件');
+  assert.strictEqual(master.getSheetByName('申込データ').getLastRow(), 2);
+  assert.ok(h.sentMail.length >= 1, '確認メールが送られている');
+});
+
+test('runFullTest は書き込み先が main のとき中止する', () => {
+  const { h } = makeHarness({
+    properties: { GITHUB_TOKEN: 'tok', GITHUB_REPO: 'owner/repo', GITHUB_BRANCH: 'main' }
+  });
+  const report = h.ctx.runFullTest();
+
+  assert.match(report, /中止しました/);
+  assert.match(report, /稼働中のフォームの設定が書き換わります/);
+  assert.ok(!/申込を受け付けました/.test(report), '申込まで進んでいない');
+});
+
+test('cleanupTestData は目印のある行だけ消す', () => {
+  const { h } = makeHarness({ properties: { DRIVE_ROOT_FOLDER_ID: 'ROOT' } });
+
+  h.ctx.runFullTest();
+
+  // 同じ保存先に、目印のない本物の申込を1件足す
+  const current = h.spreadsheets.get(h.properties.get('CURRENT_SPREADSHEET_ID'));
+  h.readResponse(h.ctx.doPost({ parameter: {
+    action: 'submit',
+    answers: JSON.stringify({ name: '本物 花子', email: 'real@example.com' }),
+    selectedOptions: '{}', boothId: 'inner', agreeTerms: '1', imageFieldIds: '[]'
+  }}));
+
+  const sheet = current.getSheetByName('申込データ');
+  assert.strictEqual(sheet.getLastRow(), 3, 'ヘッダー + テスト + 本物');
+
+  const text = h.ctx.cleanupTestData();
+  assert.match(text, /今回の申込データ: 1行を削除しました/);
+
+  assert.strictEqual(sheet.getLastRow(), 2, '本物の申込は残る');
+  const rows = h.ctx.readRows(current.getId()).rows;
+  assert.ok(rows.some((r) => r.byKey.name === '本物 花子'), '本物の行が残っている');
+  assert.ok(!rows.some((r) => String(r.byKey.name).indexOf('★自動テスト★') >= 0));
+});
+
+test('removeTriggers が自動実行をすべて外す', () => {
+  const { h } = makeHarness();
+  h.ctx.installTriggers();
+  assert.ok(h.triggers.length > 0);
+
+  const text = h.ctx.removeTriggers();
+  assert.match(text, /件のトリガーを削除しました/);
+  assert.strictEqual(h.triggers.length, 0);
+});
+
+test('runFullTest が画像の Drive 保存まで確認する', () => {
+  const { h } = makeHarness({
+    properties: { DRIVE_ROOT_FOLDER_ID: 'ROOT' },
+    mutateConfig: (c) => {
+      c.fields.push({
+        id: 'profileImage', type: 'image', label: 'プロフィール写真',
+        section: 'exhibit', order: 90, required: true
+      });
+    }
+  });
+
+  const report = h.ctx.runFullTest();
+
+  assert.ok(!/❌/.test(report), '失敗項目が出ていない:\n' + report);
+  assert.match(report, /画像が Drive に保存されました: https:\/\//);
+
+  // 行にも画像URLが入っていること
+  const current = h.spreadsheets.get(h.properties.get('CURRENT_SPREADSHEET_ID'));
+  const row = h.ctx.readRows(current.getId()).rows[0];
+  assert.match(String(row.byKey.profileImage), /^https:\/\//);
+});

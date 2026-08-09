@@ -107,12 +107,17 @@ function handleSaveConfig(params) {
 
   var token = getProp(PROP.GITHUB_TOKEN);
   var repo = getProp(PROP.GITHUB_REPO);
-  var branch = getProp(PROP.GITHUB_BRANCH, 'main');
+  var branch = getProp(PROP.GITHUB_BRANCH);
   var pathInRepo = getProp(PROP.CONFIG_PATH, 'apply/config.json');
 
-  if (!token || !repo) {
+  // 書き込み先ブランチに既定値を持たせない。
+  // main を既定にすると、検証用のプロジェクトで保存を押しただけで
+  // 稼働中のフォームの設定が書き換わる。どのブランチへ書くかは必ず明示させる。
+  if (!token || !repo || !branch) {
     return errorResponse(
-      'GitHub の接続情報が未設定です（GITHUB_TOKEN / GITHUB_REPO）。', 'NOT_CONFIGURED');
+      'GitHub の接続情報が未設定です（GITHUB_TOKEN / GITHUB_REPO / GITHUB_BRANCH）。'
+      + ' 検証用のプロジェクトでは GITHUB_BRANCH に検証用のブランチ名を入れてください。',
+      'NOT_CONFIGURED');
   }
 
   var apiBase = 'https://api.github.com/repos/' + repo + '/contents/' + pathInRepo;
