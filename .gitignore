@@ -1,0 +1,5 @@
+node_modules/
+.DS_Store
+
+# tools/build-demo.js の生成物。本物と紛れないよう配信しない
+demo/
