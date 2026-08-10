@@ -422,7 +422,7 @@
     "resendCooldownSeconds": 60
   },
   "integration": {
-    "gasUrl": "https://script.google.com/macros/s/AKfycbzdEcorQyVCAfOTmtYhWSRBVp020nBYFI8fezNUt6GRWbpTw3ZeYLG9Vs5DhslZ4i2Y/exec",
+    "gasUrl": "",
     "workerUrl": "",
     "configJsonUrl": "",
     "liffId": ""

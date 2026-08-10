@@ -414,8 +414,18 @@ test('配信中の config.json が v2 として妥当', () => {
   assert.ok(!('driveFolderUrl' in raw), 'driveFolderUrl は GAS 側で保持する');
   assert.ok(!(raw.email && raw.email.adminEmail), 'adminEmail は GAS 側で保持する');
 
-  // 送信先は必要なので残る
-  assert.ok(cfg.integration.gasUrl, 'gasUrl は必要');
+  // 送信先。切り替え時に新しい Apps Script の /exec を入れる。
+  //
+  // 稼働中の旧 Apps Script を指したままにしてはいけない。
+  // 新しいフォームは answers / selectedOptions を送るので旧 GAS は解釈できず、
+  // ローカルで動作確認しただけで稼働中のスプレッドシートに壊れた行が入る。
+  const gasUrl = cfg.integration.gasUrl;
+  assert.ok(
+    !/AKfycbzdEcorQyVCAfOTmtYhWSRBVp020nBYFI8fezNUt6GRWbpTw3ZeYLG9Vs5DhslZ4i2Y/.test(gasUrl),
+    '稼働中の旧 Apps Script を指していないこと');
+  assert.ok(
+    gasUrl === '' || /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(gasUrl),
+    'gasUrl は空（未設定）か、Apps Script の /exec URL であること');
 });
 
 // ========================================
