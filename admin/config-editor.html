@@ -110,6 +110,28 @@ select.field-input{cursor:pointer}
 .mail-preview{background:#0f172a;border:1px solid #475569;border-radius:0.5rem;padding:1rem;margin-top:0.6rem;font-size:0.85rem;line-height:1.9;white-space:pre-wrap;word-break:break-word;color:#cbd5e1}
 .mail-preview .filled{background:rgba(52,211,153,0.18);color:#6ee7b7;border-radius:0.25rem;padding:0 0.25rem;font-weight:600}
 .preview-note{font-size:0.75rem;color:var(--muted);margin-top:0.5rem}
+
+/* 開催回・保存先 */
+.help-text{font-size:0.78rem;color:var(--muted);line-height:1.8;margin-top:0.35rem}
+.danger-note{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.4);border-radius:0.5rem;padding:0.75rem 1rem;font-size:0.8rem;line-height:1.8;color:#fecaca;margin-bottom:1rem}
+.locked{opacity:0.45;pointer-events:none;transition:opacity 0.2s}
+.path-preview{background:#0f172a;border:1px solid #334155;border-radius:0.5rem;padding:0.75rem 1rem;margin-top:0.6rem;font-size:0.8rem;line-height:2;color:#cbd5e1}
+.path-preview .folder{color:#fbbf24}
+.path-preview .auto{color:var(--green);font-weight:700}
+.edition-card{background:#0f172a;border:1px solid #334155;border-radius:0.5rem;padding:1rem;margin-bottom:0.75rem}
+.edition-card.active{border-color:var(--green);box-shadow:0 0 0 1px rgba(52,211,153,0.35)}
+.edition-head{display:flex;justify-content:space-between;align-items:center;gap:0.75rem;margin-bottom:0.75rem}
+.badge-active{background:rgba(52,211,153,0.15);color:var(--green);border:1px solid var(--green);border-radius:9999px;padding:0.15rem 0.7rem;font-size:0.72rem;font-weight:700;white-space:nowrap}
+.badge-past{background:#334155;color:var(--muted);border-radius:9999px;padding:0.15rem 0.7rem;font-size:0.72rem;font-weight:700;white-space:nowrap}
+.edition-actions{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem}
+.btn-mini{padding:0.3rem 0.8rem;font-size:0.78rem;border-radius:0.4rem;border:none;font-family:inherit;font-weight:700;cursor:pointer}
+.btn-open{background:#334155;color:#e2e8f0;border:1px solid #475569}
+.btn-open:hover{background:#475569}
+.btn-make{background:rgba(52,211,153,0.15);color:var(--green);border:1px solid var(--green)}
+.btn-make:hover{background:rgba(52,211,153,0.3)}
+.sheet-status{font-size:0.75rem;margin-top:0.4rem;line-height:1.7}
+.sheet-status.ok{color:var(--green)}
+.sheet-status.ng{color:var(--yellow)}
 </style>
 </head>
 <body>
@@ -169,7 +191,8 @@ select.field-input{cursor:pointer}
     <div class="nav-item" onclick="scrollTo('s-custom')">❓ カスタム質問</div>
     <div class="nav-item" onclick="scrollTo('s-terms')">📜 出展規約</div>
     <div class="nav-item" onclick="scrollTo('s-email')">📧 メール設定</div>
-    <div class="nav-item" onclick="scrollTo('s-infra')">🔧 インフラ設定</div>
+    <div class="nav-item" onclick="scrollTo('s-editions')">📅 開催回・保存先</div>
+    <div class="nav-item" onclick="scrollTo('s-infra')">⚙️ システム設定</div>
   </nav>
 
   <!-- メイン -->
@@ -406,29 +429,72 @@ select.field-input{cursor:pointer}
     </div>
 
     <!-- インフラ設定 -->
+    <!-- 開催回とデータ保存先 -->
+    <div class="section-card" id="s-editions">
+      <div class="section-title">📅 開催回とデータの保存先</div>
+      <p class="help-text">
+        開催回ごとに「申込データを書き込むスプレッドシート」を分けて管理できます。<br>
+        <strong>受付中</strong>にした開催回のスプレッドシートに、これから届く申込が保存されます。写真は下で指定した親フォルダの中に、<strong>開催回ごとのフォルダが自動で作られて</strong>保存されます。
+      </p>
+
+      <div class="field-group">
+        <label class="field-label">いま受付中の開催回</label>
+        <select class="field-input" id="currentEditionSelect" onchange="setCurrentEdition(this.value)"></select>
+      </div>
+
+      <div id="editionList"></div>
+      <button class="add-btn" onclick="addEditionPrompt()">＋ 新しい開催回を追加する</button>
+
+      <div class="field-group" style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid #334155">
+        <label class="field-label">写真の保存先（親フォルダのURL）</label>
+        <input type="url" class="field-input" id="driveParentFolderUrl"
+               placeholder="https://drive.google.com/drive/folders/..."
+               oninput="renderDrivePathPreview()">
+        <p class="help-text">
+          Google ドライブでフォルダを開き、ブラウザのURLをそのまま貼り付けてください。
+        </p>
+        <div class="path-preview" id="drivePathPreview"></div>
+      </div>
+    </div>
+
+    <!-- システム設定 -->
     <div class="section-card" id="s-infra">
-      <div class="section-title">🔧 インフラ設定（デプロイ時に設定）</div>
-      <div class="field-group">
-        <label class="field-label">このconfig.jsonの公開URL (configJsonUrl)</label>
-        <input type="url" class="field-input" id="configJsonUrl" placeholder="https://USERNAME.github.io/REPO/apply/config.json">
+      <div class="section-title">⚙️ システム設定（通常は変更しません）</div>
+      <div class="danger-note">
+        ⚠️ ここは<strong>申込フォームの心臓部</strong>です。書き換えると申込が届かなくなることがあります。<br>
+        業者・開発者から指示があったときだけ、下のスイッチを入れて変更してください。
       </div>
-      <div class="field-group">
-        <label class="field-label">GAS デプロイURL (gasUrl)</label>
-        <input type="url" class="field-input" id="gasUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      <div class="toggle-row" style="border-bottom:none">
+        <div>
+          <div class="toggle-label">この項目を編集できるようにする</div>
+          <div class="toggle-desc">通常はオフのままにしてください</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="unlockSystem" onchange="toggleSystemLock()"><span class="toggle-slider"></span></label>
       </div>
-      <div class="field-group">
-        <label class="field-label">Cloudflare Worker URL (workerUrl)</label>
-        <input type="url" class="field-input" id="workerUrl" placeholder="https://YOUR-WORKER.workers.dev">
-      </div>
-      <div class="grid-2">
+      <div id="systemFields" class="locked">
         <div class="field-group">
-          <label class="field-label">スプレッドシートID (spreadsheetId)</label>
-          <input type="text" class="field-input" id="spreadsheetId" placeholder="1Hx...">
+          <label class="field-label">このconfig.jsonの公開URL (configJsonUrl)</label>
+          <input type="url" class="field-input" id="configJsonUrl" placeholder="https://USERNAME.github.io/REPO/apply/config.json">
         </div>
         <div class="field-group">
-          <label class="field-label">DriveフォルダURL (driveFolderUrl)</label>
-          <input type="url" class="field-input" id="driveFolderUrl" placeholder="https://drive.google.com/drive/folders/1Hx...">
-          <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">※ DriveでフォルダをひらいてURLをそのままコピーして貼り付けてください</p>
+          <label class="field-label">GAS デプロイURL (gasUrl)</label>
+          <input type="url" class="field-input" id="gasUrl" placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Cloudflare Worker URL (workerUrl)</label>
+          <input type="url" class="field-input" id="workerUrl" placeholder="https://YOUR-WORKER.workers.dev">
+        </div>
+        <div class="grid-2">
+          <div class="field-group">
+            <label class="field-label">スプレッドシートID (spreadsheetId)</label>
+            <input type="text" class="field-input" id="spreadsheetId" placeholder="1Hx..." readonly>
+            <p class="help-text">「受付中の開催回」から自動で設定されます</p>
+          </div>
+          <div class="field-group">
+            <label class="field-label">DriveフォルダURL (driveFolderUrl)</label>
+            <input type="url" class="field-input" id="driveFolderUrl" placeholder="https://drive.google.com/drive/folders/1Hx..." readonly>
+            <p class="help-text">上の「写真の保存先」から自動で設定されます</p>
+          </div>
         </div>
       </div>
     </div>
@@ -681,6 +747,10 @@ function validateConfig(c) {
   if (!c.booths?.length)   errors.push('・ブースが1件も登録されていません');
   if (!c.categories?.length) errors.push('・カテゴリが1件も登録されていません');
   if (!c.gasUrl && !c.workerUrl) errors.push('・送信先URL（GAS/Worker）が未設定です');
+  const ed = (c.editions || []).find(e => e.id === c.currentEditionId);
+  if (!ed)                  errors.push('・受付中の開催回が選ばれていません');
+  else if (!ed.spreadsheetId) errors.push(`・受付中の開催回「${ed.label || '(名前未設定)'}」の保存先スプレッドシートが未設定です`);
+  if (!c.driveParentFolderUrl) errors.push('・写真の保存先（親フォルダのURL）が未設定です');
   c.booths?.forEach((b, i) => {
     if (!b.name) errors.push(`・ブース${i + 1}の名称が未入力です`);
   });
@@ -689,6 +759,212 @@ function validateConfig(c) {
     if (!q.label) errors.push(`・カスタム質問${i + 1}の質問文が未入力です`);
   });
   return errors;
+}
+
+// ========================================
+// 開催回とデータ保存先
+// ========================================
+let editions = [];
+let currentEditionId = '';
+
+// URLでもIDでも貼り付けられるようにする
+function extractSheetId(input) {
+  const s = String(input || '').trim();
+  if (!s) return '';
+  return (s.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/) || [])[1] || (/^[a-zA-Z0-9_-]{20,}$/.test(s) ? s : '');
+}
+
+function extractFolderId(input) {
+  const s = String(input || '').trim();
+  if (!s) return '';
+  return (s.match(/\/folders\/([a-zA-Z0-9_-]+)/) || [])[1]
+      || (s.match(/[?&]id=([a-zA-Z0-9_-]+)/) || [])[1]
+      || (/^[a-zA-Z0-9_-]{20,}$/.test(s) ? s : '');
+}
+
+function sheetUrlFromId(id) {
+  return id ? `https://docs.google.com/spreadsheets/d/${id}/edit` : '';
+}
+
+function currentEdition() {
+  return editions.find(e => e.id === currentEditionId) || editions[0] || null;
+}
+
+function addEdition(data = {}) {
+  editions.push({
+    id:            data.id || `ed_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+    label:         data.label || '',
+    spreadsheetId: data.spreadsheetId || '',
+    folderName:    data.folderName || ''
+  });
+  if (!currentEditionId) currentEditionId = editions[0].id;
+}
+
+function addEditionPrompt() {
+  const label = prompt('新しい開催回の名前を入力してください\n（例: 第2回（2027年3月1日））', `第${editions.length + 1}回`);
+  if (label === null) return;
+  addEdition({ label: label.trim() || `第${editions.length + 1}回` });
+  renderEditions();
+  setDirty(true);
+  showToast('開催回を追加しました。スプレッドシートを設定してください');
+}
+
+function updateEdition(idx, key, val) {
+  if (!editions[idx]) return;
+  editions[idx][key] = key === 'spreadsheetId' ? extractSheetId(val) || val.trim() : val;
+  if (key === 'spreadsheetId') renderEditions();
+  syncSystemFields();
+  renderDrivePathPreview();
+  setDirty(true);
+}
+
+function removeEdition(idx) {
+  const ed = editions[idx];
+  if (!ed) return;
+  if (ed.id === currentEditionId) {
+    alert('受付中の開催回は削除できません。\n先に別の開催回を「受付中」にしてください。');
+    return;
+  }
+  if (!confirm(`「${ed.label}」を一覧から削除します。\n（スプレッドシートやフォルダ自体は消えません）`)) return;
+  editions.splice(idx, 1);
+  renderEditions();
+  setDirty(true);
+}
+
+function setCurrentEdition(id) {
+  currentEditionId = id;
+  renderEditions();
+  syncSystemFields();
+  renderDrivePathPreview();
+  setDirty(true);
+}
+
+function renderEditions() {
+  const list = document.getElementById('editionList');
+  const select = document.getElementById('currentEditionSelect');
+  if (!list || !select) return;
+
+  if (!editions.length) addEdition({ label: document.getElementById('eventName')?.value || '第1回' });
+  if (!editions.some(e => e.id === currentEditionId)) currentEditionId = editions[0].id;
+
+  select.innerHTML = editions
+    .map(e => `<option value="${escHtml(e.id)}"${e.id === currentEditionId ? ' selected' : ''}>${escHtml(e.label || '(名前未設定)')}</option>`)
+    .join('');
+
+  list.innerHTML = '';
+  editions.forEach((ed, idx) => {
+    const isCurrent = ed.id === currentEditionId;
+    const hasSheet  = !!ed.spreadsheetId;
+    const card = document.createElement('div');
+    card.className = 'edition-card' + (isCurrent ? ' active' : '');
+    card.innerHTML = `
+      <div class="edition-head">
+        <span class="${isCurrent ? 'badge-active' : 'badge-past'}">${isCurrent ? '✅ 受付中' : '過去の回'}</span>
+        <input type="text" class="field-input" value="${escHtml(ed.label)}" placeholder="第1回（2026年11月1日）"
+               oninput="updateEdition(${idx}, 'label', this.value)" style="flex:1">
+      </div>
+      <div class="field-group" style="margin-bottom:0.5rem">
+        <label class="field-label">申込データの保存先（スプレッドシートのURL）</label>
+        <input type="text" class="field-input" value="${escHtml(ed.spreadsheetId ? sheetUrlFromId(ed.spreadsheetId) : '')}"
+               placeholder="URLを貼り付け、または右下のボタンで新規作成"
+               onchange="updateEdition(${idx}, 'spreadsheetId', this.value)">
+        <div class="sheet-status ${hasSheet ? 'ok' : 'ng'}" id="sheetStatus-${idx}">
+          ${hasSheet ? '✅ 設定済み' : '⚠️ 未設定です。このままではこの回の申込を保存できません'}
+        </div>
+      </div>
+      <div class="field-group" style="margin-bottom:0">
+        <label class="field-label">写真フォルダ名（空欄なら開催回の名前をそのまま使用）</label>
+        <input type="text" class="field-input" value="${escHtml(ed.folderName)}" placeholder="${escHtml(ed.label || '第1回')}"
+               oninput="updateEdition(${idx}, 'folderName', this.value)">
+      </div>
+      <div class="edition-actions">
+        ${hasSheet ? `<button type="button" class="btn-mini btn-open" onclick="window.open('${sheetUrlFromId(ed.spreadsheetId)}','_blank')">📊 スプレッドシートを開く</button>` : ''}
+        <button type="button" class="btn-mini btn-make" onclick="createSpreadsheetFor(${idx})">✨ スプレッドシートを新規作成</button>
+        ${isCurrent ? '' : `<button type="button" class="btn-mini btn-open" onclick="setCurrentEdition('${escHtml(ed.id)}')">この回を受付中にする</button>`}
+        ${isCurrent ? '' : `<button type="button" class="btn-mini btn-danger" onclick="removeEdition(${idx})">削除</button>`}
+      </div>`;
+    list.appendChild(card);
+  });
+
+  syncSystemFields();
+  renderDrivePathPreview();
+}
+
+// 受付中の開催回・親フォルダを、従来からある設定値へ反映する（申込フォーム側は変更不要）
+function syncSystemFields() {
+  const ed = currentEdition();
+  const sid = document.getElementById('spreadsheetId');
+  const durl = document.getElementById('driveFolderUrl');
+  if (sid)  sid.value  = ed?.spreadsheetId || '';
+  if (durl) durl.value = document.getElementById('driveParentFolderUrl')?.value || '';
+}
+
+function renderDrivePathPreview() {
+  const box = document.getElementById('drivePathPreview');
+  if (!box) return;
+  const parentId = extractFolderId(document.getElementById('driveParentFolderUrl')?.value);
+  const ed = currentEdition();
+  const folderName = (ed?.folderName || ed?.label || '第1回').trim();
+
+  if (!parentId) {
+    box.innerHTML = '<span style="color:var(--yellow)">⚠️ 親フォルダのURLが未設定です。写真の保存先が決まりません。</span>';
+    return;
+  }
+  box.innerHTML =
+    `📁 <span class="folder">指定した親フォルダ</span><br>` +
+    `　└ 📁 <span class="auto">${escHtml(folderName)}</span> ← 開催回ごとに自動で作成<br>` +
+    `　　　└ 🖼 山田花子_プロフィール.jpg`;
+  syncSystemFields();
+}
+
+// GAS にスプレッドシートの新規作成を依頼する
+async function createSpreadsheetFor(idx) {
+  const ed = editions[idx];
+  if (!ed) return;
+
+  const name = prompt('新しいスプレッドシートの名前', `申込データ_${ed.label || '第1回'}`);
+  if (name === null) return;
+
+  const endpoint = document.getElementById('workerUrl').value.trim() || document.getElementById('gasUrl').value.trim();
+  if (!endpoint) { alert('システム設定の送信先URL（Worker/GAS）が未設定のため作成できません。'); return; }
+
+  const status = document.getElementById(`sheetStatus-${idx}`);
+  if (status) { status.className = 'sheet-status'; status.textContent = '⏳ 作成中...'; }
+
+  try {
+    const fd = new FormData();
+    fd.set('action', 'createSpreadsheet');
+    fd.set('name', name);
+    fd.set('parentFolderId', extractFolderId(document.getElementById('driveParentFolderUrl').value));
+
+    const res = await fetch(endpoint, { method: 'POST', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success || !(data.spreadsheetId || data.spreadsheetUrl)) {
+      throw new Error(data.error || `作成機能に応答がありません（${res.status}）`);
+    }
+    ed.spreadsheetId = data.spreadsheetId || extractSheetId(data.spreadsheetUrl);
+    renderEditions();
+    setDirty(true);
+    showToast('✅ スプレッドシートを作成しました。「Webに保存」で確定してください');
+  } catch (err) {
+    console.error(err);
+    renderEditions();
+    if (confirm(
+      '自動作成できませんでした。\n' +
+      `（理由: ${err.message}）\n\n` +
+      'このボタンを使うには、Apps Script 側に作成機能を追加する必要があります（docs/gas-setup.md 参照）。\n\n' +
+      '代わりに、空のスプレッドシートを新しいタブで開きますか？\n' +
+      '開いたらそのURLをコピーして、「申込データの保存先」に貼り付けてください。'
+    )) {
+      window.open('https://sheets.new', '_blank');
+    }
+  }
+}
+
+function toggleSystemLock() {
+  const on = document.getElementById('unlockSystem').checked;
+  document.getElementById('systemFields').classList.toggle('locked', !on);
+  if (on) showToast('⚠️ システム設定を編集できる状態にしました', true);
 }
 
 // ========================================
@@ -944,6 +1220,9 @@ function addDefaultData() {
   addCustomQuestion({ id:'cq_menu', type:'textarea', label:'出展メニュー名', placeholder:'例：タロット占い 20分 2,000円', maxLength:200, required:true, showCounter:true });
   addCustomQuestion({ id:'cq_intro', type:'textarea', label:'自己紹介', placeholder:'200文字以内でご記入ください', maxLength:200, required:true, showCounter:true });
   addCustomQuestion({ id:'cq_pr', type:'text', label:'一言PR', placeholder:'35文字以内', maxLength:35, required:true, showCounter:true });
+  // デフォルト開催回
+  addEdition({ label: '第1回' });
+  renderEditions();
   // デフォルトメール本文
   setRichValue('e-confirmationBodyTemplate',
 `{{name}} 様
@@ -1279,11 +1558,19 @@ function buildConfig() {
       confirmationBodyTemplate:   richValue('e-confirmationBodyTemplate'),
       adminNotificationSubject:   richValue('e-adminNotificationSubject')
     },
+    // 開催回（受付中の回のスプレッドシートを spreadsheetId として書き出すので、
+    // 申込フォーム・GAS 側は従来どおりの読み方で動作する）
+    editions: editions.map(e => ({
+      id: e.id, label: e.label, spreadsheetId: e.spreadsheetId, folderName: e.folderName || ''
+    })),
+    currentEditionId,
+    driveParentFolderUrl: v('driveParentFolderUrl'),
+
     configJsonUrl: v('configJsonUrl'),
     gasUrl:        v('gasUrl'),
     workerUrl:     v('workerUrl'),
-    spreadsheetId: v('spreadsheetId'),
-    driveFolderUrl: v('driveFolderUrl')
+    spreadsheetId: currentEdition()?.spreadsheetId || v('spreadsheetId'),
+    driveFolderUrl: v('driveParentFolderUrl') || v('driveFolderUrl')
   };
 }
 
@@ -1417,6 +1704,21 @@ function applyConfig(c) {
   renderMailPreview();
 
   // Infra
+  // 開催回（旧形式のconfigは、現在の設定から1件目を自動生成して引き継ぐ）
+  editions = (c.editions || []).map(e => ({
+    id:            e.id || `ed_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+    label:         e.label || '',
+    spreadsheetId: e.spreadsheetId || '',
+    folderName:    e.folderName || ''
+  }));
+  currentEditionId = c.currentEditionId || editions[0]?.id || '';
+  if (!editions.length) {
+    addEdition({ label: c.event?.name || '第1回', spreadsheetId: c.spreadsheetId || '' });
+    currentEditionId = editions[0].id;
+  }
+  set('driveParentFolderUrl', c.driveParentFolderUrl || c.driveFolderUrl || '');
+  renderEditions();
+
   set('configJsonUrl', c.configJsonUrl || '');
   set('gasUrl',        c.gasUrl        || '');
   set('workerUrl',     c.workerUrl     || '');

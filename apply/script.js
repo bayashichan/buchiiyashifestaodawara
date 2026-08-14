@@ -989,6 +989,18 @@ async function submitForm() {
     // スプレッドシートID
     if (CONFIG.spreadsheetId) formData.set('spreadsheetId', CONFIG.spreadsheetId);
 
+    // 開催回ごとの保存先。GAS が未対応でも無視されるだけで、従来の動作は変わらない
+    const edition = (CONFIG.editions || []).find(e => e.id === CONFIG.currentEditionId)
+                 || (CONFIG.editions || [])[0];
+    if (edition) {
+      if (edition.spreadsheetId) formData.set('spreadsheetId', edition.spreadsheetId);
+      formData.set('editionId',       edition.id    || '');
+      formData.set('editionName',     edition.label || '');
+      formData.set('driveFolderName', edition.folderName || edition.label || '');
+    }
+    const parentFolderId = extractDriveFolderId(CONFIG.driveParentFolderUrl || CONFIG.driveFolderUrl);
+    if (parentFolderId) formData.set('driveParentFolderId', parentFolderId);
+
     // イベント名
     formData.set('eventName', CONFIG.event?.name || '');
 
@@ -1348,6 +1360,17 @@ function togglePhotoUpload() {
     preview?.classList.add('hidden');
     if (reqTag) reqTag.style.display = 'inline';
   }
+}
+
+// ========================================
+// Drive フォルダURL → フォルダID
+// ========================================
+function extractDriveFolderId(input) {
+  const s = String(input || '').trim();
+  if (!s) return '';
+  return (s.match(/\/folders\/([a-zA-Z0-9_-]+)/) || [])[1]
+      || (s.match(/[?&]id=([a-zA-Z0-9_-]+)/) || [])[1]
+      || (/^[a-zA-Z0-9_-]{20,}$/.test(s) ? s : '');
 }
 
 // ========================================
