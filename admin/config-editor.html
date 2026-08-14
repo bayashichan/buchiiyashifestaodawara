@@ -82,6 +82,17 @@ select.field-input{cursor:pointer}
 /* トースト */
 .toast{position:fixed;bottom:5rem;right:1.5rem;background:#334155;color:#e2e8f0;padding:0.75rem 1.25rem;border-radius:0.5rem;font-size:0.875rem;font-weight:600;opacity:0;transition:opacity 0.3s;z-index:999;border-left:3px solid var(--green)}
 .toast.show{opacity:1}
+.toast.error{border-left-color:var(--red)}
+
+/* 接続ステータス & 接続設定パネル */
+.conn-status{font-size:0.8rem;font-weight:600;color:var(--muted);align-self:center;white-space:nowrap}
+.setup-panel{background:#1e293b;border-bottom:1px solid #334155;max-height:0;overflow:hidden;transition:max-height 0.25s ease}
+.setup-panel.open{max-height:520px}
+.setup-inner{padding:1.25rem 1.5rem;max-width:900px}
+.setup-inner h2{font-size:0.95rem;font-weight:700;color:var(--primary);margin-bottom:0.75rem}
+.setup-note{font-size:0.78rem;color:var(--muted);line-height:1.7;margin-top:0.75rem}
+.setup-note code{background:#0f172a;padding:0.1rem 0.35rem;border-radius:0.25rem;color:#e2e8f0}
+.setup-btns{display:flex;gap:0.75rem;margin-top:1rem}
 </style>
 </head>
 <body>
@@ -90,14 +101,43 @@ select.field-input{cursor:pointer}
 <header class="app-header">
   <h1>⚙️ Config Editor — イベント申込フォーム設定ツール</h1>
   <div class="header-btns">
-    <label class="btn btn-secondary" style="cursor:pointer">
-      📂 JSONを読み込む
-      <input type="file" accept=".json" id="loadFile" style="display:none" onchange="loadJson(event)">
-    </label>
+    <span class="conn-status" id="connectionStatus">接続設定が必要です</span>
+    <button class="btn btn-secondary" id="setupToggleBtn" onclick="toggleSetup()">🔌 接続設定</button>
     <button class="btn btn-secondary" onclick="togglePreview()">👁 JSONプレビュー</button>
-    <button class="btn btn-success" onclick="downloadJson()">💾 config.jsonをダウンロード</button>
+    <button class="btn btn-secondary" onclick="reloadFromGitHub()">⟳ 再読み込み</button>
+    <button class="btn btn-success" id="saveBtn" onclick="saveToGitHub()">💾 Webに保存</button>
   </div>
 </header>
+
+<!-- 接続設定パネル -->
+<div class="setup-panel" id="setupArea">
+  <div class="setup-inner">
+    <h2>🔌 GitHub 接続設定</h2>
+    <div class="grid-3">
+      <div class="field-group">
+        <label class="field-label">オーナー名</label>
+        <input type="text" class="field-input" id="ghOwner" placeholder="bayashichan" autocomplete="off">
+      </div>
+      <div class="field-group">
+        <label class="field-label">リポジトリ名</label>
+        <input type="text" class="field-input" id="ghRepo" placeholder="buchiiyashifestaodawara" autocomplete="off">
+      </div>
+      <div class="field-group">
+        <label class="field-label">アクセストークン</label>
+        <input type="password" class="field-input" id="ghToken" placeholder="github_pat_..." autocomplete="off">
+      </div>
+    </div>
+    <div class="setup-btns">
+      <button class="btn btn-primary" onclick="saveGitHubSettings()">接続する</button>
+      <button class="btn btn-secondary" onclick="clearGitHubSettings()">接続情報を削除</button>
+    </div>
+    <p class="setup-note">
+      トークンは GitHub の <strong>Settings → Developer settings → Personal access tokens → Fine-grained tokens</strong> で発行し、
+      対象リポジトリのみに <code>Contents: Read and write</code> 権限を付けてください。<br>
+      入力した情報はこのブラウザ内（localStorage）にのみ保存され、外部には送信されません。共用PCで使った場合は「接続情報を削除」を押してください。
+    </p>
+  </div>
+</div>
 
 <div class="app-body">
   <!-- サイドバー -->
@@ -361,8 +401,15 @@ select.field-input{cursor:pointer}
 
 <!-- フッター -->
 <footer class="app-footer">
-  <div class="footer-note">入力内容は自動保存されません。必ず「💾 JSONをダウンロード」してください。</div>
-  <button class="btn btn-success" onclick="downloadJson()">💾 config.jsonをダウンロード</button>
+  <div class="footer-note" id="footerNote">「💾 Webに保存」で apply/config.json が直接更新され、申込フォームに反映されます。</div>
+  <div class="header-btns">
+    <label class="btn btn-secondary" style="cursor:pointer">
+      📂 JSONを読み込む
+      <input type="file" accept=".json" id="loadFile" style="display:none" onchange="loadJson(event)">
+    </label>
+    <button class="btn btn-secondary" onclick="downloadJson()">⬇ バックアップ保存</button>
+    <button class="btn btn-success" onclick="saveToGitHub()">💾 Webに保存</button>
+  </div>
 </footer>
 
 <!-- JSONプレビュー -->
@@ -400,14 +447,243 @@ const OPTIONS_DEF = [
 // ========================================
 window.onload = () => {
   renderOptions();
-  addDefaultData();
   initNewCategoryOnEnter();
+  initDirtyTracking();
+
+  const settings = loadGitHubSettings();
+  if (settings) {
+    document.getElementById('ghOwner').value = settings.owner;
+    document.getElementById('ghRepo').value  = settings.repo;
+    document.getElementById('ghToken').value = settings.token;
+    fetchConfigFromGitHub(settings);
+  } else {
+    addDefaultData();
+    openSetup();
+  }
 };
 
 function initNewCategoryOnEnter() {
   document.getElementById('newCategory').addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); addCategory(); }
   });
+}
+
+// ========================================
+// GitHub 直接読み書き（Webに保存）
+// ========================================
+const GH_STORAGE_KEY = 'qs_github_settings'; // quick-settings.html と共用
+let fileSha  = null;   // 更新に必要な現在ファイルのSHA
+let isDirty  = false;  // 未保存の変更があるか
+
+function loadGitHubSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(GH_STORAGE_KEY));
+    return (s?.owner && s?.repo && s?.token) ? s : null;
+  } catch { return null; }
+}
+
+function toggleSetup() {
+  const open = document.getElementById('setupArea').classList.toggle('open');
+  document.getElementById('setupToggleBtn').textContent = open ? '▲ 接続設定を閉じる' : '🔌 接続設定';
+}
+
+function openSetup() {
+  document.getElementById('setupArea').classList.add('open');
+  document.getElementById('setupToggleBtn').textContent = '▲ 接続設定を閉じる';
+}
+
+function saveGitHubSettings() {
+  const owner = document.getElementById('ghOwner').value.trim();
+  const repo  = document.getElementById('ghRepo').value.trim();
+  const token = document.getElementById('ghToken').value.trim();
+  if (!owner || !repo || !token) { showToast('すべての項目を入力してください', true); return; }
+
+  localStorage.setItem(GH_STORAGE_KEY, JSON.stringify({ owner, repo, token }));
+  document.getElementById('setupArea').classList.remove('open');
+  document.getElementById('setupToggleBtn').textContent = '🔌 接続設定';
+  fetchConfigFromGitHub({ owner, repo, token });
+}
+
+function clearGitHubSettings() {
+  localStorage.removeItem(GH_STORAGE_KEY);
+  fileSha = null;
+  document.getElementById('ghOwner').value = '';
+  document.getElementById('ghRepo').value  = '';
+  document.getElementById('ghToken').value = '';
+  updateConnectionStatus('接続設定が必要です', 'var(--muted)');
+  openSetup();
+  showToast('接続情報を削除しました');
+}
+
+function configApiUrl({ owner, repo }) {
+  return `https://api.github.com/repos/${owner}/${repo}/contents/apply/config.json`;
+}
+
+// GitHub の Base64 は UTF-8 バイト列なので、日本語が壊れないよう明示的にデコードする
+function b64ToUtf8(b64) {
+  const bin = atob(b64.replace(/\s/g, ''));
+  return new TextDecoder('utf-8').decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+}
+
+function utf8ToB64(str) {
+  let bin = '';
+  new TextEncoder().encode(str).forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin);
+}
+
+async function fetchConfigFromGitHub(settings) {
+  updateConnectionStatus('接続中...', 'var(--yellow)');
+  try {
+    const res = await fetch(configApiUrl(settings), {
+      cache: 'no-store',
+      headers: {
+        'Authorization': `Bearer ${settings.token}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `HTTPエラー: ${res.status}`);
+    }
+    const data = await res.json();
+    fileSha = data.sha;
+    applyConfig(JSON.parse(b64ToUtf8(data.content)));
+    setDirty(false);
+    updateConnectionStatus(`✅ 接続済み（${settings.owner}/${settings.repo}）`, 'var(--green)');
+    showToast('✅ 現在の設定を読み込みました');
+  } catch (err) {
+    console.error(err);
+    updateConnectionStatus('❌ 接続できません', 'var(--red)');
+    showToast('読み込み失敗: ' + err.message, true);
+    openSetup();
+  }
+}
+
+function reloadFromGitHub() {
+  const settings = loadGitHubSettings();
+  if (!settings) { openSetup(); showToast('先に接続設定を行ってください', true); return; }
+  if (isDirty && !confirm('未保存の変更があります。破棄して最新の設定を読み込みますか？')) return;
+  fetchConfigFromGitHub(settings);
+}
+
+async function saveToGitHub() {
+  const settings = loadGitHubSettings();
+  if (!settings) { openSetup(); showToast('先に接続設定を行ってください', true); return; }
+
+  const config = buildConfig();
+  const errors = validateConfig(config);
+  if (errors.length) { alert('保存できません:\n\n' + errors.join('\n')); return; }
+
+  if (!confirm(`apply/config.json を更新します。\n申込フォームに反映されます。よろしいですか？\n\nイベント名: ${config.event.name}\nブース: ${config.booths.length}件`)) return;
+
+  const btn = document.getElementById('saveBtn');
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ 保存中...';
+
+  try {
+    let res = await putConfig(settings, config, fileSha);
+
+    // 他の画面（quick-settings 等）で更新されていた場合は、確認のうえ最新SHAで再試行
+    if (res.status === 409 || res.status === 422) {
+      const latest = await fetch(configApiUrl(settings), {
+        cache: 'no-store',
+        headers: { 'Authorization': `Bearer ${settings.token}`, 'Accept': 'application/vnd.github.v3+json' }
+      });
+      if (latest.ok) {
+        const data = await latest.json();
+        fileSha = data.sha;
+        if (!confirm('この画面を開いた後に、別の場所で設定が更新されています。\nこの画面の内容で上書きしますか？')) {
+          throw new Error('保存を中止しました');
+        }
+        res = await putConfig(settings, config, fileSha);
+      }
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `HTTPエラー: ${res.status}`);
+    }
+
+    const result = await res.json();
+    fileSha = result.content.sha;
+    setDirty(false);
+    showToast('✅ 保存しました！申込フォームに反映されます（反映まで最大数分）');
+  } catch (err) {
+    console.error(err);
+    showToast('保存失敗: ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
+function putConfig(settings, config, sha) {
+  const body = {
+    message: `設定更新（Config Editor）: ${config.event?.name || 'config.json'}`,
+    content: utf8ToB64(JSON.stringify(config, null, 2))
+  };
+  if (sha) body.sha = sha;
+
+  return fetch(configApiUrl(settings), {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${settings.token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+}
+
+// 保存前チェック（本番フォームが壊れる設定を防ぐ）
+function validateConfig(c) {
+  const errors = [];
+  if (!c.event?.name)      errors.push('・イベント名が未入力です');
+  if (!c.booths?.length)   errors.push('・ブースが1件も登録されていません');
+  if (!c.categories?.length) errors.push('・カテゴリが1件も登録されていません');
+  if (!c.gasUrl && !c.workerUrl) errors.push('・送信先URL（GAS/Worker）が未設定です');
+  c.booths?.forEach((b, i) => {
+    if (!b.name) errors.push(`・ブース${i + 1}の名称が未入力です`);
+  });
+  c.customQuestions?.forEach((q, i) => {
+    if (!q.id)    errors.push(`・カスタム質問${i + 1}のIDが未入力です`);
+    if (!q.label) errors.push(`・カスタム質問${i + 1}の質問文が未入力です`);
+  });
+  return errors;
+}
+
+// ========================================
+// 未保存チェック
+// ========================================
+function initDirtyTracking() {
+  const main = document.getElementById('mainArea');
+  main.addEventListener('input',  () => setDirty(true));
+  main.addEventListener('change', () => setDirty(true));
+  // 追加・削除ボタン（ブース／カテゴリ／質問）も変更として扱う
+  main.addEventListener('click', e => { if (e.target.closest('button')) setDirty(true); });
+  window.addEventListener('beforeunload', e => {
+    if (!isDirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+}
+
+function setDirty(v) {
+  isDirty = v;
+  const note = document.getElementById('footerNote');
+  if (note) {
+    note.textContent = v
+      ? '⚠️ 未保存の変更があります。「💾 Webに保存」を押すと申込フォームに反映されます。'
+      : '「💾 Webに保存」で apply/config.json が直接更新され、申込フォームに反映されます。';
+    note.style.color = v ? 'var(--yellow)' : 'var(--muted)';
+  }
+}
+
+function updateConnectionStatus(msg, color) {
+  const el = document.getElementById('connectionStatus');
+  el.textContent = msg;
+  el.style.color = color;
 }
 
 function addDefaultData() {
@@ -789,7 +1065,8 @@ function loadJson(event) {
     try {
       const c = JSON.parse(e.target.result);
       applyConfig(c);
-      showToast('✅ config.json を読み込みました');
+      setDirty(true);
+      showToast('✅ config.json を読み込みました（Webに保存すると反映されます）');
     } catch (err) {
       alert('JSONの解析に失敗しました: ' + err.message);
     }
@@ -921,11 +1198,11 @@ function scrollTo(id) {
 // ========================================
 // トースト
 // ========================================
-function showToast(msg) {
+function showToast(msg, isError = false) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  t.className = 'toast' + (isError ? ' error' : '') + ' show';
+  setTimeout(() => t.classList.remove('show'), isError ? 5000 : 2500);
 }
 </script>
 </body>

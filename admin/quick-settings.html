@@ -552,7 +552,10 @@
         }
         const data = await res.json();
         fileSha = data.sha;
-        config = JSON.parse(atob(data.content.replace(/\n/g, '')));
+        // GitHub の Base64 は UTF-8 バイト列。atob だけでは日本語が壊れるため明示的にデコードする
+        const bin = atob(data.content.replace(/\s/g, ''));
+        const text = new TextDecoder('utf-8').decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+        config = JSON.parse(text);
 
         updateConnectionStatus(`✅ 接続済み（${owner}/${repo}）`, '#16a34a');
         renderSettings();
