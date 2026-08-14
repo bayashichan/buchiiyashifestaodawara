@@ -1,141 +1,202 @@
-# Apps Script（GAS）に追加する設定
+# Apps Script（GAS）に追加する機能
 
-管理画面の「📅 開催回とデータの保存先」を**完全に自動化**するために、Apps Script 側へ2つの機能を追加します。
+管理画面（Config Editor）の機能をフルに使うために、稼働中のGASへ3つの機能を追加します。
+どれも**既存の処理には手を加えず、追加と1行の差し替えだけ**で済みます。
+
+| 追加する機能 | 何のため | 重要度 |
+|---|---|---|
+| ① 設定キャッシュのクリア | 管理画面の変更を**すぐに**反映させる | **高** |
+| ② 開催回ごとの写真フォルダ | 写真を開催回ごとのフォルダに自動で振り分ける | 中 |
+| ③ スプレッドシートの新規作成 | 次回開催分のシートを管理画面から作る | 低 |
 
 > **追加しなくても申込フォームは今までどおり動きます。**
-> 未対応の状態では、次の2点だけが手作業になります。
-> - 写真は従来のフォルダに保存されます（開催回ごとのフォルダは作られません）
-> - 「✨ スプレッドシートを新規作成」ボタンは、空のシートを開く案内に切り替わります
+> ①だけは、開催回を切り替える運用をするなら実質必須です（理由は下記）。
 
-管理画面から送られてくる項目（追加分）は次の4つです。いずれも未対応なら無視されるだけです。
+## 編集するスクリプトの見分け方
 
-| 項目名 | 内容 | 例 |
-|---|---|---|
-| `spreadsheetId` | 受付中の開催回のスプレッドシートID（従来と同じ項目） | `1-KFjF...` |
-| `driveParentFolderId` | 写真を入れる親フォルダのID | `1Yr2nO...` |
-| `driveFolderName` | この開催回のフォルダ名 | `第1回（2026年11月1日）` |
-| `editionId` / `editionName` | 開催回の識別子と名前 | `ed_1762...` / `第1回` |
+`CONFIG_JSON_URL` の定義と `doPost(e)` があるプロジェクトが対象です。
+Googleフォームのトリガー用スクリプト（`e.itemResponses` を使うもの）とは別物なので注意してください。
 
 ---
 
-## 1. 写真を開催回ごとのフォルダに保存する
+## ① 設定キャッシュのクリア（最優先）
 
-Apps Script のエディタで、以下の関数をファイルの末尾に貼り付けます。
+### なぜ必要か
+
+GASは config.json を**30分キャッシュ**しています。
+
+```javascript
+cache.put('config', JSON.stringify(config), 1800); // 30分キャッシュ
+```
+
+このため、管理画面で「受付中の開催回」を切り替えても、**最大30分は前の開催回のスプレッドシートに
+申込が保存され続けます**。料金・メール文面・質問項目の変更も同じく最大30分遅れます。
+
+この機能を追加すると、管理画面で保存した瞬間にGASへクリアが通知され、**次の申込から即座に新しい設定**が使われます。
+
+### 手順1：関数を追加（ファイル末尾に貼り付け）
+
+```javascript
+/** JSONレスポンスを返す共通処理 */
+function jsonOutput_(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/** 管理画面から「設定を更新したのでキャッシュを捨てて」と依頼されたときの処理 */
+function handleClearCache_() {
+  CacheService.getScriptCache().remove('config');
+  return jsonOutput_({ success: true, action: 'clearCache' });
+}
+```
+
+### 手順2：`doPost(e)` の先頭に3行追加
+
+```javascript
+function doPost(e) {
+  // ▼▼ 追加 ▼▼
+  const action = (e && e.parameter && e.parameter.action) || '';
+  if (action === 'clearCache') return handleClearCache_();
+  // ▲▲ 追加ここまで ▲▲
+
+  let result;
+
+  try {
+    const config = getConfig();
+    // ↓ 以下は今までのコードのまま
+```
+
+---
+
+## ② 開催回ごとの写真フォルダ
+
+親フォルダ（`config.driveFolderUrl`）の中に、開催回ごとのフォルダを自動で作って保存します。
+
+```
+📁 親フォルダ（管理画面の「写真の保存先」）
+  └ 📁 第2回（2027年3月1日）   ← 初回の申込時に自動作成
+      └ 🖼 山田花子_プロフィール.jpg
+```
+
+### 手順1：関数を追加（ファイル末尾に貼り付け）
 
 ```javascript
 /**
  * 親フォルダの中の「開催回フォルダ」を返す。無ければ作成する。
- * parentFolderId が空のときは null を返すので、呼び出し側で従来のフォルダを使う。
+ * 開催回名が渡されていない場合は、従来どおり親フォルダをそのまま使う。
  */
-function getEditionFolder_(parentFolderId, folderName) {
-  if (!parentFolderId) return null;
+function getEditionFolder_(baseFolder, folderName) {
+  const name = String(folderName || '').trim();
+  if (!name) return baseFolder;
 
-  var name = String(folderName || '').trim() || '未分類';
-  var parent = DriveApp.getFolderById(parentFolderId);
-  var found = parent.getFoldersByName(name);
-  return found.hasNext() ? found.next() : parent.createFolder(name);
+  const found = baseFolder.getFoldersByName(name);
+  return found.hasNext() ? found.next() : baseFolder.createFolder(name);
 }
 ```
 
-次に、**画像を保存している既存の箇所**を探します。だいたい次のような形になっているはずです。
+### 手順2：`saveProfileImage()` の中の3行を差し替え
+
+既存のコードのうち、**フォルダを決めている部分だけ**を差し替えます。
 
 ```javascript
-// 変更前（例）
-var folder = DriveApp.getFolderById(FOLDER_ID);
-var blob = Utilities.newBlob(
-  Utilities.base64Decode(e.parameter.profileImageBase64),
-  e.parameter.profileImageMimeType,
-  e.parameter.profileImageName
-);
-var file = folder.createFile(blob);
+// 変更前
+    const folderId = parseDriveFolderId(config.driveFolderUrl || config.driveFolderId);
+    const folder   = folderId
+      ? DriveApp.getFolderById(folderId)
+      : DriveApp.getRootFolder();
 ```
-
-このうち **フォルダを決めている1行だけ**を、次のように差し替えます。
 
 ```javascript
 // 変更後
-var folder = getEditionFolder_(e.parameter.driveParentFolderId, e.parameter.driveFolderName)
-          || DriveApp.getFolderById(FOLDER_ID);   // 未設定なら従来のフォルダ
+    const folderId   = parseDriveFolderId(config.driveFolderUrl || config.driveFolderId);
+    const baseFolder = folderId
+      ? DriveApp.getFolderById(folderId)
+      : DriveApp.getRootFolder();
+    const folder = getEditionFolder_(baseFolder, e.parameter.driveFolderName);
 ```
 
-これで、保存先が次のようになります。
-
-```
-📁 親フォルダ
-  └ 📁 第1回（2026年11月1日）   ← 初回の申込時に自動作成
-      └ 🖼 山田花子_プロフィール.jpg
-```
+> `saveProfileImage(params, config)` は `params` を受け取っているので、`e.parameter.driveFolderName` の代わりに
+> `params.driveFolderName` と書いても同じです。呼び出し元の書き方に合わせてください。
 
 ---
 
-## 2. スプレッドシートを新規作成できるようにする
+## ③ スプレッドシートの新規作成
 
-同じく末尾に貼り付けます。
+管理画面の「✨ スプレッドシートを新規作成」ボタンから、次回開催分のシートを作れるようにします。
+**このボタンで作られたシートは、GASを実行しているアカウントの所有物になります。**
+（＝GASをクライアントのアカウントへ移行した後に使えば、クライアント所有のシートが作られます）
+
+### 手順1：関数を追加（ファイル末尾に貼り付け）
 
 ```javascript
-/** 管理画面からの「スプレッドシート新規作成」リクエストを処理する */
+/** 管理画面からの「スプレッドシート新規作成」依頼を処理する */
 function handleCreateSpreadsheet_(e) {
   try {
-    var name = String(e.parameter.name || '').trim()
-            || ('申込データ_' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMdd'));
+    const name = String(e.parameter.name || '').trim()
+              || ('申込データ_' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMdd'));
 
-    var ss = SpreadsheetApp.create(name);
+    const ss = SpreadsheetApp.create(name);
 
     // 親フォルダが指定されていれば、その中へ移動する
-    var parentId = e.parameter.parentFolderId;
+    const parentId = parseDriveFolderId(e.parameter.parentFolderId);
     if (parentId) {
       DriveApp.getFileById(ss.getId()).moveTo(DriveApp.getFolderById(parentId));
     }
 
-    return ContentService
-      .createTextOutput(JSON.stringify({
-        success: true,
-        spreadsheetId: ss.getId(),
-        spreadsheetUrl: ss.getUrl()
-      }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonOutput_({
+      success: true,
+      action: 'createSpreadsheet',
+      spreadsheetId: ss.getId(),
+      spreadsheetUrl: ss.getUrl()
+    });
 
   } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, error: String(err) }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonOutput_({ success: false, error: String(err) });
   }
 }
 ```
 
-そのうえで、**`doPost(e)` の一番最初**に次の3行を追加します。
+### 手順2：`doPost(e)` の先頭に1行追加（①と同じ場所）
 
 ```javascript
 function doPost(e) {
-  if (e && e.parameter && e.parameter.action === 'createSpreadsheet') {
-    return handleCreateSpreadsheet_(e);
-  }
+  const action = (e && e.parameter && e.parameter.action) || '';
+  if (action === 'clearCache')        return handleClearCache_();
+  if (action === 'createSpreadsheet') return handleCreateSpreadsheet_(e);   // ← 追加
 
-  // ↓ ここから下は今までのコードのまま
+  let result;
   ...
-}
 ```
+
+作成したシートには、GASエディタで `setupSpreadsheet()` を実行するとヘッダー行が用意されます
+（実行しなくても、最初の申込が届いた時点で自動生成されます）。
 
 ---
 
-## 3. 再デプロイ（これを忘れると反映されません）
+## 再デプロイ（これを忘れると反映されません）
 
-1. Apps Script の画面右上「**デプロイ**」→「**デプロイを管理**」
-2. 稼働中のデプロイの ✏️（鉛筆）をクリック
+1. 画面右上「**デプロイ**」→「**デプロイを管理**」
+2. 稼働中のデプロイの ✏️（鉛筆アイコン）をクリック
 3. バージョンを「**新バージョン**」に変更 → 「**デプロイ**」
 4. **URLは変わりません**。config.json の変更は不要です
 
-> 「新しいデプロイ」を選ぶと URL が変わってしまい、申込が届かなくなります。必ず「デプロイを管理」から更新してください。
+> ⚠️ 「**新しいデプロイ**」を選ぶとURLが変わり、申込が届かなくなります。
+> 必ず「デプロイを管理」から既存のデプロイを更新してください。
 
 ---
 
-## 4. 動作確認
+## 動作確認
 
-1. 管理画面の「📅 開催回とデータの保存先」で「✨ スプレッドシートを新規作成」を押す
-   → 新しいスプレッドシートのURLが自動で入れば成功です
-2. 申込フォームからテスト送信し、親フォルダの中に開催回名のフォルダができ、その中に画像が入っていることを確認します
+| 追加した機能 | 確認方法 |
+|---|---|
+| ① キャッシュクリア | 管理画面で何か変更して保存 → 「**すぐに反映されます**」と表示されれば成功（未対応時は「最大30分」と表示） |
+| ② 写真フォルダ | テスト申込を送信 → 親フォルダの中に開催回名のフォルダができ、画像が入っている |
+| ③ 新規作成 | 「✨ スプレッドシートを新規作成」→ URLが自動で入力される |
 
-うまくいかない場合は、Apps Script の「実行数」画面でエラー内容を確認してください。よくある原因は次の2つです。
+うまくいかない場合は、Apps Script の「**実行数**」画面でエラーを確認してください。よくある原因は次の2つです。
 
 - **再デプロイを忘れている**（一番多い）
-- **親フォルダの権限**：Apps Script を実行しているGoogleアカウントに、そのフォルダの編集権限がない
+- **フォルダの権限**：GASを実行しているGoogleアカウントに、そのフォルダの編集権限がない
+  - 特に注意：写真フォルダの所有者を移した場合、**申込は成功するのに写真URLだけ空になります**
+    （`saveProfileImage` はエラーを握りつぶす作りのため、表面上は成功して見えます）

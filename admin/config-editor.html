@@ -712,13 +712,43 @@ async function saveToGitHub() {
     const result = await res.json();
     fileSha = result.content.sha;
     setDirty(false);
-    showToast('✅ 保存しました！申込フォームに反映されます（反映まで最大数分）');
+
+    // GAS は設定を30分キャッシュするため、保存のたびにクリアを依頼する。
+    // 未対応・失敗でも保存は成功しているので、案内文だけ切り替える。
+    const cleared = await requestConfigCacheClear();
+    showToast(cleared
+      ? '✅ 保存しました！申込フォームにすぐ反映されます'
+      : '✅ 保存しました（メール・保存先への反映は最大30分かかります）');
   } catch (err) {
     console.error(err);
     showToast('保存失敗: ' + err.message, true);
   } finally {
     btn.disabled = false;
     btn.textContent = label;
+  }
+}
+
+// GAS 側の設定キャッシュ（30分）をクリアさせる。成否を boolean で返す
+async function requestConfigCacheClear() {
+  const endpoint = document.getElementById('workerUrl').value.trim()
+                || document.getElementById('gasUrl').value.trim();
+  if (!endpoint) return false;
+
+  try {
+    const fd = new FormData();
+    fd.set('action', 'clearCache');
+
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 15000);
+    const res = await fetch(endpoint, { method: 'POST', body: fd, signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => ({}));
+    return data.success === true && data.action === 'clearCache';
+  } catch (err) {
+    console.warn('config cache clear skipped:', err);
+    return false;
   }
 }
 
