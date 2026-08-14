@@ -93,6 +93,23 @@ select.field-input{cursor:pointer}
 .setup-note{font-size:0.78rem;color:var(--muted);line-height:1.7;margin-top:0.75rem}
 .setup-note code{background:#0f172a;padding:0.1rem 0.35rem;border-radius:0.25rem;color:#e2e8f0}
 .setup-btns{display:flex;gap:0.75rem;margin-top:1rem}
+
+/* 差し込み項目（メール本文の変数） */
+.var-palette{background:#0f172a;border:1px dashed #475569;border-radius:0.5rem;padding:0.7rem;margin-bottom:0.5rem}
+.var-palette-title{font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;line-height:1.6}
+.var-btns{display:flex;flex-wrap:wrap;gap:0.4rem}
+.var-btn{background:rgba(129,140,248,0.15);border:1px solid rgba(129,140,248,0.45);color:#c7d2fe;border-radius:9999px;padding:0.25rem 0.75rem;font-size:0.78rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.15s}
+.var-btn:hover{background:rgba(129,140,248,0.35);color:#fff}
+.rich-input{width:100%;background:#0f172a;border:1px solid #475569;border-radius:0.5rem;padding:0.55rem 0.75rem;color:#e2e8f0;font-size:0.9rem;font-family:inherit;line-height:2;white-space:pre-wrap;word-break:break-word;outline:none;transition:border-color 0.15s}
+.rich-input:focus{border-color:var(--primary)}
+.rich-input.single{line-height:1.8;overflow-x:auto}
+.rich-input.body{min-height:280px;max-height:480px;overflow-y:auto}
+.rich-input:empty:before{content:attr(data-placeholder);color:#64748b}
+.var-chip{display:inline-flex;align-items:center;gap:0.25rem;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;border-radius:9999px;padding:0.1rem 0.6rem;margin:0 0.15rem;font-size:0.8rem;font-weight:700;white-space:nowrap;vertical-align:baseline;cursor:default}
+.var-chip.unknown{background:#7f1d1d;color:#fecaca;border:1px solid var(--red)}
+.mail-preview{background:#0f172a;border:1px solid #475569;border-radius:0.5rem;padding:1rem;margin-top:0.6rem;font-size:0.85rem;line-height:1.9;white-space:pre-wrap;word-break:break-word;color:#cbd5e1}
+.mail-preview .filled{background:rgba(52,211,153,0.18);color:#6ee7b7;border-radius:0.25rem;padding:0 0.25rem;font-weight:600}
+.preview-note{font-size:0.75rem;color:var(--muted);margin-top:0.5rem}
 </style>
 </head>
 <body>
@@ -354,18 +371,37 @@ select.field-input{cursor:pointer}
       </div>
       <div class="field-group">
         <label class="field-label">申込者への件名</label>
-        <input type="text" class="field-input" id="e-confirmationSubject" placeholder="【{{eventName}}】出展お申込みを受け付けました">
-      </div>
-      <div class="field-group">
-        <label class="field-label">申込者へのメール本文テンプレート</label>
-        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.4rem">
-          使用できる変数: {{name}} {{email}} {{eventName}} {{boothName}} {{totalFee}} {{breakdown}} {{submittedAt}} {{exhibitorName}} ＋ カスタム質問のID
+        <div class="var-palette" data-palette-for="e-confirmationSubject">
+          <div class="var-palette-title">下のボタンを押すと、その場所に差し込み項目が入ります</div>
+          <div class="var-btns"></div>
         </div>
-        <textarea class="field-input" id="e-confirmationBodyTemplate" rows="10"></textarea>
+        <div class="rich-input single" id="e-confirmationSubject" contenteditable="true"
+             data-single="1" data-placeholder="【イベント名】出展お申込みを受け付けました"></div>
       </div>
+
+      <div class="field-group">
+        <label class="field-label">申込者へのメール本文</label>
+        <div class="var-palette" data-palette-for="e-confirmationBodyTemplate">
+          <div class="var-palette-title">
+            💡 <strong>差し込み項目</strong>とは、メール送信時に申込者ごとの内容へ自動で置き換わる部分です。<br>
+            入れたい場所をクリックしてから、下のボタンを押してください。色付きのタグは1文字のように削除できます。
+          </div>
+          <div class="var-btns"></div>
+        </div>
+        <div class="rich-input body" id="e-confirmationBodyTemplate" contenteditable="true"
+             data-placeholder="メール本文を入力してください"></div>
+        <button type="button" class="btn btn-secondary" style="margin-top:0.6rem" onclick="toggleMailPreview()" id="mailPreviewBtn">👁 送信イメージを見る</button>
+        <div class="mail-preview" id="mailPreview" style="display:none"></div>
+      </div>
+
       <div class="field-group">
         <label class="field-label">管理者通知メール件名</label>
-        <input type="text" class="field-input" id="e-adminNotificationSubject" placeholder="【新規申込】{{name}}様 ({{exhibitorName}})">
+        <div class="var-palette" data-palette-for="e-adminNotificationSubject">
+          <div class="var-palette-title">下のボタンを押すと、その場所に差し込み項目が入ります</div>
+          <div class="var-btns"></div>
+        </div>
+        <div class="rich-input single" id="e-adminNotificationSubject" contenteditable="true"
+             data-single="1" data-placeholder="【新規申込】お名前様（出展名）"></div>
       </div>
     </div>
 
@@ -449,6 +485,8 @@ window.onload = () => {
   renderOptions();
   initNewCategoryOnEnter();
   initDirtyTracking();
+  initRichEditors();
+  renderVarPalettes();
 
   const settings = loadGitHubSettings();
   if (settings) {
@@ -654,6 +692,216 @@ function validateConfig(c) {
 }
 
 // ========================================
+// メール差し込み項目（変数）
+// ========================================
+// key = 実際にメール送信時に置き換わる文字列 {{key}}
+// label = 画面上の表示名（素人向け）、sample = プレビュー用の例
+const MAIL_VARS = [
+  { key: 'name',          icon: '👤', label: 'お名前',         sample: '山田 花子' },
+  { key: 'exhibitorName', icon: '🏷', label: '出展名',         sample: 'ヒーリングサロン花' },
+  { key: 'email',         icon: '✉️', label: 'メールアドレス',  sample: 'hanako@example.com' },
+  { key: 'eventName',     icon: '🎪', label: 'イベント名',      sample: () => document.getElementById('eventName')?.value || 'イベント名' },
+  { key: 'boothName',     icon: '🏪', label: 'ブース名',        sample: () => booths[0]?.name || 'Aブース' },
+  { key: 'totalFee',      icon: '💰', label: '合計金額',        sample: '13,500' },
+  { key: 'breakdown',     icon: '🧾', label: '料金の内訳',      sample: 'ブース料金: ¥8,000\nコンセント使用: ¥500\n懇親会参加費: ¥5,000' },
+  { key: 'customAnswers', icon: '📝', label: '質問への回答',    sample: () => (customQuestions.length ? customQuestions : [{ label: '出展メニュー名' }]).map(q => `${q.label}: （回答内容）`).join('\n') },
+  { key: 'submittedAt',   icon: '🕒', label: '申込日時',        sample: '2026/08/14 15:30' }
+];
+
+// 質問ごとの回答も差し込めるので、カスタム質問を差し込み項目として合流させる
+function allMailVars() {
+  return MAIL_VARS.concat(
+    customQuestions
+      .filter(q => q.id)
+      .map(q => ({ key: q.id, icon: '❓', label: q.label || q.id, sample: `（${q.label || q.id}の回答）` }))
+  );
+}
+
+function findMailVar(key) {
+  return allMailVars().find(v => v.key === key) || null;
+}
+
+function mailVarSample(v) {
+  return typeof v.sample === 'function' ? v.sample() : v.sample;
+}
+
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function varChipHtml(key) {
+  const v = findMailVar(key);
+  return v
+    ? `<span class="var-chip" contenteditable="false" data-var="${escHtml(key)}" title="{{${escHtml(key)}}}">${v.icon} ${escHtml(v.label)}</span>`
+    : `<span class="var-chip unknown" contenteditable="false" data-var="${escHtml(key)}" title="この差し込み項目は現在の設定にありません">⚠ ${escHtml(key)}</span>`;
+}
+
+// ========================================
+// 差し込み項目つき入力欄（contenteditable）
+// ========================================
+const lastRanges = new WeakMap(); // 入力欄ごとのカーソル位置
+
+function textToRichHtml(text) {
+  return String(text || '')
+    .split(/(\{\{\s*[\w.-]+\s*\}\})/g)
+    .map(part => {
+      const m = part.match(/^\{\{\s*([\w.-]+)\s*\}\}$/);
+      return m ? varChipHtml(m[1]) : escHtml(part);
+    })
+    .join('');
+}
+
+// 画面の内容を {{key}} 形式のテキストに戻す
+function richToText(root) {
+  let out = '';
+  const walk = node => {
+    node.childNodes.forEach(n => {
+      if (n.nodeType === Node.TEXT_NODE) { out += n.nodeValue; return; }
+      if (n.nodeType !== Node.ELEMENT_NODE) return;
+      if (n.dataset?.var) { out += `{{${n.dataset.var}}}`; return; }
+      if (n.tagName === 'BR') {
+        // ブラウザが行末に自動で入れる BR は改行として数えない
+        if (n === n.parentNode.lastChild && n.parentNode !== root) return;
+        out += '\n'; return;
+      }
+      if (/^(DIV|P|LI|TR)$/.test(n.tagName) && out && !out.endsWith('\n')) out += '\n';
+      walk(n);
+    });
+  };
+  walk(root);
+  return out.replace(/ /g, ' '); // 入力中に混入するノーブレークスペースを通常の空白に戻す
+}
+
+function richValue(id) {
+  const el = document.getElementById(id);
+  return el ? richToText(el) : '';
+}
+
+function setRichValue(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = textToRichHtml(text);
+}
+
+function initRichEditors() {
+  document.querySelectorAll('.rich-input').forEach(el => {
+    // 貼り付けは書式なしテキストとして扱う
+    el.addEventListener('paste', e => {
+      e.preventDefault();
+      let text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      if (el.dataset.single) text = text.replace(/\r?\n/g, ' ');
+      document.execCommand('insertText', false, text);
+    });
+    // 件名は1行入力
+    el.addEventListener('keydown', e => {
+      if (el.dataset.single && e.key === 'Enter') e.preventDefault();
+    });
+    ['keyup', 'mouseup', 'focus'].forEach(ev => el.addEventListener(ev, () => saveRange(el)));
+    el.addEventListener('input', () => { saveRange(el); renderMailPreview(); });
+  });
+}
+
+function saveRange(el) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (el.contains(range.commonAncestorContainer)) lastRanges.set(el, range.cloneRange());
+}
+
+function insertVariable(targetId, key) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  el.focus();
+
+  let range = lastRanges.get(el);
+  if (!range || !el.contains(range.commonAncestorContainer)) {
+    range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false); // 末尾に挿入
+  }
+
+  const chip = document.createRange().createContextualFragment(varChipHtml(key)).firstChild;
+  range.deleteContents();
+  range.insertNode(chip);
+
+  // カーソルをタグの直後へ
+  const after = document.createRange();
+  after.setStartAfter(chip);
+  after.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(after);
+  lastRanges.set(el, after.cloneRange());
+
+  setDirty(true);
+  renderMailPreview();
+}
+
+// 差し込みボタンを描画（カスタム質問の増減にも追従）
+function renderVarPalettes() {
+  document.querySelectorAll('.var-palette').forEach(palette => {
+    const targetId = palette.dataset.paletteFor;
+    const box = palette.querySelector('.var-btns');
+    box.innerHTML = '';
+    allMailVars().forEach(v => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'var-btn';
+      btn.textContent = `${v.icon} ${v.label}`;
+      btn.title = `メール送信時に「${typeof v.sample === 'function' ? v.sample() : v.sample}」のような内容に置き換わります`;
+      btn.onclick = () => insertVariable(targetId, v.key);
+      box.appendChild(btn);
+    });
+  });
+  refreshChipLabels();
+}
+
+// カスタム質問の名前を変えたとき、本文中のタグ表示も追従させる
+function refreshChipLabels() {
+  document.querySelectorAll('.rich-input .var-chip').forEach(chip => {
+    const key = chip.dataset.var;
+    const v = findMailVar(key);
+    if (v) {
+      chip.className = 'var-chip';
+      chip.textContent = `${v.icon} ${v.label}`;
+      chip.title = `{{${key}}}`;
+    } else {
+      chip.className = 'var-chip unknown';
+      chip.textContent = `⚠ ${key}`;
+      chip.title = 'この差し込み項目は現在の設定にありません';
+    }
+  });
+}
+
+// ========================================
+// 送信イメージ（プレビュー）
+// ========================================
+function toggleMailPreview() {
+  const box = document.getElementById('mailPreview');
+  const btn = document.getElementById('mailPreviewBtn');
+  const open = box.style.display === 'none';
+  box.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '✕ 送信イメージを閉じる' : '👁 送信イメージを見る';
+  if (open) renderMailPreview();
+}
+
+function renderMailPreview() {
+  const box = document.getElementById('mailPreview');
+  if (!box || box.style.display === 'none') return;
+
+  const subject = richValue('e-confirmationSubject') || '（件名が未入力です）';
+  const body    = richValue('e-confirmationBodyTemplate');
+  const fill = text => escHtml(text).replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (m, key) => {
+    const v = findMailVar(key);
+    return v ? `<span class="filled">${escHtml(mailVarSample(v))}</span>` : m;
+  });
+
+  box.innerHTML =
+    `<div style="color:var(--muted);font-size:0.75rem">件名</div>${fill(subject)}` +
+    `<div style="color:var(--muted);font-size:0.75rem;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid #334155">本文</div>${fill(body)}` +
+    `<div class="preview-note">※ 緑色の部分が、申込者ごとの内容に自動で置き換わります（表示はサンプルです）</div>`;
+}
+
+// ========================================
 // 未保存チェック
 // ========================================
 function initDirtyTracking() {
@@ -697,7 +945,7 @@ function addDefaultData() {
   addCustomQuestion({ id:'cq_intro', type:'textarea', label:'自己紹介', placeholder:'200文字以内でご記入ください', maxLength:200, required:true, showCounter:true });
   addCustomQuestion({ id:'cq_pr', type:'text', label:'一言PR', placeholder:'35文字以内', maxLength:35, required:true, showCounter:true });
   // デフォルトメール本文
-  document.getElementById('e-confirmationBodyTemplate').value =
+  setRichValue('e-confirmationBodyTemplate',
 `{{name}} 様
 
 この度は「{{eventName}}」へのご出展申込みありがとうございます。
@@ -716,7 +964,7 @@ function addDefaultData() {
 （振込先情報をここに記入してください）
 
 ご不明な点はこのメールへ返信ください。
-{{eventName}} 運営事務局`;
+{{eventName}} 運営事務局`);
 }
 
 // ========================================
@@ -889,6 +1137,7 @@ function addCustomQuestion(data = {}) {
 }
 
 function renderCustomQuestions() {
+  renderVarPalettes();
   const container = document.getElementById('customQuestionList');
   container.innerHTML = '';
   customQuestions.forEach((q, idx) => {
@@ -1026,9 +1275,9 @@ function buildConfig() {
       adminEmail:                 v('e-adminEmail'),
       replyToEmail:               v('e-replyToEmail'),
       adminSenderName:            v('e-adminSenderName'),
-      confirmationSubject:        v('e-confirmationSubject'),
-      confirmationBodyTemplate:   v('e-confirmationBodyTemplate'),
-      adminNotificationSubject:   v('e-adminNotificationSubject')
+      confirmationSubject:        richValue('e-confirmationSubject'),
+      confirmationBodyTemplate:   richValue('e-confirmationBodyTemplate'),
+      adminNotificationSubject:   richValue('e-adminNotificationSubject')
     },
     configJsonUrl: v('configJsonUrl'),
     gasUrl:        v('gasUrl'),
@@ -1162,9 +1411,10 @@ function applyConfig(c) {
   set('e-adminEmail',                em.adminEmail                || '');
   set('e-replyToEmail',              em.replyToEmail              || '');
   set('e-adminSenderName',           em.adminSenderName           || '');
-  set('e-confirmationSubject',       em.confirmationSubject       || '');
-  set('e-confirmationBodyTemplate',  em.confirmationBodyTemplate  || '');
-  set('e-adminNotificationSubject',  em.adminNotificationSubject  || '');
+  setRichValue('e-confirmationSubject',       em.confirmationSubject       || '');
+  setRichValue('e-confirmationBodyTemplate',  em.confirmationBodyTemplate  || '');
+  setRichValue('e-adminNotificationSubject',  em.adminNotificationSubject  || '');
+  renderMailPreview();
 
   // Infra
   set('configJsonUrl', c.configJsonUrl || '');
