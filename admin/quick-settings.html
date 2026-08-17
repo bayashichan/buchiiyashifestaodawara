@@ -437,6 +437,15 @@
         <div id="changePreview" style="font-size:0.85rem;color:#475569;line-height:1.8"></div>
       </div>
 
+      <!-- 詳細設定への導線 -->
+      <div class="card">
+        <div class="card-title">🛠 そのほかの設定</div>
+        <p style="font-size:0.85rem;color:#64748b;line-height:1.7;margin-bottom:0.75rem">
+          料金・ブースの追加・質問項目・メール文面・開催回の切り替えは詳細設定から行えます。
+        </p>
+        <a href="config-editor.html" class="load-btn" style="display:inline-block;text-decoration:none">詳細設定を開く</a>
+      </div>
+
     </div>
 
     <!-- 未接続状態の案内 -->
@@ -552,7 +561,7 @@
         }
         const data = await res.json();
         fileSha = data.sha;
-        config = JSON.parse(atob(data.content.replace(/\n/g, '')));
+        config = JSON.parse(decodeBase64Utf8(data.content));
 
         updateConnectionStatus(`✅ 接続済み（${owner}/${repo}）`, '#16a34a');
         renderSettings();
@@ -728,7 +737,7 @@
       try {
         const { owner, repo, token } = settings;
         const url = `https://api.github.com/repos/${owner}/${repo}/contents/apply/config.json`;
-        const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(config, null, 2))));
+        const newContent = encodeBase64Utf8(JSON.stringify(config, null, 2));
         const changeMsg = [...changes].join('、');
 
         const res = await fetch(url, {
@@ -757,13 +766,56 @@
         changes.clear();
         updateChangePreview();
         updateSaveBtn();
-        showToast('✅ 保存しました！フォームに反映されます（最大30分）');
+
+        // バックエンド(GAS)の設定キャッシュも消して即時反映させる
+        clearGasCache();
+
+        showToast('✅ 保存しました！フォームに反映されます（1〜2分）');
 
       } catch (err) {
         console.error(err);
         showToast('保存失敗: ' + err.message, true);
         btn.disabled = false;
         btn.textContent = '💾 変更を保存する';
+      }
+    }
+
+    // ========================================
+    // Base64 変換（UTF-8対応）
+    // config.json にはイベント名・規約・メール文面など日本語が含まれるため、
+    // バイト列を意識した変換が必須（atob/btoa をそのまま使うと文字化けします）
+    // ========================================
+    function encodeBase64Utf8(str) {
+      const bytes = new TextEncoder().encode(str);
+      let bin = '';
+      // 引数の数に上限があるため、まとめて渡さず分割して連結する
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      }
+      return btoa(bin);
+    }
+
+    function decodeBase64Utf8(b64) {
+      const bin = atob(String(b64).replace(/\s/g, ''));
+      return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+    }
+
+    // ========================================
+    // GAS 設定キャッシュのクリア
+    // 満枠・早割を変えても、バックエンドが古い設定を最大30分保持するため
+    // 保存直後にキャッシュを消して即時反映させる
+    // ========================================
+    async function clearGasCache() {
+      const gasUrl = config?.gasUrl;
+      if (!gasUrl) return;
+      try {
+        const url = new URL(gasUrl);
+        url.searchParams.set('action', 'clear_cache');
+        const token = localStorage.getItem('admin_gas_token');
+        if (token) url.searchParams.set('token', token);
+        await fetch(url, { method: 'GET', mode: 'no-cors' });
+      } catch (err) {
+        console.warn('キャッシュクリアに失敗しました:', err);
       }
     }
 

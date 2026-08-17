@@ -8,6 +8,8 @@
   },
   "event": {
     "name": "第1回ぶち癒しフェスタin小田原",
+    "edition": "第1回",
+    "editionId": "odawara-01",
     "date": "2026年11月1日（日）11:00〜16:30",
     "location": "おだわら市民交流センター UMECO 　神奈川県小田原市栄町一丁目1番27号",
     "earlyBirdDeadline": ""
@@ -152,5 +154,6 @@
   "gasUrl": "https://script.google.com/macros/s/AKfycbzdEcorQyVCAfOTmtYhWSRBVp020nBYFI8fezNUt6GRWbpTw3ZeYLG9Vs5DhslZ4i2Y/exec",
   "workerUrl": "",
   "spreadsheetId": "1-KFjFMYIwvWqrg8hW-vvl0gHmTCnSvjS-adopfVlw0E",
+  "databaseSpreadsheetId": "1QjOHkZRXZOJF7e6pslNPO2S_rnnHXaUxhY_LJrH9D6M",
   "driveFolderUrl": "https://drive.google.com/drive/folders/1Yr2nO-FYygBZefYbOn9qGTNzapa8CbnX"
 }
