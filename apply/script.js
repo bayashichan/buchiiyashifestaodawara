@@ -18,6 +18,8 @@ let optionValues = {
   secondaryPartyCount: 0
 };
 let snsLinkCount = 1;
+// 選択時に縮小・圧縮を済ませた写真（送信時はこれをそのまま使う）
+let preparedPhoto = null;
 
 // ========================================
 // SNS判別パターン
@@ -915,8 +917,9 @@ function validateForm() {
     if (!usePrevious && !sendLater) {
       if (!photoInput?.files?.length) {
         errors.push('プロフィール写真をアップロードしてください（うまく送れない場合は「写真をあとからメールで送る」にチェックしてください）');
-      } else if (photoInput.files[0].size > 8 * 1024 * 1024) {
-        errors.push('画像ファイルは8MB以下にしてください');
+      } else if (!preparedPhoto) {
+        // 縮小がまだ終わっていない、または読み込めなかった
+        errors.push('写真の準備が終わっていません。少し待ってからもう一度お試しください');
       }
     }
   }
@@ -1027,7 +1030,8 @@ async function submitForm() {
 
     if (!sendLater && photoInput?.files?.length) {
       try {
-        const b64 = await convertFileToBase64(photoInput.files[0]);
+        // 選択時に縮小済みならそれを使う。何らかの理由で未準備ならここで変換する
+        const b64 = preparedPhoto || await convertFileToBase64(photoInput.files[0]);
         formData.set('profileImageBase64',   b64.base64);
         formData.set('profileImageMimeType', b64.mimeType);
         formData.set('profileImageName',     b64.name);
@@ -1203,23 +1207,73 @@ function initEmailConfirmation() {
 // ========================================
 // ファイルサイズチェック
 // ========================================
+/**
+ * 写真を選んだ時点で縮小・圧縮まで済ませます。
+ *
+ * 以前はファイルサイズが8MBを超えると、縮小する前に拒否していました。
+ * 最近のスマホの写真は8MBを超えることが珍しくないため、
+ * まず縮小してみて、結果が送れる大きさなら受け付けます。
+ */
 function initFileSizeCheck() {
   const photoInput = document.getElementById('profileImage');
   if (!photoInput) return;
 
-  photoInput.addEventListener('change', e => {
+  photoInput.addEventListener('change', async e => {
     const file = e.target.files[0];
-    if (!file) return;
-    const name = file.name.toLowerCase();
-    if (name.endsWith('.heic') || name.endsWith('.heif')) {
-      alert('HEIC形式はサポートされていません。JPGまたはPNG形式でアップロードしてください。');
-      e.target.value = ''; return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      alert(`画像は8MB以下にしてください。\n現在: ${(file.size/1024/1024).toFixed(2)}MB`);
-      e.target.value = '';
+    preparedPhoto = null;
+
+    if (!file) { setPhotoStatus(''); return; }
+
+    setPhotoStatus('画像を準備しています...', 'wait');
+
+    try {
+      preparedPhoto = await convertFileToBase64(file);
+
+      const kb = Math.round(preparedPhoto.base64.length * 0.75 / 1024);
+      const before = file.size / 1024 / 1024;
+      setPhotoStatus(
+        before >= 1
+          ? `準備できました（${before.toFixed(1)}MB → 約${kb}KB に縮小）`
+          : `準備できました（約${kb}KB）`,
+        'ok'
+      );
+      showPhotoPreview(preparedPhoto);
+
+    } catch (err) {
+      console.error('画像の準備に失敗:', err);
+      preparedPhoto = null;
+      showPhotoPreview(null);
+      setPhotoStatus('この画像は読み込めませんでした。別の画像を選ぶか、あとからメールでお送りください。', 'ng');
+
+      // 逃げ道を自動で選択しておく（申込を進められるように）
+      const later = document.getElementById('photoLater');
+      if (later && !later.checked) {
+        later.checked = true;
+        togglePhotoUpload();
+      }
     }
   });
+}
+
+// 写真欄の状態表示
+function setPhotoStatus(message, kind) {
+  const el = document.getElementById('photoStatus');
+  if (!el) return;
+  el.textContent = message || '';
+  el.classList.toggle('hidden', !message);
+  const colors = { wait: '#6b7280', ok: '#16a34a', ng: '#dc2626' };
+  el.style.color = colors[kind] || '#6b7280';
+}
+
+// 縮小後の画像をその場で見せる
+function showPhotoPreview(prepared) {
+  const box = document.getElementById('photoPreviewBox');
+  const img = document.getElementById('photoPreviewImg');
+  if (!box || !img) return;
+
+  if (!prepared) { box.classList.add('hidden'); img.removeAttribute('src'); return; }
+  img.src = `data:${prepared.mimeType};base64,${prepared.base64}`;
+  box.classList.remove('hidden');
 }
 
 // ========================================
@@ -1474,7 +1528,11 @@ function togglePhotoUpload() {
 
   fileInput.disabled = skipUpload;
   fileInput.required = !skipUpload;
-  if (skipUpload) fileInput.value = '';
+  if (skipUpload) {
+    fileInput.value = '';
+    preparedPhoto = null;
+    showPhotoPreview(null);
+  }
   if (reqTag) reqTag.style.display = skipUpload ? 'none' : 'inline';
 
   preview?.classList.toggle('hidden', !usePrevious?.checked);

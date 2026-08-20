@@ -36,7 +36,7 @@ const expect = (label, cond) => {
  * フォームを起動して、必須項目を埋めた状態を作る
  * failImageConversion=true のとき、画像変換が必ず失敗するようにする
  */
-async function boot({ attachFile = false, sendLater = false, failImageConversion = false } = {}) {
+async function boot({ attachFile = false, sendLater = false, failImageConversion = false, fileSizeMB = 1, scriptSource = null } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.test/apply/' });
   const { window } = dom, doc = window.document;
 
@@ -53,7 +53,7 @@ async function boot({ attachFile = false, sendLater = false, failImageConversion
     return { ok: true, json: async () => ({ success: true, totalFee: 8000 }) };
   };
 
-  window.eval(fs.readFileSync(`${REPO}/apply/script.js`, 'utf8'));
+  window.eval(scriptSource || fs.readFileSync(`${REPO}/apply/script.js`, 'utf8'));
   await new Promise(r => setTimeout(r, 80));
 
   // 画像変換の成否を差し替える
@@ -88,10 +88,13 @@ async function boot({ attachFile = false, sendLater = false, failImageConversion
   }
 
   if (attachFile) {
-    // ファイルが選ばれている状態を模擬する
-    Object.defineProperty(doc.getElementById('profileImage'), 'files', {
-      value: [{ name: 'p.jpg', size: 1000 }], configurable: true
+    // ファイルを選んだ状態を模擬し、選択時の準備処理まで走らせる
+    const input = doc.getElementById('profileImage');
+    Object.defineProperty(input, 'files', {
+      value: [{ name: 'p.jpg', size: fileSizeMB * 1024 * 1024 }], configurable: true
     });
+    input.dispatchEvent(new window.Event('change'));
+    await new Promise(r => setTimeout(r, 20));
   }
 
   return { window, doc, sent };
@@ -123,6 +126,7 @@ console.log('\n[2] 画像を選んだが変換に失敗した場合');
   const { window, doc, sent } = await boot({ attachFile: true, failImageConversion: true });
   await window.submitForm();
 
+
   expect('申込は完了する（止まらない）', !doc.getElementById('completeModal').classList.contains('hidden'));
   expect('エラーで止まっていない', !sent.alert);
   expect('画像データは送られていない', !fieldOf(sent.body, 'profileImageBase64'));
@@ -149,6 +153,46 @@ console.log('\n[4] 写真を付けず、チェックも入れない場合');
   const errors = window.validateForm();
   expect('写真が必須として案内される', errors.some(e => e.includes('プロフィール写真')));
   expect('逃げ道が案内文に含まれる', errors.some(e => e.includes('あとからメールで送る')));
+}
+
+// ---------------------------------------------------------------
+console.log('\n[5] 8MBを超える大きな写真');
+{
+  const { window, doc, sent } = await boot({ attachFile: true, fileSizeMB: 25 });
+
+  expect('警告ダイアログが出ない', !sent.alert);
+  expect('縮小できた旨が表示される', doc.getElementById('photoStatus').textContent.includes('準備できました'));
+  expect('縮小後のサイズが案内される', doc.getElementById('photoStatus').textContent.includes('25.0MB'));
+  expect('バリデーションを通過する', window.validateForm().length === 0);
+
+  await window.submitForm();
+  expect('画像が送信される', fieldOf(sent.body, 'profileImageBase64') === 'AAAA');
+  expect('写真ありとして送信される', fieldOf(sent.body, 'photoPending') === '0');
+}
+
+// 修正前は8MB超を縮小前に拒否していた。その差を確認する
+{
+  const { execSync } = await import('node:child_process');
+  let oldSrc = null;
+  try {
+    oldSrc = execSync('git show 08ebe13:apply/script.js', { cwd: REPO, encoding: 'utf8', maxBuffer: 1e8 });
+  } catch { /* 比較できない環境ではスキップ */ }
+
+  if (oldSrc) {
+    const before = await boot({ attachFile: true, fileSizeMB: 25, scriptSource: oldSrc });
+    expect('修正前は8MB超で警告が出ていた（不具合の再現）',
+      String(before.sent.alert || '').includes('8MB以下'));
+  }
+}
+
+// ---------------------------------------------------------------
+console.log('\n[6] 読み込めない画像を選んだ場合');
+{
+  const { window, doc } = await boot({ attachFile: true, failImageConversion: true });
+
+  expect('読み込めない旨が表示される', doc.getElementById('photoStatus').textContent.includes('読み込めませんでした'));
+  expect('「あとからメールで送る」が自動で選ばれる', doc.getElementById('photoLater').checked === true);
+  expect('そのまま申込を進められる', window.validateForm().length === 0);
 }
 
 console.log(failures === 0 ? '\n✅ すべて成功' : `\n❌ ${failures}件失敗`);

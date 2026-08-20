@@ -211,10 +211,18 @@
               </div>
             </div>
 
-            <input type="file" name="profileImage" id="profileImage" accept="image/png,image/jpeg" class="input-field" required>
+            <input type="file" name="profileImage" id="profileImage" accept="image/*" class="input-field" required>
             <input type="hidden" name="profileImageUrl" id="profileImageUrl">
+
+            <!-- 縮小の進み具合と結果 -->
+            <p id="photoStatus" class="hidden" style="font-size:0.85rem;font-weight:600;margin-top:0.5rem"></p>
+            <div id="photoPreviewBox" class="hidden" style="margin-top:0.5rem">
+              <img id="photoPreviewImg" alt="選択した写真"
+                   style="width:6rem;height:6rem;object-fit:cover;border-radius:0.5rem;border:1px solid #d1d5db">
+            </div>
+
             <p style="font-size:0.8rem;color:#9ca3af;margin-top:0.4rem">
-              ※ JPG/PNG 形式、8MB以下<br>
+              ※ 大きな写真は自動で小さくして送ります。サイズを気にせず選んでください<br>
               ※ 顔出し不要の場合はイラスト・風景画でもOK
             </p>
 
