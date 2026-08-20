@@ -907,13 +907,14 @@ function validateForm() {
     }
   });
 
-  // 写真
+  // 写真（「前回の写真を使う」「あとからメールで送る」を選んだ場合は不要）
   if (sf.showPhotoUpload !== false) {
-    const photoInput = form.querySelector('[name="profileImage"]');
+    const photoInput  = form.querySelector('[name="profileImage"]');
     const usePrevious = form.querySelector('[name="usePreviousPhoto"]')?.checked;
-    if (!usePrevious) {
+    const sendLater   = form.querySelector('[name="photoLater"]')?.checked;
+    if (!usePrevious && !sendLater) {
       if (!photoInput?.files?.length) {
-        errors.push('プロフィール写真をアップロードしてください');
+        errors.push('プロフィール写真をアップロードしてください（うまく送れない場合は「写真をあとからメールで送る」にチェックしてください）');
       } else if (photoInput.files[0].size > 8 * 1024 * 1024) {
         errors.push('画像ファイルは8MB以下にしてください');
       }
@@ -1018,17 +1019,34 @@ async function submitForm() {
     formData.set('eventName', CONFIG.event?.name || '');
 
     // 写真処理
-    const photoInput = form.querySelector('[name="profileImage"]');
-    if (photoInput?.files?.length) {
+    // 変換に失敗しても申込自体は完了させ、あとからメールで送っていただく
+    const photoInput  = form.querySelector('[name="profileImage"]');
+    const sendLater   = form.querySelector('[name="photoLater"]')?.checked;
+    const usePrevious = form.querySelector('[name="usePreviousPhoto"]')?.checked;
+    let photoAttached = false;
+
+    if (!sendLater && photoInput?.files?.length) {
       try {
         const b64 = await convertFileToBase64(photoInput.files[0]);
-        formData.set('profileImageBase64',  b64.base64);
+        formData.set('profileImageBase64',   b64.base64);
         formData.set('profileImageMimeType', b64.mimeType);
         formData.set('profileImageName',     b64.name);
+        photoAttached = true;
       } catch (e) {
-        throw new Error('画像の処理に失敗しました。別の画像を選択してください。');
+        console.error('画像処理に失敗したため、写真なしで送信します:', e);
+        formData.delete('profileImageBase64');
+        formData.delete('profileImageMimeType');
+        formData.delete('profileImageName');
       }
     }
+
+    // 前回の写真を使う場合は、そのURLが送られるので写真ありとして扱う
+    if (usePrevious && form.querySelector('[name="profileImageUrl"]')?.value) {
+      photoAttached = true;
+    }
+
+    // 写真が付いていないことをバックエンドにも伝える
+    formData.set('photoPending', photoAttached ? '0' : '1');
 
     // LINE情報
     formData.set('lineUserId',      document.getElementById('lineUserId')?.value || '');
@@ -1064,7 +1082,8 @@ async function submitForm() {
     const result = await response.json().catch(() => { throw new Error('サーバーからの応答が不正です。'); });
 
     if (result.success) {
-      document.getElementById('completeModal')?.classList.remove('hidden');
+      // バックエンド側で写真を保存できなかった場合も未受領として扱う
+      showCompleteModal(!photoAttached || result.photoPending === true);
     } else {
       throw new Error(result.error || '送信に失敗しました。再度お試しください。');
     }
@@ -1076,6 +1095,38 @@ async function submitForm() {
     document.getElementById('loadingOverlay')?.classList.remove('visible');
     document.getElementById('submitBtn').disabled = false;
   }
+}
+
+// 申込完了モーダルを表示する
+// photoPending が true のときだけ、写真をメールで送っていただく案内を出す
+function showCompleteModal(photoPending) {
+  const modal  = document.getElementById('completeModal');
+  const notice = document.getElementById('photoPendingNotice');
+
+  if (notice) {
+    notice.classList.toggle('hidden', !photoPending);
+
+    if (photoPending) {
+      const address = CONFIG?.email?.replyToEmail || CONFIG?.email?.adminEmail || '';
+      const name    = document.getElementById('nameInput')?.value || '';
+      const shop    = document.querySelector('[name="exhibitorName"]')?.value || '';
+      const subject = `【プロフィール写真】${name}${shop ? '（' + shop + '）' : ''}`;
+      const body    = `${CONFIG?.event?.name || ''} に申し込みました ${name} です。\nプロフィール写真を添付いたします。\n\n出展名: ${shop}`;
+
+      const link = document.getElementById('photoMailLink');
+      if (link) {
+        link.href = address
+          ? `mailto:${address}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+          : '#';
+        link.style.display = address ? 'block' : 'none';
+      }
+
+      const addressEl = document.getElementById('photoMailAddress');
+      if (addressEl) addressEl.textContent = address ? `送り先: ${address}` : '送り先は事務局へお問い合わせください';
+    }
+  }
+
+  modal?.classList.remove('hidden');
 }
 
 // ========================================
@@ -1412,21 +1463,21 @@ function parseSnsLinks(snsData) {
 }
 
 function togglePhotoUpload() {
-  const checkbox  = document.getElementById('usePreviousPhoto');
-  const fileInput = document.getElementById('profileImage');
-  const preview   = document.getElementById('previousPhotoPreview');
-  const reqTag    = document.getElementById('photoRequiredTag');
-  if (!checkbox || !fileInput) return;
+  const usePrevious = document.getElementById('usePreviousPhoto');
+  const sendLater   = document.getElementById('photoLater');
+  const fileInput   = document.getElementById('profileImage');
+  const preview     = document.getElementById('previousPhotoPreview');
+  const reqTag      = document.getElementById('photoRequiredTag');
+  if (!fileInput) return;
 
-  if (checkbox.checked) {
-    fileInput.disabled = true; fileInput.required = false; fileInput.value = '';
-    preview?.classList.remove('hidden');
-    if (reqTag) reqTag.style.display = 'none';
-  } else {
-    fileInput.disabled = false; fileInput.required = true;
-    preview?.classList.add('hidden');
-    if (reqTag) reqTag.style.display = 'inline';
-  }
+  const skipUpload = !!usePrevious?.checked || !!sendLater?.checked;
+
+  fileInput.disabled = skipUpload;
+  fileInput.required = !skipUpload;
+  if (skipUpload) fileInput.value = '';
+  if (reqTag) reqTag.style.display = skipUpload ? 'none' : 'inline';
+
+  preview?.classList.toggle('hidden', !usePrevious?.checked);
 }
 
 // ========================================
