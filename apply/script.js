@@ -329,30 +329,48 @@ function initBoothAccordion() {
 }
 
 // ブースオプション要素を生成するヘルパー
+// ブースIDにはブース名がそのまま入るため、引用符や記号が含まれても
+// 壊れないよう、文字列ではなく DOM API で組み立てる
 function createBoothOption(booth) {
   const earlyPrice   = booth.prices.earlyBird;
   const regularPrice = booth.prices.regular;
-  let priceDisplay;
-  if (isEarlyBird()) {
-    priceDisplay = earlyPrice === regularPrice
-      ? `¥${earlyPrice.toLocaleString()}`
-      : `¥${earlyPrice.toLocaleString()} <span class="booth-price-early">（通常¥${regularPrice.toLocaleString()}）</span>`;
-  } else {
-    priceDisplay = `¥${regularPrice.toLocaleString()}`;
-  }
+
   const option = document.createElement('label');
   option.className = 'booth-option' + (booth.soldOut ? ' sold-out' : '');
+
+  const radio = document.createElement('input');
+  radio.type  = 'radio';
+  radio.name  = 'boothRadio';
+  radio.value = booth.id;
+
+  const name = document.createElement('span');
+  name.style.flex = '1';
+  name.textContent = booth.name;
+
+  option.append(radio, name);
+
   if (booth.soldOut) {
-    option.innerHTML = `
-      <input type="radio" name="boothRadio" value="${booth.id}" disabled>
-      <span style="flex:1">${booth.name}</span>
-      <span class="sold-out-badge">満枠</span>`;
+    radio.disabled = true;
+    const badge = document.createElement('span');
+    badge.className = 'sold-out-badge';
+    badge.textContent = '満枠';
+    option.appendChild(badge);
   } else {
-    option.innerHTML = `
-      <input type="radio" name="boothRadio" value="${booth.id}" onchange="selectBooth('${booth.id}')">
-      <span style="flex:1">${booth.name}</span>
-      <span class="booth-price">${priceDisplay}</span>`;
+    radio.addEventListener('change', () => selectBooth(booth.id));
+    const price = document.createElement('span');
+    price.className = 'booth-price';
+    if (isEarlyBird() && earlyPrice !== regularPrice) {
+      price.textContent = `¥${earlyPrice.toLocaleString()} `;
+      const note = document.createElement('span');
+      note.className = 'booth-price-early';
+      note.textContent = `（通常¥${regularPrice.toLocaleString()}）`;
+      price.appendChild(note);
+    } else {
+      price.textContent = `¥${(isEarlyBird() ? earlyPrice : regularPrice).toLocaleString()}`;
+    }
+    option.appendChild(price);
   }
+
   return option;
 }
 
@@ -364,8 +382,8 @@ function selectBooth(boothId) {
   document.getElementById('boothIdInput').value = boothId;
 
   document.querySelectorAll('.booth-option').forEach(opt => {
-    opt.classList.remove('selected');
-    if (opt.querySelector(`input[value="${boothId}"]`)) opt.classList.add('selected');
+    const input = opt.querySelector('input[name="boothRadio"]');
+    opt.classList.toggle('selected', !!input && input.value === boothId);
   });
 
   // オプション値リセット
@@ -389,12 +407,12 @@ function selectBooth(boothId) {
   if (staffCountSec)  staffCountSec.classList.add('hidden');
   if (chairsCountSec) chairsCountSec.classList.add('hidden');
 
-  // BodyEquipment セクション
-  if (CONFIG.features?.bodyEquipment) {
-    const equipSection = document.getElementById('equipmentSection');
-    if (equipSection) {
-      equipSection.classList.toggle('hidden', !boothId.startsWith('body_'));
-    }
+  // 持ち込み物品欄（ブースごとの設定で表示を切り替える）
+  const equipSection = document.getElementById('equipmentSection');
+  if (equipSection) {
+    const ask = selectedBooth?.askEquipment ??
+                (CONFIG.features?.bodyEquipment && String(boothId).includes('ボディ'));
+    equipSection.classList.toggle('hidden', !ask);
   }
 
   updateOptionsUI();
@@ -738,20 +756,7 @@ function initSnsInputs() {
   container.querySelectorAll('.sns-input').forEach(input =>
     input.addEventListener('input', handleSnsInput));
 
-  addBtn?.addEventListener('click', () => {
-    if (snsLinkCount >= 6) return;
-    snsLinkCount++;
-    const row = document.createElement('div');
-    row.className = 'sns-link-row';
-    row.innerHTML = `
-      <span class="sns-badge" data-index="${snsLinkCount - 1}">未入力</span>
-      <input type="url" name="snsLink${snsLinkCount}" class="input-field" style="flex:1"
-        data-index="${snsLinkCount - 1}" placeholder="https://...">
-      <button type="button" style="color:#ef4444;padding:0 0.5rem;border:none;background:none;cursor:pointer;font-size:1.2rem" onclick="removeSnsRow(this)">✕</button>`;
-    container.appendChild(row);
-    row.querySelector('.sns-input')?.addEventListener('input', handleSnsInput);
-    if (snsLinkCount >= 6) addBtn.style.display = 'none';
-  });
+  addBtn?.addEventListener('click', () => addSnsLinkInput());
 }
 
 function handleSnsInput(e) {
@@ -784,9 +789,26 @@ function handleSnsInput(e) {
 
 function removeSnsRow(btn) {
   btn.closest('.sns-link-row')?.remove();
-  snsLinkCount--;
+  renumberSnsRows();
   const addBtn = document.getElementById('addSnsBtn');
   if (addBtn) addBtn.style.display = 'block';
+}
+
+// 行の削除・追加後に data-index を振り直す
+// （バッジと入力欄の対応、および送信時の収集順を保つため）
+function renumberSnsRows() {
+  const container = document.getElementById('snsLinksContainer');
+  if (!container) return;
+  const rows = container.querySelectorAll('.sns-link-row');
+  rows.forEach((row, i) => {
+    row.querySelector('.sns-badge')?.setAttribute('data-index', i);
+    const input = row.querySelector('.sns-input');
+    if (input) {
+      input.dataset.index = i;
+      input.name = `snsLink${i + 1}`;
+    }
+  });
+  snsLinkCount = rows.length;
 }
 
 function addSnsLinkInput(url = '') {
@@ -794,17 +816,20 @@ function addSnsLinkInput(url = '') {
   const addBtn    = document.getElementById('addSnsBtn');
   if (!container || snsLinkCount >= 6) return;
 
+  const index = snsLinkCount;
   snsLinkCount++;
+
   const row = document.createElement('div');
   row.className = 'sns-link-row';
   row.innerHTML = `
-    <span class="sns-badge" data-index="${snsLinkCount - 1}">未入力</span>
-    <input type="url" name="snsLink${snsLinkCount}" class="input-field" style="flex:1"
-      data-index="${snsLinkCount - 1}" placeholder="https://..." value="${url}">
+    <span class="sns-badge" data-index="${index}">未入力</span>
+    <input type="url" name="snsLink${index + 1}" class="input-field sns-input" style="flex:1"
+      data-index="${index}" placeholder="https://...">
     <button type="button" style="color:#ef4444;padding:0 0.5rem;border:none;background:none;cursor:pointer;font-size:1.2rem" onclick="removeSnsRow(this)">✕</button>`;
   container.appendChild(row);
 
   const inp = row.querySelector('.sns-input');
+  if (url) inp.value = url;
   inp?.addEventListener('input', handleSnsInput);
   if (url) inp?.dispatchEvent(new Event('input'));
   if (snsLinkCount >= 6 && addBtn) addBtn.style.display = 'none';
@@ -1255,13 +1280,25 @@ function showRepeaterSelectionModal(list, statusEl, searchArea) {
   list.forEach(data => {
     const item = document.createElement('div');
     item.style.cssText = 'border:1.5px solid #e5e7eb;border-radius:0.5rem;padding:1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;';
-    item.innerHTML = `
-      <div>
-        <p style="font-weight:700">${data.eventName || '過去のイベント'}</p>
-        <p style="font-size:0.8rem;color:#6b7280">${data.submittedAt || ''}</p>
-        <p style="font-size:0.85rem;color:#374151">出展名: ${data.exhibitorName || ''}</p>
-      </div>
-      <button type="button" style="background:var(--color-primary);color:#fff;padding:0.4rem 1rem;border:none;border-radius:0.5rem;font-weight:700;cursor:pointer;font-size:0.85rem">選択</button>`;
+
+    const info = document.createElement('div');
+    const title = document.createElement('p');
+    title.style.fontWeight = '700';
+    title.textContent = data.eventName || data.edition || '過去のイベント';
+    const when = document.createElement('p');
+    when.style.cssText = 'font-size:0.8rem;color:#6b7280';
+    when.textContent = data.submittedAt || '';
+    const who = document.createElement('p');
+    who.style.cssText = 'font-size:0.85rem;color:#374151';
+    who.textContent = `出展名: ${data.exhibitorName || ''}`;
+    info.append(title, when, who);
+
+    const pick = document.createElement('button');
+    pick.type = 'button';
+    pick.style.cssText = 'background:var(--color-primary);color:#fff;padding:0.4rem 1rem;border:none;border-radius:0.5rem;font-weight:700;cursor:pointer;font-size:0.85rem';
+    pick.textContent = '選択';
+
+    item.append(info, pick);
     item.addEventListener('click', () => {
       fillFormWithData(data);
       modal.classList.add('hidden');
@@ -1288,10 +1325,28 @@ function fillFormWithData(data) {
   setVal('#emailInput',            data.email);
   setVal('#emailConfirmInput',     data.email);
   setVal('[name="exhibitorName"]', data.exhibitorName);
+  setVal('[name="equipment"]',     data.equipment);
+
+  // カスタム質問（出展メニュー名・自己紹介など）を label で対応付けて復元
+  const answerByLabel = {
+    '出展メニュー名': data.menu,
+    '自己紹介':       data.intro
+  };
+  (CONFIG?.customQuestions || []).forEach(q => {
+    const value = answerByLabel[q.label];
+    const el = document.getElementById(q.id);
+    if (el && value) el.value = value;
+  });
+
+  // 写真掲載可否
+  if (data.photoPermission) {
+    document.querySelectorAll('input[name="photoPermission"]').forEach(radio => {
+      if (radio.value === data.photoPermission) radio.checked = true;
+    });
+  }
 
   // カテゴリ復元
   if (data.category) {
-    document.addEventListener('configLoaded', () => {}, { once: true });
     document.querySelectorAll('.category-btn').forEach(btn => {
       if (btn.textContent === data.category) btn.click();
     });
@@ -1315,21 +1370,45 @@ function fillFormWithData(data) {
   // SNS リンク復元
   const container = document.getElementById('snsLinksContainer');
   if (container) { container.innerHTML = ''; snsLinkCount = 0; }
-  const snsData = data.snsLinks || data.sns;
-  const snsList = [];
-  if (snsData) {
-    if (snsData.hp)    snsList.push(snsData.hp);
-    if (snsData.insta) snsList.push(snsData.insta);
-    if (snsData.blog)  snsList.push(snsData.blog);
-    if (snsData.fb)    snsList.push(snsData.fb);
-    if (snsData.line)  snsList.push(snsData.line);
-    if (snsData.other) snsList.push(snsData.other);
-  }
-  snsList.filter(Boolean).forEach(url => addSnsLinkInput(url));
+  const snsList = parseSnsLinks(data.snsLinks || data.sns);
+  snsList.forEach(url => addSnsLinkInput(url));
   if (!snsList.length) addSnsLinkInput();
 
   document.querySelectorAll('textarea, input[type="text"]').forEach(el =>
     el.dispatchEvent(new Event('input')));
+}
+
+/**
+ * 保存形式が複数あるSNS欄からURLの配列を取り出します。
+ *  - スプレッドシートの文字列 "Instagram: https://... \n HP: https://..."
+ *  - JSON配列 [{type, url}, ...]
+ *  - 旧形式のオブジェクト {hp, insta, blog, fb, line, other}
+ */
+function parseSnsLinks(snsData) {
+  if (!snsData) return [];
+
+  if (typeof snsData === 'string') {
+    const text = snsData.trim();
+    if (!text || text === 'なし') return [];
+    if (text.startsWith('[')) {
+      try {
+        const arr = JSON.parse(text);
+        if (Array.isArray(arr)) return arr.map(l => l?.url).filter(Boolean);
+      } catch { /* 文字列として処理を続ける */ }
+    }
+    // 「種別: URL」形式、または URL のみの行から URL を抽出
+    return text.split(/\r?\n/)
+      .map(line => (line.match(/https?:\/\/\S+/) || [])[0])
+      .filter(Boolean);
+  }
+
+  if (Array.isArray(snsData)) {
+    return snsData.map(l => (typeof l === 'string' ? l : l?.url)).filter(Boolean);
+  }
+
+  return ['hp', 'insta', 'blog', 'fb', 'line', 'other']
+    .map(k => snsData[k])
+    .filter(Boolean);
 }
 
 function togglePhotoUpload() {
