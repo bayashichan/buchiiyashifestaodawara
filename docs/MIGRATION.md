@@ -34,24 +34,23 @@
 
 > 現行プロジェクトはそのまま動かし続けます。切り替えは手順5で行います。
 
-### 切り替え前にテストする場合（重要）
+### `CONFIG_JSON_URL` について
 
-`gas/Code.gs` の先頭にある `CONFIG_JSON_URL` は、**公開中（main）の config.json** を指しています。
-移行用の設定（`databaseSpreadsheetId` など）はまだ main に入っていないため、
-そのままだと手順3で「databaseSpreadsheetId がありません」というエラーになります。
-
-テスト中は、この1行を作業ブランチのファイルに向けてください。
-
-```js
-const CONFIG_JSON_URL = 'https://raw.githubusercontent.com/bayashichan/buchiiyashifestaodawara/claude/reception-system-migration-btsevs/apply/config.json';
-```
-
-変更したら **`clearConfigCache` を1回実行**してから次へ進みます（設定は最大30分キャッシュされるため）。
-手順5でブランチを main に取り込んだあとは、**この行を元のURLに戻してください。**
+`gas/Code.gs` の先頭にあるこの1行が、設定の読み込み元です。**変更する必要はありません。**
 
 ```js
 const CONFIG_JSON_URL = 'https://bayashichan.github.io/buchiiyashifestaodawara/apply/config.json';
 ```
+
+移行に必要な設定（`databaseSpreadsheetId` / `event.editionId`）は
+2026年8月20日に main へ取り込み済みで、このURLから読み込めます。
+
+> **「databaseSpreadsheetId がありません」というエラーが出た場合**
+>
+> 設定は最大30分キャッシュされます。まず **`clearConfigCache` を1回実行**してから、
+> あらためて実行してください。
+> それでも解消しない場合は、上のURLをブラウザで開き、
+> `databaseSpreadsheetId` が含まれているかを確認してください。
 
 ---
 
@@ -69,7 +68,7 @@ const CONFIG_JSON_URL = 'https://bayashichan.github.io/buchiiyashifestaodawara/a
 
 ## 3. データベースを整える
 
-`apply/config.json` にはすでに次が設定済みです。
+`apply/config.json` には次が設定済みで、すでに公開されています。
 
 ```json
 "event":  { "edition": "第1回", "editionId": "odawara-01" },
