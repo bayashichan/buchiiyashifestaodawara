@@ -1487,6 +1487,89 @@ function migrateReceptionToDatabase() {
 }
 
 /**
+ * 【必要なときだけ】データベースに記録済みの「開催回ID」を一括で付け替えます。
+ *
+ * 管理画面で開催回の呼び方を変えた場合（例: odawara-01 → 第1回）、
+ * 過去に登録した行のIDは古いままです。そのままにすると、
+ * 同じ回のデータが2つのIDに分かれて重複登録の原因になります。
+ *
+ * 使い方: 下の2行を書き換えてから実行してください。
+ */
+function renameEditionId() {
+  const OLD_ID = 'odawara-01';   // ← 変更前のID
+  const NEW_ID = '第1回';         // ← 変更後のID（管理画面の「開催回」と同じ文字）
+
+  if (!OLD_ID || !NEW_ID) throw new Error('OLD_ID と NEW_ID を設定してください');
+  if (OLD_ID === NEW_ID) { console.log('同じIDのため何もしません。'); return; }
+
+  const config = getConfig();
+  const dbId = getDatabaseSpreadsheetId_(config);
+  if (!dbId) throw new Error('config.json に databaseSpreadsheetId がありません');
+
+  const ss = SpreadsheetApp.openById(dbId);
+  let changed = 0;
+
+  // applications: 開催回ID と、申込IDの先頭を付け替える
+  const appSheet = ss.getSheetByName(DB_SHEET_APPLICATIONS);
+  if (appSheet && appSheet.getLastRow() >= 2) {
+    const headers = appSheet.getRange(1, 1, 1, appSheet.getLastColumn()).getValues()[0];
+    const idxEdition = headers.indexOf('開催回ID');
+    const idxAppId   = headers.indexOf('申込ID');
+    const rowCount   = appSheet.getLastRow() - 1;
+
+    if (idxEdition >= 0) {
+      const editions = appSheet.getRange(2, idxEdition + 1, rowCount, 1).getValues();
+      const appIds   = idxAppId >= 0 ? appSheet.getRange(2, idxAppId + 1, rowCount, 1).getValues() : null;
+
+      for (let i = 0; i < editions.length; i++) {
+        if (String(editions[i][0]).trim() !== OLD_ID) continue;
+        editions[i][0] = NEW_ID;
+        if (appIds) {
+          const cur = String(appIds[i][0] || '');
+          if (cur.indexOf(OLD_ID + '-') === 0) {
+            appIds[i][0] = NEW_ID + '-' + cur.slice(OLD_ID.length + 1);
+          }
+        }
+        changed++;
+      }
+
+      appSheet.getRange(2, idxEdition + 1, rowCount, 1).setValues(editions);
+      if (appIds) appSheet.getRange(2, idxAppId + 1, rowCount, 1).setValues(appIds);
+    }
+  }
+
+  // exhibitors: 最終開催回
+  const exSheet = ss.getSheetByName(DB_SHEET_EXHIBITORS);
+  if (exSheet && exSheet.getLastRow() >= 2) {
+    const headers = exSheet.getRange(1, 1, 1, exSheet.getLastColumn()).getValues()[0];
+    const idx = headers.indexOf('最終開催回');
+    if (idx >= 0) {
+      const rowCount = exSheet.getLastRow() - 1;
+      const values = exSheet.getRange(2, idx + 1, rowCount, 1).getValues();
+      let touched = false;
+      values.forEach(function (r) {
+        if (String(r[0]).trim() === OLD_ID) { r[0] = NEW_ID; touched = true; }
+      });
+      if (touched) exSheet.getRange(2, idx + 1, rowCount, 1).setValues(values);
+    }
+  }
+
+  // events: 開催回ID
+  const evSheet = ss.getSheetByName(DB_SHEET_EVENTS);
+  if (evSheet && evSheet.getLastRow() >= 2) {
+    const rowCount = evSheet.getLastRow() - 1;
+    const ids = evSheet.getRange(2, 1, rowCount, 1).getValues();
+    let touched = false;
+    ids.forEach(function (r) {
+      if (String(r[0]).trim() === OLD_ID) { r[0] = NEW_ID; touched = true; }
+    });
+    if (touched) evSheet.getRange(2, 1, rowCount, 1).setValues(ids);
+  }
+
+  console.log('開催回IDを付け替えました: ' + OLD_ID + ' → ' + NEW_ID + '（applications ' + changed + '件）');
+}
+
+/**
  * 【任意】開催が終わったあとに、受付スプシの最終状態（座席番号・入金など）を
  * データベースへ反映します。申込日時をキーに既存行を更新します。
  */
@@ -1620,8 +1703,11 @@ function dateKey_(value) {
 function applyTemplate(template, vars) {
   let result = String(template || '');
   Object.keys(vars).forEach(function (key) {
+    // 差し込み名は質問文をそのまま使うため、記号（（） ・ ? など）が
+    // 正規表現として解釈されないようエスケープする
+    const safeKey = String(key).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     result = result.replace(
-      new RegExp('\\{\\{' + key + '\\}\\}', 'g'),
+      new RegExp('\\{\\{' + safeKey + '\\}\\}', 'g'),
       vars[key] !== undefined && vars[key] !== null ? String(vars[key]) : ''
     );
   });

@@ -3,1200 +3,1396 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Config Editor | イベント申込フォーム設定ツール</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<meta name="robots" content="noindex, nofollow">
+<title>イベント設定</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Noto Sans JP',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column}
-:root{--primary:#818cf8;--accent:#f472b6;--bg:#0f172a;--bg2:#1e293b;--bg3:#334155;--border:#475569;--text:#e2e8f0;--muted:#94a3b8;--green:#34d399;--red:#f87171;--yellow:#fbbf24}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ヘッダー */
-.app-header{background:#1e293b;border-bottom:1px solid #334155;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-.app-header h1{font-size:1.1rem;font-weight:700;background:linear-gradient(135deg,var(--primary),var(--accent));background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.header-btns{display:flex;gap:0.75rem}
-.btn{padding:0.5rem 1.25rem;border:none;border-radius:0.5rem;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.15s}
-.btn-primary{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff}
-.btn-primary:hover{opacity:0.85}
-.btn-secondary{background:#334155;color:#e2e8f0;border:1px solid #475569}
-.btn-secondary:hover{background:#475569}
-.btn-success{background:var(--green);color:#022c22}
-.btn-success:hover{opacity:0.85}
-.btn-danger{background:var(--red);color:#fff;padding:0.3rem 0.75rem;font-size:0.8rem}
+  :root {
+    --bg:        #f6f4f7;
+    --card:      #ffffff;
+    --line:      #e6dfe4;
+    --ink:       #2a1a22;
+    --ink-soft:  #77636d;
+    --brand:     #650133;
+    --brand-soft:#f7e9f0;
+    --ok:        #1c6b4b;
+    --ok-soft:   #e6f3ec;
+    --warn:      #8a5200;
+    --warn-soft: #fdf3e2;
+    --danger:    #a3182a;
+    --danger-soft:#fbebed;
+    --radius:    0.85rem;
+    --shadow:    0 1px 3px rgba(42,26,34,.08), 0 8px 24px rgba(42,26,34,.05);
+  }
 
-/* レイアウト */
-.app-body{display:flex;flex:1}
-.sidebar{width:200px;background:#1e293b;border-right:1px solid #334155;padding:1rem 0;position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;flex-shrink:0}
-.nav-item{display:block;padding:0.6rem 1.25rem;font-size:0.85rem;cursor:pointer;color:#94a3b8;border-left:3px solid transparent;transition:all 0.15s}
-.nav-item:hover{color:#e2e8f0;background:#334155}
-.nav-item.active{color:var(--primary);border-left-color:var(--primary);background:rgba(129,140,248,0.08)}
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", YuGothic, Meiryo, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.7;
+    -webkit-text-size-adjust: 100%;
+  }
 
-/* メインコンテンツ */
-.main{flex:1;padding:2rem;max-width:900px;overflow-y:auto}
-.section-card{background:#1e293b;border:1px solid #334155;border-radius:0.75rem;padding:1.5rem;margin-bottom:1.5rem}
-.section-title{font-size:1rem;font-weight:700;color:var(--primary);margin-bottom:1.25rem;padding-bottom:0.75rem;border-bottom:1px solid #334155}
+  /* ============ 画面の骨格 ============ */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--brand); color: #fff;
+    padding: .85rem 1rem;
+    display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  }
+  .topbar h1 { font-size: 1.05rem; font-weight: 700; }
+  .topbar .state { font-size: .75rem; opacity: .85; }
 
-/* フォーム */
-.field-group{margin-bottom:1rem}
-.field-label{display:block;font-size:0.8rem;font-weight:600;color:var(--muted);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.05em}
-.field-input{width:100%;background:#0f172a;border:1px solid #475569;border-radius:0.5rem;padding:0.55rem 0.75rem;color:#e2e8f0;font-size:0.9rem;font-family:inherit;outline:none;transition:border-color 0.15s}
-.field-input:focus{border-color:var(--primary)}
-.field-input[type="color"]{height:2.5rem;padding:0.2rem 0.4rem;cursor:pointer}
-textarea.field-input{resize:vertical;min-height:80px}
-select.field-input{cursor:pointer}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem}
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 1rem .85rem 7rem; }
 
-/* トグルスイッチ */
-.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0;border-bottom:1px solid #1e293b}
-.toggle-label{font-size:0.9rem;color:#e2e8f0}
-.toggle-desc{font-size:0.75rem;color:var(--muted);margin-top:0.1rem}
-.toggle{position:relative;width:44px;height:24px;flex-shrink:0}
-.toggle input{opacity:0;width:0;height:0}
-.toggle-slider{position:absolute;inset:0;background:#334155;border-radius:12px;cursor:pointer;transition:0.2s}
-.toggle-slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:#94a3b8;border-radius:50%;transition:0.2s}
-.toggle input:checked + .toggle-slider{background:var(--primary)}
-.toggle input:checked + .toggle-slider:before{transform:translateX(20px);background:#fff}
+  /* ============ カード（開閉式） ============ */
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    margin-bottom: .85rem; overflow: hidden;
+  }
+  .card > summary {
+    list-style: none; cursor: pointer;
+    padding: 1rem 1.1rem;
+    font-size: 1.02rem; font-weight: 700;
+    display: flex; align-items: center; gap: .6rem;
+  }
+  .card > summary::-webkit-details-marker { display: none; }
+  .card > summary::after {
+    content: '⌄'; margin-left: auto; font-size: 1.3rem; line-height: 1;
+    color: var(--ink-soft); transition: transform .2s;
+  }
+  .card[open] > summary::after { transform: rotate(180deg); }
+  .card > summary:hover { background: var(--brand-soft); }
+  .card-body { padding: 0 1.1rem 1.2rem; display: flex; flex-direction: column; gap: 1.1rem; }
+  .card-note { font-size: .8rem; color: var(--ink-soft); font-weight: 400; }
 
-/* ブース・質問カード */
-.item-card{background:#0f172a;border:1px solid #334155;border-radius:0.5rem;padding:1rem;margin-bottom:0.75rem}
-.item-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem}
-.item-card-title{font-size:0.9rem;font-weight:700;color:#e2e8f0}
-.add-btn{background:rgba(129,140,248,0.15);color:var(--primary);border:1px dashed var(--primary);border-radius:0.5rem;padding:0.6rem 1rem;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;width:100%;transition:all 0.15s;margin-top:0.75rem}
-.add-btn:hover{background:rgba(129,140,248,0.25)}
+  /* ============ 入力 ============ */
+  .field { display: flex; flex-direction: column; gap: .35rem; }
+  .field > label { font-size: .88rem; font-weight: 700; }
+  .field .hint { font-size: .78rem; color: var(--ink-soft); line-height: 1.6; }
 
-/* タグ入力（カテゴリ） */
-.tag-list{display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem}
-.tag{background:#334155;border:1px solid #475569;border-radius:9999px;padding:0.25rem 0.75rem;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem}
-.tag-del{cursor:pointer;color:var(--red);font-weight:700;line-height:1}
-.tag-input-row{display:flex;gap:0.5rem}
+  input[type=text], input[type=url], input[type=email], input[type=number],
+  input[type=password], input[type=datetime-local], textarea, select {
+    width: 100%;
+    font: inherit;
+    font-size: 16px;            /* スマホで自動ズームしないように */
+    padding: .65rem .8rem;
+    border: 1.5px solid var(--line);
+    border-radius: .6rem;
+    background: #fff; color: var(--ink);
+    outline: none;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--brand); }
+  textarea { resize: vertical; min-height: 5rem; line-height: 1.8; }
 
-/* JSON プレビュー */
-.json-preview{position:fixed;right:0;top:57px;bottom:0;width:380px;background:#0f172a;border-left:1px solid #334155;transform:translateX(100%);transition:transform 0.3s;overflow:auto;padding:1rem;z-index:90}
-.json-preview.open{transform:translateX(0)}
-.json-preview pre{font-size:0.75rem;color:#94a3b8;white-space:pre-wrap;word-break:break-all}
+  .row { display: flex; flex-wrap: wrap; gap: .75rem; }
+  .row > * { flex: 1 1 11rem; min-width: 0; }
 
-/* フッター */
-.app-footer{background:#1e293b;border-top:1px solid #334155;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;bottom:0;z-index:100}
-.footer-note{font-size:0.8rem;color:var(--muted)}
+  /* ============ スイッチ ============ */
+  .switch {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; padding: .7rem 0; border-bottom: 1px solid #f2edf0;
+  }
+  .switch:last-child { border-bottom: 0; }
+  .switch .txt { font-size: .92rem; font-weight: 700; }
+  .switch .sub { font-size: .78rem; color: var(--ink-soft); font-weight: 400; }
+  .toggle { position: relative; width: 52px; height: 30px; flex: 0 0 auto; }
+  .toggle input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .toggle span {
+    position: absolute; inset: 0; background: #cfc4cb; border-radius: 999px; transition: background .2s;
+    pointer-events: none;
+  }
+  .toggle span::after {
+    content: ''; position: absolute; width: 24px; height: 24px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  .toggle input:checked + span { background: var(--ok); }
+  .toggle input:checked + span::after { transform: translateX(22px); }
+  .toggle input:focus-visible + span { outline: 3px solid var(--brand); outline-offset: 2px; }
 
-/* トースト */
-.toast{position:fixed;bottom:5rem;right:1.5rem;background:#334155;color:#e2e8f0;padding:0.75rem 1.25rem;border-radius:0.5rem;font-size:0.875rem;font-weight:600;opacity:0;transition:opacity 0.3s;z-index:999;border-left:3px solid var(--green)}
-.toast.show{opacity:1}
+  /* ============ 一覧アイテム（ブース・質問） ============ */
+  .item {
+    border: 1.5px solid var(--line); border-radius: .75rem;
+    padding: .9rem; display: flex; flex-direction: column; gap: .8rem;
+    background: #fdfcfd;
+  }
+  .item-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+  .item-head .no { font-size: .78rem; font-weight: 700; color: var(--ink-soft); }
+
+  .btn {
+    font: inherit; font-size: .9rem; font-weight: 700;
+    border-radius: .6rem; border: 1.5px solid var(--line);
+    background: #fff; color: var(--ink); padding: .55rem .9rem; cursor: pointer;
+  }
+  .btn:hover { background: var(--brand-soft); }
+  .btn-del { border-color: #f0d6da; color: var(--danger); padding: .4rem .7rem; font-size: .82rem; }
+  .btn-del:hover { background: var(--danger-soft); }
+  .btn-add { width: 100%; border-style: dashed; border-color: var(--brand); color: var(--brand); }
+
+  /* ============ タグ（ジャンル） ============ */
+  .tags { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .tag {
+    display: flex; align-items: center; gap: .45rem;
+    background: var(--brand-soft); border-radius: 999px;
+    padding: .35rem .5rem .35rem .85rem; font-size: .88rem;
+  }
+  .tag button { border: 0; background: none; color: var(--danger); font-size: 1rem; cursor: pointer; line-height: 1; padding: 0 .2rem; }
+
+  /* ============ 色とプレビュー ============ */
+  .color-row { display: flex; align-items: center; gap: .7rem; }
+  .color-row input[type=color] {
+    width: 3.2rem; height: 2.6rem; padding: .15rem; border: 1.5px solid var(--line);
+    border-radius: .5rem; background: #fff; cursor: pointer; flex: 0 0 auto;
+  }
+  .color-row .name { font-size: .88rem; font-weight: 700; flex: 1; }
+
+  .preview {
+    border: 1px solid var(--line); border-radius: .75rem; overflow: hidden;
+    background: #fff; font-size: .85rem;
+  }
+  .pv-head { padding: 1.1rem .9rem; text-align: center; }
+  .pv-head .t { font-size: 1.05rem; font-weight: 700; line-height: 1.35; }
+  .pv-head .s { font-size: .78rem; opacity: .9; margin-top: .15rem; }
+  .pv-body { padding: .9rem; display: flex; flex-direction: column; gap: .7rem; }
+  .pv-title { font-weight: 700; padding-bottom: .35rem; border-bottom: 2px solid; font-size: .92rem; }
+  .pv-booth {
+    display: flex; align-items: center; gap: .5rem;
+    border: 1.5px solid; border-radius: .5rem; padding: .55rem .7rem; font-size: .85rem;
+  }
+  .pv-booth .dot { width: .8rem; height: .8rem; border-radius: 50%; border: 2px solid; flex: 0 0 auto; }
+  .pv-booth .grow { flex: 1; }
+  .pv-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+    border-top: 1px solid var(--line); padding: .75rem .9rem; background: #fff;
+  }
+  .pv-foot .total { font-size: .95rem; font-weight: 700; }
+  .pv-btn { border: 0; border-radius: 999px; color: #fff; font-weight: 700; padding: .5rem 1.1rem; font-size: .85rem; }
+
+  /* ============ メールの差し込みボタン ============ */
+  .chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .chip {
+    font: inherit; font-size: .82rem; font-weight: 700;
+    border: 1.5px solid var(--line); background: #fff; color: var(--brand);
+    border-radius: 999px; padding: .3rem .75rem; cursor: pointer;
+  }
+  .chip:hover { background: var(--brand-soft); }
+
+  /* ============ 注意書き ============ */
+  .note { border-radius: .6rem; padding: .75rem .9rem; font-size: .83rem; line-height: 1.7; }
+  .note-info { background: var(--brand-soft); }
+  .note-warn { background: var(--warn-soft); color: var(--warn); }
+  .note-warn strong { color: var(--warn); }
+
+  /* ============ 保存バー ============ */
+  .savebar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    background: rgba(255,255,255,.96); border-top: 1px solid var(--line);
+    padding: .7rem .85rem calc(.7rem + env(safe-area-inset-bottom));
+    backdrop-filter: blur(8px);
+  }
+  .savebar-in { max-width: 46rem; margin: 0 auto; display: flex; align-items: center; gap: .75rem; }
+  .savebar .status { font-size: .8rem; color: var(--ink-soft); flex: 1; }
+  .save-btn {
+    font: inherit; font-size: 1rem; font-weight: 700; color: #fff;
+    background: var(--brand); border: 0; border-radius: 999px;
+    padding: .8rem 1.6rem; cursor: pointer; white-space: nowrap;
+  }
+  .save-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ============ 合い言葉の画面 ============ */
+  .lock { min-height: 100dvh; display: grid; place-items: center; padding: 1.5rem; }
+  .lock-box {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 1.75rem 1.4rem; width: 100%; max-width: 24rem;
+    display: flex; flex-direction: column; gap: 1rem; text-align: center;
+  }
+  .lock-box h1 { font-size: 1.15rem; color: var(--brand); }
+  .lock-box p { font-size: .85rem; color: var(--ink-soft); }
+  .lock-msg { font-size: .85rem; font-weight: 700; min-height: 1.4rem; }
+
+  /* ============ トースト ============ */
+  .toast {
+    position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%);
+    background: var(--ink); color: #fff; border-radius: .7rem;
+    padding: .7rem 1.2rem; font-size: .88rem; font-weight: 700;
+    opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 90;
+    max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; }
+
+  .hidden { display: none !important; }
+
+  /* ============ 作成者用 ============ */
+  .dev { border-color: #cbb7c2; background: #fbf7f9; }
+  .dev > summary { color: var(--brand); }
+  .dev code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .82rem; word-break: break-all; }
+
+  @media (min-width: 40rem) {
+    .wrap { padding: 1.5rem 1.25rem 7rem; }
+    .topbar { padding: 1rem 1.5rem; }
+  }
 </style>
 </head>
 <body>
 
-<!-- ヘッダー -->
-<header class="app-header">
-  <h1>⚙️ Config Editor — イベント申込フォーム設定ツール</h1>
-  <div class="header-btns">
-    <label class="btn btn-secondary" style="cursor:pointer">
-      📂 JSONを読み込む
-      <input type="file" accept=".json" id="loadFile" style="display:none" onchange="loadJson(event)">
-    </label>
-    <button class="btn btn-secondary" onclick="togglePreview()">👁 JSONプレビュー</button>
-    <button class="btn btn-secondary" onclick="downloadJson()">💾 ダウンロード</button>
-    <button class="btn btn-primary" onclick="saveToGitHub()" id="saveGhBtn">🚀 保存して公開する</button>
+<!-- ===================== 合い言葉 ===================== -->
+<div class="lock" id="lockScreen">
+  <div class="lock-box">
+    <h1>イベント設定</h1>
+    <p>合い言葉を入力してください</p>
+    <input type="password" id="passInput" placeholder="合い言葉" autocomplete="current-password" enterkeyhint="go">
+    <button class="save-btn" id="unlockBtn" style="width:100%">ひらく</button>
+    <div class="lock-msg" id="lockMsg"></div>
   </div>
-</header>
-
-<div class="app-body">
-  <!-- サイドバー -->
-  <nav class="sidebar">
-    <div class="nav-item" onclick="scrollToId('s-connect')">🔗 接続</div>
-    <div class="nav-item active" onclick="scrollToId('s-theme')">🎨 テーマ</div>
-    <div class="nav-item" onclick="scrollToId('s-event')">📅 イベント情報</div>
-    <div class="nav-item" onclick="scrollToId('s-features')">⚙️ 機能設定</div>
-    <div class="nav-item" onclick="scrollToId('s-pricing')">💰 料金設定</div>
-    <div class="nav-item" onclick="scrollToId('s-booths')">🏪 ブース設定</div>
-    <div class="nav-item" onclick="scrollToId('s-categories')">🗂 カテゴリ</div>
-    <div class="nav-item" onclick="scrollToId('s-stdfields')">📋 標準フィールド</div>
-    <div class="nav-item" onclick="scrollToId('s-custom')">❓ カスタム質問</div>
-    <div class="nav-item" onclick="scrollToId('s-terms')">📜 出展規約</div>
-    <div class="nav-item" onclick="scrollToId('s-email')">📧 メール設定</div>
-    <div class="nav-item" onclick="scrollToId('s-infra')">🔧 インフラ設定</div>
-  </nav>
-
-  <!-- メイン -->
-  <main class="main" id="mainArea">
-
-    <!-- 接続設定 -->
-    <div class="section-card" id="s-connect">
-      <div class="section-title">🔗 接続設定（公開中のフォームに直接反映）</div>
-      <div id="connectState" style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">読み込み中...</div>
-      <div class="grid-2">
-        <div class="field-group">
-          <label class="field-label">GitHub ユーザー名 (owner)</label>
-          <input type="text" class="field-input" id="ghOwner" placeholder="bayashichan">
-        </div>
-        <div class="field-group">
-          <label class="field-label">リポジトリ名 (repo)</label>
-          <input type="text" class="field-input" id="ghRepo" placeholder="buchiiyashifestaodawara">
-        </div>
-      </div>
-      <div class="field-group">
-        <label class="field-label">GitHub アクセストークン</label>
-        <input type="password" class="field-input" id="ghToken" placeholder="ghp_xxxxxxxxxxxxx" autocomplete="off">
-        <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">
-          ※ このブラウザ内にのみ保存されます。共用パソコンでは使用後に「接続を解除」してください。
-        </p>
-      </div>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-        <button class="btn btn-secondary" onclick="connectGitHub()">接続して最新設定を読み込む</button>
-        <button class="btn btn-secondary" onclick="disconnectGitHub()">接続を解除</button>
-        <button class="btn btn-secondary" onclick="clearGasCache()">フォームへ即時反映（キャッシュクリア）</button>
-      </div>
-      <p style="font-size:0.75rem;color:var(--muted);margin-top:0.75rem;line-height:1.6">
-        「保存して公開する」で config.json が更新され、1〜2分でフォームに反映されます。<br>
-        バックエンド(GAS)は設定を最大30分キャッシュするため、料金やブースを変えた直後は
-        「キャッシュクリア」も押してください。
-      </p>
-    </div>
-
-    <!-- テーマ -->
-    <div class="section-card" id="s-theme">
-      <div class="section-title">🎨 テーマ・デザイン</div>
-      <div class="grid-2">
-        <div class="field-group">
-          <label class="field-label">メインカラー (primaryColor)</label>
-          <input type="color" class="field-input" id="primaryColor" value="#9b5de5">
-        </div>
-        <div class="field-group">
-          <label class="field-label">アクセントカラー (accentColor)</label>
-          <input type="color" class="field-input" id="accentColor" value="#f15bb5">
-        </div>
-        <div class="field-group">
-          <label class="field-label">ヘッダー背景色 (headerBgColor)</label>
-          <input type="color" class="field-input" id="headerBgColor" value="#1a0a2e">
-        </div>
-        <div class="field-group">
-          <label class="field-label">ヘッダー文字色 (headerTextColor)</label>
-          <input type="color" class="field-input" id="headerTextColor" value="#ffffff">
-        </div>
-      </div>
-      <div class="field-group">
-        <label class="field-label">ヘッダー画像URL (任意)</label>
-        <input type="url" class="field-input" id="headerImageUrl" placeholder="https://...">
-      </div>
-    </div>
-
-    <!-- イベント情報 -->
-    <div class="section-card" id="s-event">
-      <div class="section-title">📅 イベント情報</div>
-      <div class="field-group">
-        <label class="field-label">イベント名 *</label>
-        <input type="text" class="field-input" id="eventName" placeholder="第1回〇〇イベント">
-      </div>
-      <div class="grid-2">
-        <div class="field-group">
-          <label class="field-label">開催回（表示用）</label>
-          <input type="text" class="field-input" id="eventEdition" placeholder="第2回">
-        </div>
-        <div class="field-group">
-          <label class="field-label">開催回ID（データベースの管理キー）*</label>
-          <input type="text" class="field-input" id="eventEditionId" placeholder="odawara-02">
-          <p style="font-size:0.72rem;color:var(--yellow);margin-top:0.3rem">
-            ※ 開催回ごとに必ず変更してください（例: odawara-01 → odawara-02）。
-            同じIDのまま次回受付を始めると、前回データと同じ回として記録されます。
-          </p>
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="field-group">
-          <label class="field-label">開催日時テキスト</label>
-          <input type="text" class="field-input" id="eventDate" placeholder="2025年11月15日（土）10:00〜17:00">
-        </div>
-        <div class="field-group">
-          <label class="field-label">早割締切日時 (YYYY-MM-DD HH:mm:ss)</label>
-          <input type="text" class="field-input" id="earlyBirdDeadline" placeholder="2025-10-31 23:59:59">
-        </div>
-      </div>
-      <div class="field-group">
-        <label class="field-label">開催場所</label>
-        <input type="text" class="field-input" id="eventLocation" placeholder="〇〇会館 1階ホール">
-      </div>
-    </div>
-
-    <!-- 機能設定 -->
-    <div class="section-card" id="s-features">
-      <div class="section-title">⚙️ 機能設定（ON/OFF）</div>
-      <div class="toggle-row">
-        <div><div class="toggle-label">早割機能</div><div class="toggle-desc">早割期間中は割引価格を表示</div></div>
-        <label class="toggle"><input type="checkbox" id="f-earlyBird" checked><span class="toggle-slider"></span></label>
-      </div>
-      <div class="toggle-row">
-        <div><div class="toggle-label">リピーター検索</div><div class="toggle-desc">データベースから前回の申込内容を呼び出して自動入力（第2回以降でON）</div></div>
-        <label class="toggle"><input type="checkbox" id="f-repeaterSearch"><span class="toggle-slider"></span></label>
-      </div>
-      <div class="toggle-row">
-        <div><div class="toggle-label">会員割引</div><div class="toggle-desc">会員割引フィールドを表示</div></div>
-        <label class="toggle"><input type="checkbox" id="f-memberDiscount"><span class="toggle-slider"></span></label>
-      </div>
-      <div class="field-group" style="margin-top:0.75rem;padding-left:0.5rem">
-        <label class="field-label">会員割引ラベル名</label>
-        <input type="text" class="field-input" id="f-memberDiscountLabel" placeholder="会員割引">
-      </div>
-      <div class="toggle-row">
-        <div><div class="toggle-label">スタンプラリー景品提供</div><div class="toggle-desc">景品提供フィールドを表示</div></div>
-        <label class="toggle"><input type="checkbox" id="f-stampRally"><span class="toggle-slider"></span></label>
-      </div>
-      <div class="toggle-row">
-        <div><div class="toggle-label">懇親会（別セクション）</div><div class="toggle-desc">懇親会参加セクションを表示</div></div>
-        <label class="toggle"><input type="checkbox" id="f-party"><span class="toggle-slider"></span></label>
-      </div>
-      <div class="toggle-row">
-        <div><div class="toggle-label">二次会</div><div class="toggle-desc">二次会出欠フィールドを表示</div></div>
-        <label class="toggle"><input type="checkbox" id="f-secondaryParty"><span class="toggle-slider"></span></label>
-      </div>
-      <div class="toggle-row">
-        <div><div class="toggle-label">ボディケアブース持ち込み物品</div><div class="toggle-desc">bodyブース選択時に物品記入欄を表示</div></div>
-        <label class="toggle"><input type="checkbox" id="f-bodyEquipment"><span class="toggle-slider"></span></label>
-      </div>
-      <div class="field-group" style="margin-top:0.75rem">
-        <label class="field-label">LINE LIFF ID（空欄=LINE連携なし）</label>
-        <input type="text" class="field-input" id="f-liffId" placeholder="例: 2009544922-XXXXXXXX">
-      </div>
-    </div>
-
-    <!-- 料金設定 -->
-    <div class="section-card" id="s-pricing">
-      <div class="section-title">💰 料金設定</div>
-      <div class="field-group">
-        <label class="field-label">会員割引額（円）</label>
-        <input type="number" class="field-input" id="p-memberDiscount" value="2000" min="0">
-      </div>
-      <div style="margin-top:1rem">
-        <div class="field-label" style="margin-bottom:0.75rem">オプション料金</div>
-        <div id="optionsArea"></div>
-      </div>
-    </div>
-
-    <!-- ブース設定 -->
-    <div class="section-card" id="s-booths">
-      <div class="section-title">🏪 ブース設定</div>
-      <div id="boothList"></div>
-      <button class="add-btn" onclick="addBooth()">＋ ブースを追加</button>
-    </div>
-
-    <!-- カテゴリ -->
-    <div class="section-card" id="s-categories">
-      <div class="section-title">🗂 出展カテゴリ</div>
-      <div class="tag-list" id="categoryTags"></div>
-      <div class="tag-input-row">
-        <input type="text" class="field-input" id="newCategory" placeholder="カテゴリ名を入力" style="flex:1">
-        <button class="btn btn-secondary" onclick="addCategory()">追加</button>
-      </div>
-      <p style="font-size:0.75rem;color:var(--muted);margin-top:0.5rem">※ 空にするとカテゴリ選択欄が非表示になります</p>
-    </div>
-
-    <!-- 標準フィールド -->
-    <div class="section-card" id="s-stdfields">
-      <div class="section-title">📋 標準フィールド設定</div>
-      <div class="field-group">
-        <label class="field-label">出展名ラベル</label>
-        <input type="text" class="field-input" id="sf-exhibitorNameLabel" placeholder="出展名（セラピスト名・屋号）">
-      </div>
-      <div class="field-group">
-        <label class="field-label">出展名プレースホルダー</label>
-        <input type="text" class="field-input" id="sf-exhibitorNamePlaceholder" placeholder="ヒーリングサロン〇〇">
-      </div>
-      <div style="margin-top:0.75rem">
-        <div class="toggle-row">
-          <div class="toggle-label">電話番号フィールド</div>
-          <label class="toggle"><input type="checkbox" id="sf-showPhoneNumber" checked><span class="toggle-slider"></span></label>
-        </div>
-        <div class="toggle-row">
-          <div class="toggle-label">住所・郵便番号フィールド</div>
-          <label class="toggle"><input type="checkbox" id="sf-showAddress" checked><span class="toggle-slider"></span></label>
-        </div>
-        <div class="toggle-row">
-          <div class="toggle-label">写真アップロード</div>
-          <label class="toggle"><input type="checkbox" id="sf-showPhotoUpload" checked><span class="toggle-slider"></span></label>
-        </div>
-        <div class="toggle-row">
-          <div class="toggle-label">SNSリンク</div>
-          <label class="toggle"><input type="checkbox" id="sf-showSnsLinks" checked><span class="toggle-slider"></span></label>
-        </div>
-        <div class="toggle-row">
-          <div class="toggle-label">写真掲載可否</div>
-          <label class="toggle"><input type="checkbox" id="sf-showPhotoPermission" checked><span class="toggle-slider"></span></label>
-        </div>
-        <div class="toggle-row">
-          <div class="toggle-label">備考・質問欄</div>
-          <label class="toggle"><input type="checkbox" id="sf-showNotes" checked><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-    </div>
-
-    <!-- カスタム質問 -->
-    <div class="section-card" id="s-custom">
-      <div class="section-title">❓ カスタム質問</div>
-      <div id="customQuestionList"></div>
-      <button class="add-btn" onclick="addCustomQuestion()">＋ 質問を追加</button>
-    </div>
-
-    <!-- 規約 -->
-    <div class="section-card" id="s-terms">
-      <div class="section-title">📜 出展規約</div>
-      <div class="field-group">
-        <label class="field-label">規約テキスト（フォームに表示されます）</label>
-        <textarea class="field-input" id="termsText" rows="10" placeholder="【出展規約】&#10;&#10;1. ..."></textarea>
-      </div>
-    </div>
-
-    <!-- メール設定 -->
-    <div class="section-card" id="s-email">
-      <div class="section-title">📧 メール設定</div>
-      <div class="grid-2">
-        <div class="field-group">
-          <label class="field-label">管理者メールアドレス</label>
-          <input type="email" class="field-input" id="e-adminEmail" placeholder="your-event@gmail.com">
-        </div>
-        <div class="field-group">
-          <label class="field-label">返信先メールアドレス</label>
-          <input type="email" class="field-input" id="e-replyToEmail" placeholder="your-event@gmail.com">
-        </div>
-      </div>
-      <div class="field-group">
-        <label class="field-label">送信者名</label>
-        <input type="text" class="field-input" id="e-adminSenderName" placeholder="イベント事務局">
-      </div>
-      <div class="field-group">
-        <label class="field-label">申込者への件名</label>
-        <input type="text" class="field-input" id="e-confirmationSubject" placeholder="【{{eventName}}】出展お申込みを受け付けました">
-      </div>
-      <div class="field-group">
-        <label class="field-label">申込者へのメール本文テンプレート</label>
-        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.4rem">
-          使用できる変数: {{name}} {{email}} {{eventName}} {{boothName}} {{totalFee}} {{breakdown}} {{submittedAt}} {{exhibitorName}} ＋ カスタム質問のID
-        </div>
-        <textarea class="field-input" id="e-confirmationBodyTemplate" rows="10"></textarea>
-      </div>
-      <div class="field-group">
-        <label class="field-label">管理者通知メール件名</label>
-        <input type="text" class="field-input" id="e-adminNotificationSubject" placeholder="【新規申込】{{name}}様 ({{exhibitorName}})">
-      </div>
-    </div>
-
-    <!-- インフラ設定 -->
-    <div class="section-card" id="s-infra">
-      <div class="section-title">🔧 インフラ設定（デプロイ時に設定）</div>
-      <div class="field-group">
-        <label class="field-label">このconfig.jsonの公開URL (configJsonUrl)</label>
-        <input type="url" class="field-input" id="configJsonUrl" placeholder="https://USERNAME.github.io/REPO/apply/config.json">
-      </div>
-      <div class="field-group">
-        <label class="field-label">GAS デプロイURL (gasUrl)</label>
-        <input type="url" class="field-input" id="gasUrl" placeholder="https://script.google.com/macros/s/.../exec">
-      </div>
-      <div class="field-group">
-        <label class="field-label">Cloudflare Worker URL (workerUrl)</label>
-        <input type="url" class="field-input" id="workerUrl" placeholder="https://YOUR-WORKER.workers.dev">
-      </div>
-      <div class="grid-2">
-        <div class="field-group">
-          <label class="field-label">受付スプレッドシートID (spreadsheetId)</label>
-          <input type="text" class="field-input" id="spreadsheetId" placeholder="1Hx...">
-          <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">※ 今回の受付データが入るシート。開催回ごとに新しいシートへ差し替えます</p>
-        </div>
-        <div class="field-group">
-          <label class="field-label">データベース スプレッドシートID (databaseSpreadsheetId)</label>
-          <input type="text" class="field-input" id="databaseSpreadsheetId" placeholder="1Qj...">
-          <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">※ 全開催回を蓄積する共通データベース。毎回同じIDのままにします</p>
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="field-group">
-          <label class="field-label">DriveフォルダURL (driveFolderUrl)</label>
-          <input type="url" class="field-input" id="driveFolderUrl" placeholder="https://drive.google.com/drive/folders/1Hx...">
-          <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">※ DriveでフォルダをひらいてURLをそのままコピーして貼り付けてください</p>
-        </div>
-      </div>
-    </div>
-  </main>
 </div>
 
-<!-- フッター -->
-<footer class="app-footer">
-  <div class="footer-note" id="footerNote">入力内容は自動保存されません。「🚀 保存して公開する」を押すまで反映されません。</div>
-  <div style="display:flex;gap:0.75rem">
-    <button class="btn btn-secondary" onclick="downloadJson()">💾 ダウンロード</button>
-    <button class="btn btn-primary" onclick="saveToGitHub()">🚀 保存して公開する</button>
-  </div>
-</footer>
+<!-- ===================== 本体 ===================== -->
+<div id="app" class="hidden">
 
-<!-- JSONプレビュー -->
-<div class="json-preview" id="jsonPreview">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-    <span style="font-weight:700;font-size:0.9rem">JSON プレビュー</span>
-    <button class="btn btn-secondary" onclick="togglePreview()">✕</button>
+  <div class="topbar">
+    <h1>イベント設定</h1>
+    <div class="state" id="topState"></div>
   </div>
-  <pre id="jsonPreviewContent"></pre>
+
+  <div class="wrap">
+
+    <!-- ========== イベントのこと ========== -->
+    <details class="card" open>
+      <summary>📅 イベントのこと</summary>
+      <div class="card-body">
+        <div class="field">
+          <label for="f-eventName">イベント名</label>
+          <input type="text" id="f-eventName" placeholder="第2回ぶち癒しフェスタin小田原">
+          <span class="hint">申込フォームの一番上と、自動返信メールに表示されます</span>
+        </div>
+        <div class="field">
+          <label for="f-edition">開催回</label>
+          <input type="text" id="f-edition" placeholder="第2回">
+          <span class="hint">「第1回」「第2回」のように入れてください</span>
+        </div>
+        <div class="note note-warn" id="editionWarn" hidden>
+          <strong>開催回を変更しました。</strong>
+          新しい申込は別の回として記録されます。次の開催の準備であれば、このまま保存してください。
+        </div>
+        <div class="field">
+          <label for="f-eventDate">開催日時</label>
+          <input type="text" id="f-eventDate" placeholder="2026年11月1日（日）11:00〜16:30">
+        </div>
+        <div class="field">
+          <label for="f-eventPlace">会場</label>
+          <input type="text" id="f-eventPlace" placeholder="おだわら市民交流センター UMECO">
+        </div>
+      </div>
+    </details>
+
+    <!-- ========== 見た目の色 ========== -->
+    <details class="card">
+      <summary>🎨 見た目の色</summary>
+      <div class="card-body">
+        <div class="preview" id="preview">
+          <div class="pv-head" id="pvHead">
+            <div class="t" id="pvTitle">イベント名</div>
+            <div class="s">出展申込フォーム</div>
+          </div>
+          <div class="pv-body">
+            <div class="pv-title" id="pvSection">✨ 出展内容</div>
+            <div class="pv-booth" id="pvBoothOn">
+              <span class="dot" id="pvDot"></span>
+              <span class="grow" id="pvBoothName">ブース名</span>
+              <span id="pvBoothPrice">¥8,000</span>
+            </div>
+            <div class="pv-booth" style="border-color:#e5e7eb">
+              <span class="dot" style="border-color:#cfc4cb"></span>
+              <span class="grow">えらんでいないブース</span>
+              <span>¥9,000</span>
+            </div>
+          </div>
+          <div class="pv-foot">
+            <div class="total">合計: <span id="pvTotal">¥8,000</span></div>
+            <button type="button" class="pv-btn" id="pvBtn">申し込む</button>
+          </div>
+        </div>
+        <span class="hint">実際の申込フォームの見え方です。色を変えるとその場で反映されます。</span>
+
+        <div class="color-row">
+          <input type="color" id="c-primary">
+          <span class="name">メインの色<br><span class="hint">見出し・ボタン・選択中の枠</span></span>
+        </div>
+        <div class="color-row">
+          <input type="color" id="c-accent">
+          <span class="name">アクセントの色<br><span class="hint">ボタンのグラデーション</span></span>
+        </div>
+        <div class="color-row">
+          <input type="color" id="c-headBg">
+          <span class="name">見出し帯の背景色</span>
+        </div>
+        <div class="color-row">
+          <input type="color" id="c-headTxt">
+          <span class="name">見出し帯の文字色</span>
+        </div>
+      </div>
+    </details>
+
+    <!-- ========== ブース ========== -->
+    <details class="card">
+      <summary>🏪 ブース（出展枠）</summary>
+      <div class="card-body">
+        <div id="boothList" style="display:flex;flex-direction:column;gap:.85rem"></div>
+        <button type="button" class="btn btn-add" id="addBooth">＋ ブースを追加</button>
+        <div class="note note-warn">
+          <strong>受付中はブース名を変えないでください。</strong>
+          変えると、その瞬間に申込画面を開いていた方が送信できなくなることがあります。
+        </div>
+      </div>
+    </details>
+
+    <!-- ========== ジャンル ========== -->
+    <details class="card">
+      <summary>🗂 出展のジャンル</summary>
+      <div class="card-body">
+        <div class="tags" id="tagList"></div>
+        <div class="row">
+          <input type="text" id="newTag" placeholder="ジャンル名" enterkeyhint="done">
+          <button type="button" class="btn" id="addTag" style="flex:0 0 auto">追加</button>
+        </div>
+        <span class="hint">申込フォームで、出展者さんが1つ選びます</span>
+      </div>
+    </details>
+
+    <!-- ========== 料金 ========== -->
+    <details class="card">
+      <summary>💰 料金とオプション</summary>
+      <div class="card-body">
+
+        <div>
+          <div class="switch">
+            <div><div class="txt">早割を使う</div><div class="sub">締切までは早割料金で表示されます</div></div>
+            <label class="toggle"><input type="checkbox" id="f-earlyBird"><span></span></label>
+          </div>
+          <div class="field" id="earlyBirdWrap" style="margin-top:.6rem">
+            <label for="f-earlyDeadline">早割の締切</label>
+            <input type="datetime-local" id="f-earlyDeadline">
+          </div>
+        </div>
+
+        <div>
+          <div class="switch">
+            <div><div class="txt">会員割引を使う</div></div>
+            <label class="toggle"><input type="checkbox" id="f-member"><span></span></label>
+          </div>
+          <div id="memberWrap" class="row" style="margin-top:.6rem">
+            <div class="field">
+              <label for="f-memberLabel">聞き方</label>
+              <input type="text" id="f-memberLabel" placeholder="協会会員ですか？">
+            </div>
+            <div class="field">
+              <label for="f-memberAmount">割引額（円）</label>
+              <input type="number" id="f-memberAmount" min="0" inputmode="numeric">
+            </div>
+          </div>
+        </div>
+
+        <div id="optionList" style="display:flex;flex-direction:column;gap:.85rem"></div>
+      </div>
+    </details>
+
+    <!-- ========== 申込フォームの内容 ========== -->
+    <details class="card">
+      <summary>📝 申込フォームで聞くこと</summary>
+      <div class="card-body">
+
+        <div class="field">
+          <label for="f-exhibitorLabel">出展名の聞き方</label>
+          <input type="text" id="f-exhibitorLabel" placeholder="出展名（セラピスト名・屋号）">
+        </div>
+        <div class="field">
+          <label for="f-exhibitorPh">出展名の入力例</label>
+          <input type="text" id="f-exhibitorPh" placeholder="ヒーリングサロン〇〇">
+        </div>
+
+        <div>
+          <div class="switch"><div><div class="txt">電話番号</div></div>
+            <label class="toggle"><input type="checkbox" id="sf-phone"><span></span></label></div>
+          <div class="switch"><div><div class="txt">郵便番号・住所</div></div>
+            <label class="toggle"><input type="checkbox" id="sf-address"><span></span></label></div>
+          <div class="switch"><div><div class="txt">プロフィール写真</div></div>
+            <label class="toggle"><input type="checkbox" id="sf-photo"><span></span></label></div>
+          <div class="switch"><div><div class="txt">写真をSNSに載せてよいか</div></div>
+            <label class="toggle"><input type="checkbox" id="sf-photoPerm"><span></span></label></div>
+          <div class="switch"><div><div class="txt">SNSのリンク</div></div>
+            <label class="toggle"><input type="checkbox" id="sf-sns"><span></span></label></div>
+          <div class="switch"><div><div class="txt">質問・備考欄</div></div>
+            <label class="toggle"><input type="checkbox" id="sf-notes"><span></span></label></div>
+          <div class="switch"><div><div class="txt">スタンプラリーの景品提供</div></div>
+            <label class="toggle"><input type="checkbox" id="f-stamp"><span></span></label></div>
+          <div class="switch">
+            <div><div class="txt">前回の内容を呼び出せるようにする</div>
+              <div class="sub">2回目以降の出展者さんが、前回の申込内容を自動入力できます</div></div>
+            <label class="toggle"><input type="checkbox" id="f-repeater"><span></span></label></div>
+        </div>
+
+        <div>
+          <div style="font-weight:700;margin-bottom:.5rem">自由に聞きたいこと</div>
+          <div id="questionList" style="display:flex;flex-direction:column;gap:.85rem"></div>
+          <button type="button" class="btn btn-add" id="addQuestion" style="margin-top:.75rem">＋ 質問を追加</button>
+        </div>
+
+        <div class="note note-warn">
+          <strong>受付中は質問文を変えないでください。</strong>
+          質問文がそのまま集計シートの見出しになるため、途中で変えるとその質問の答えが記録されなくなります。
+        </div>
+      </div>
+    </details>
+
+    <!-- ========== 規約 ========== -->
+    <details class="card">
+      <summary>📜 出展規約</summary>
+      <div class="card-body">
+        <div class="field">
+          <label for="f-terms">規約の本文</label>
+          <textarea id="f-terms" rows="14"></textarea>
+          <span class="hint">申込フォームの「出展規約」を押すと表示されます</span>
+        </div>
+      </div>
+    </details>
+
+    <!-- ========== メール ========== -->
+    <details class="card">
+      <summary>✉️ 自動返信メール</summary>
+      <div class="card-body">
+
+        <div class="field">
+          <label for="f-senderName">差出人の名前</label>
+          <input type="text" id="f-senderName" placeholder="ぶち癒しフェスタin小田原事務局">
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="f-adminEmail">お知らせを受け取るアドレス</label>
+            <input type="email" id="f-adminEmail" placeholder="jimukyoku@example.com">
+            <span class="hint">新しい申込が入るとここに届きます</span>
+          </div>
+          <div class="field">
+            <label for="f-replyEmail">返信先のアドレス</label>
+            <input type="email" id="f-replyEmail" placeholder="jimukyoku@example.com">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="f-subject">申込者へのメールの件名</label>
+          <input type="text" id="f-subject" placeholder="お申込みを受け付けました">
+          <div class="chips" id="chipsSubject"></div>
+        </div>
+
+        <div class="field">
+          <label for="f-body">申込者へのメール本文</label>
+          <span class="hint">下のボタンを押すと、その人の情報が自動で入る場所を追加できます</span>
+          <div class="chips" id="chipsBody"></div>
+          <textarea id="f-body" rows="16"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="f-adminSubject">事務局へのお知らせメールの件名</label>
+          <input type="text" id="f-adminSubject" placeholder="新しい申込がありました">
+          <div class="chips" id="chipsAdmin"></div>
+        </div>
+      </div>
+    </details>
+
+    <!-- ========== 保存先 ========== -->
+    <details class="card">
+      <summary>📊 データの保存先</summary>
+      <div class="card-body">
+        <div class="field">
+          <label for="f-sheetUrl">今回の受付シート</label>
+          <input type="url" id="f-sheetUrl" placeholder="https://docs.google.com/spreadsheets/...">
+          <span class="hint">申込がここに1件ずつ入ります。開催回ごとに新しいシートに差し替えます</span>
+        </div>
+        <div class="field">
+          <label for="f-dbUrl">出展者データベース</label>
+          <input type="url" id="f-dbUrl" placeholder="https://docs.google.com/spreadsheets/...">
+          <span class="hint">これまでの全開催分がたまります。<strong>毎回そのままにしてください</strong></span>
+        </div>
+        <div class="field">
+          <label for="f-driveUrl">写真の保存フォルダ</label>
+          <input type="url" id="f-driveUrl" placeholder="https://drive.google.com/drive/folders/...">
+          <span class="hint">プロフィール写真がここに保存されます</span>
+        </div>
+        <div class="note note-info">
+          Google で開いたときのURLを、そのままコピーして貼り付けてください。
+        </div>
+      </div>
+    </details>
+
+    <!-- ========== 作成者用 ========== -->
+    <details class="card dev hidden" id="devCard">
+      <summary>🔒 作成者用（さわらないでください）</summary>
+      <div class="card-body">
+        <div class="note note-warn">
+          この欄は制作者が設定します。運用では変更しないでください。
+        </div>
+
+        <div class="field">
+          <label for="d-configUrl">config.json の公開URL</label>
+          <input type="url" id="d-configUrl" placeholder="https://USER.github.io/REPO/apply/config.json">
+        </div>
+        <div class="field">
+          <label for="d-gasUrl">GAS ウェブアプリURL</label>
+          <input type="url" id="d-gasUrl" placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+        <div class="field">
+          <label for="d-workerUrl">Cloudflare Worker URL（未使用なら空）</label>
+          <input type="url" id="d-workerUrl" placeholder="">
+        </div>
+
+        <hr style="border:0;border-top:1px solid var(--line)">
+
+        <div style="font-weight:700">保存先リポジトリと合い言葉</div>
+        <div class="row">
+          <div class="field"><label for="d-owner">GitHub ユーザー名</label>
+            <input type="text" id="d-owner" placeholder="bayashichan"></div>
+          <div class="field"><label for="d-repo">リポジトリ名</label>
+            <input type="text" id="d-repo" placeholder="buchiiyashifestaodawara"></div>
+        </div>
+        <div class="field">
+          <label for="d-token">アクセストークン</label>
+          <input type="password" id="d-token" placeholder="github_pat_..." autocomplete="off">
+          <span class="hint">Fine-grained / このリポジトリのみ / Contents: Read and write</span>
+        </div>
+        <div class="row">
+          <div class="field"><label for="d-pass1">合い言葉</label>
+            <input type="password" id="d-pass1" autocomplete="new-password"></div>
+          <div class="field"><label for="d-pass2">合い言葉（確認）</label>
+            <input type="password" id="d-pass2" autocomplete="new-password"></div>
+        </div>
+        <button type="button" class="btn" id="makeUnlock">合い言葉を登録する</button>
+        <div class="hint" id="devMsg"></div>
+        <div class="note note-warn">
+          合い言葉は暗号化してリポジトリに保存されます。
+          <strong>10文字以上</strong>の、推測されにくい言葉にしてください。
+          万一漏れた場合は、GitHub でトークンを失効させてから登録し直してください。
+        </div>
+      </div>
+    </details>
+
+  </div>
+
+  <div class="savebar">
+    <div class="savebar-in">
+      <div class="status" id="saveStatus">読み込み中...</div>
+      <button type="button" class="save-btn" id="saveBtn" disabled>設定内容を保存</button>
+    </div>
+  </div>
 </div>
 
-<!-- トースト -->
 <div class="toast" id="toast"></div>
 
 <script>
-// ========================================
-// 状態管理
-// ========================================
-let booths = [];
-let categories = [];
-let customQuestions = [];
-let boothIdCounter = 1;
-let questionIdCounter = 1;
+// =====================================================================
+// 定数
+// =====================================================================
+const CONFIG_PATH = 'apply/config.json';
+const UNLOCK_PATH = 'admin/unlock.json';
+const STORE_KEY   = 'buchi_admin_conn';
+const PBKDF2_ITER = 310000;
 
-const OPTIONS_DEF = [
-  { key: 'power',          label: 'コンセント使用',     defaultPrice: 500,  defaultEnabled: true  },
-  { key: 'chair',          label: '椅子追加',           defaultPrice: 100,  defaultEnabled: true  },
-  { key: 'staff',          label: '参加人数追加',        defaultPrice: 1000, defaultEnabled: true  },
-  { key: 'party',          label: '懇親会参加費',        defaultPrice: 5000, defaultEnabled: false },
-  { key: 'secondaryParty', label: '二次会参加費',        defaultPrice: 3000, defaultEnabled: false }
+const IS_SETUP = new URLSearchParams(location.search).has('setup');
+
+// 自動返信メールに差し込める項目（表示名 → 差し込み文字）
+const MAIL_VARS = [
+  ['お名前',       '{{name}}'],
+  ['出展名',       '{{exhibitorName}}'],
+  ['メールアドレス', '{{email}}'],
+  ['イベント名',    '{{eventName}}'],
+  ['出展ブース',    '{{boothName}}'],
+  ['合計金額',      '{{totalFee}}'],
+  ['料金の内訳',    '{{breakdown}}'],
+  ['申込内容',      '{{customAnswers}}'],
+  ['申込日時',      '{{submittedAt}}']
 ];
 
-// GitHub 接続情報（quick-settings.html と共通）
-const STORAGE_KEY = 'qs_github_settings';
-const CONFIG_PATH = 'apply/config.json';
-let fileSha = null;   // GitHub 上のファイルSHA（更新時に必要）
+// =====================================================================
+// 状態
+// =====================================================================
+let cfg   = null;   // 読み込んだ設定（表示していない項目もそのまま持ち続ける）
+let conn  = null;   // { owner, repo, token }
+let dirty = false;
+let originalEdition = '';
 
-// ========================================
-// 初期化
-// ========================================
-window.onload = () => {
-  renderOptions();
-  initNewCategoryOnEnter();
-  initEditor();
-};
+// =====================================================================
+// 起動
+// =====================================================================
+window.addEventListener('DOMContentLoaded', () => {
+  buildMailChips();
+  bindEvents();
 
-async function initEditor() {
-  const settings = loadGhSettings();
-  if (settings) {
-    document.getElementById('ghOwner').value = settings.owner;
-    document.getElementById('ghRepo').value  = settings.repo;
-    document.getElementById('ghToken').value = settings.token;
-    const ok = await loadFromGitHub(settings);
-    if (ok) return;
+  conn = readConn();
+  if (IS_SETUP || conn) {
+    openApp();
+  } else {
+    document.getElementById('passInput').focus();
   }
+});
 
-  // 未接続時は、公開中の config.json を読み込んで初期表示にする
-  const loaded = await loadPublishedConfig();
-  if (!loaded) {
-    addDefaultData();
-    setConnectState('⚠️ 公開中の設定を読み込めませんでした。初期値を表示しています。', 'var(--yellow)');
+async function openApp() {
+  document.getElementById('lockScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  if (IS_SETUP) document.getElementById('devCard').classList.remove('hidden');
+
+  const ok = await loadConfig();
+  if (!ok) return;
+
+  render();
+  setStatus(conn ? '変更はまだありません' : '保存できません（合い言葉が未登録）');
+  document.getElementById('topState').textContent = cfg.event?.edition || '';
+}
+
+// =====================================================================
+// 合い言葉
+// =====================================================================
+function bindEvents() {
+  document.getElementById('unlockBtn').addEventListener('click', unlock);
+  document.getElementById('passInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') unlock();
+  });
+  document.getElementById('saveBtn').addEventListener('click', save);
+  document.getElementById('makeUnlock').addEventListener('click', registerPassphrase);
+
+  document.getElementById('addBooth').addEventListener('click', () => {
+    cfg.booths.push(newBooth());
+    renderBooths(); markDirty();
+  });
+  document.getElementById('addQuestion').addEventListener('click', () => {
+    cfg.customQuestions.push(newQuestion());
+    renderQuestions(); markDirty();
+  });
+  document.getElementById('addTag').addEventListener('click', addTag);
+  document.getElementById('newTag').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addTag(); }
+  });
+
+  // 見た目のプレビュー
+  ['c-primary','c-accent','c-headBg','c-headTxt'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => { updatePreview(); markDirty(); });
+  });
+  document.getElementById('f-eventName').addEventListener('input', updatePreview);
+
+  document.getElementById('f-edition').addEventListener('input', e => {
+    document.getElementById('editionWarn').hidden =
+      !originalEdition || e.target.value.trim() === originalEdition;
+    markDirty();
+  });
+
+  document.getElementById('f-earlyBird').addEventListener('change', e => {
+    document.getElementById('earlyBirdWrap').classList.toggle('hidden', !e.target.checked);
+  });
+  document.getElementById('f-member').addEventListener('change', e => {
+    document.getElementById('memberWrap').classList.toggle('hidden', !e.target.checked);
+  });
+
+  // どこかを触ったら「未保存」にする
+  document.addEventListener('input', e => {
+    if (e.target.closest('#app')) markDirty();
+  });
+  document.addEventListener('change', e => {
+    if (e.target.closest('#app')) markDirty();
+  });
+
+  window.addEventListener('beforeunload', e => {
+    if (dirty) { e.preventDefault(); e.returnValue = ''; }
+  });
+}
+
+async function unlock() {
+  const pass = document.getElementById('passInput').value;
+  const msg  = document.getElementById('lockMsg');
+  if (!pass) { msg.textContent = '合い言葉を入力してください'; msg.style.color = 'var(--danger)'; return; }
+
+  msg.textContent = '確認中...';
+  msg.style.color = 'var(--ink-soft)';
+
+  try {
+    const res = await fetch(`../${UNLOCK_PATH}?t=${Date.now()}`);
+    if (!res.ok) throw new Error('未登録');
+    const blob = await res.json();
+    const data = await decryptJson(blob, pass);
+    if (!data.token) throw new Error('中身が不正です');
+
+    conn = data;
+    localStorage.setItem(STORE_KEY, JSON.stringify(conn));
+    openApp();
+  } catch (err) {
+    msg.textContent = err.message === '未登録'
+      ? '合い言葉がまだ登録されていません。制作者にご連絡ください。'
+      : '合い言葉が違います';
+    msg.style.color = 'var(--danger)';
   }
 }
 
-/** 同じサイトに公開されている config.json（読み取り専用の下敷き） */
-async function loadPublishedConfig() {
+function readConn() {
   try {
-    const res = await fetch(`../${CONFIG_PATH}?t=${Date.now()}`);
-    if (!res.ok) return false;
-    applyConfig(await res.json());
-    setConnectState('📄 公開中の設定を表示しています（保存するにはGitHub接続が必要です）', 'var(--yellow)');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// ========================================
-// GitHub 接続
-// ========================================
-function loadGhSettings() {
-  try {
-    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return (s && s.owner && s.repo && s.token) ? s : null;
+    const c = JSON.parse(localStorage.getItem(STORE_KEY));
+    return (c && c.owner && c.repo && c.token) ? c : null;
   } catch { return null; }
 }
 
-function currentGhInputs() {
-  return {
-    owner: document.getElementById('ghOwner').value.trim(),
-    repo:  document.getElementById('ghRepo').value.trim(),
-    token: document.getElementById('ghToken').value.trim()
-  };
-}
+async function registerPassphrase() {
+  const owner = val('d-owner'), repo = val('d-repo'), token = val('d-token');
+  const p1 = val('d-pass1'), p2 = val('d-pass2');
+  const msg = document.getElementById('devMsg');
 
-function setConnectState(msg, color) {
-  const el = document.getElementById('connectState');
-  el.textContent = msg;
-  el.style.color = color || 'var(--muted)';
-}
+  if (!owner || !repo || !token) { msg.textContent = 'ユーザー名・リポジトリ名・トークンを入力してください'; return; }
+  if (p1.length < 10) { msg.textContent = '合い言葉は10文字以上にしてください'; return; }
+  if (p1 !== p2)      { msg.textContent = '合い言葉が一致しません'; return; }
 
-async function connectGitHub() {
-  const settings = currentGhInputs();
-  if (!settings.owner || !settings.repo || !settings.token) {
-    showToast('⚠️ owner / repo / トークンをすべて入力してください');
-    return;
-  }
-  const ok = await loadFromGitHub(settings);
-  if (ok) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    showToast('✅ 接続しました');
-  }
-}
-
-function disconnectGitHub() {
-  localStorage.removeItem(STORAGE_KEY);
-  document.getElementById('ghToken').value = '';
-  fileSha = null;
-  setConnectState('接続を解除しました（保存はできません）', 'var(--muted)');
-  showToast('接続を解除しました');
-}
-
-function ghContentsUrl(settings) {
-  return `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${CONFIG_PATH}`;
-}
-
-async function loadFromGitHub(settings) {
-  setConnectState('接続中...', 'var(--yellow)');
+  msg.textContent = '登録中...';
   try {
-    const res = await fetch(`${ghContentsUrl(settings)}?ref=HEAD&t=${Date.now()}`, {
-      headers: {
-        'Authorization': `Bearer ${settings.token}`,
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `HTTPエラー: ${res.status}`);
-    }
-    const data = await res.json();
-    fileSha = data.sha;
-    applyConfig(JSON.parse(decodeBase64Utf8(data.content)));
-    setConnectState(`✅ 接続済み（${settings.owner}/${settings.repo}）— 保存すると公開フォームに反映されます`, 'var(--green)');
+    const blob = await encryptJson({ owner, repo, token }, p1);
+    conn = { owner, repo, token };
+    await putFile(UNLOCK_PATH, JSON.stringify(blob, null, 2), '管理画面の合い言葉を更新');
+    localStorage.setItem(STORE_KEY, JSON.stringify(conn));
+    msg.textContent = '✅ 登録しました。この合い言葉で管理画面をひらけます。';
+    setStatus('変更はまだありません');
+    updateSaveBtn();
+  } catch (err) {
+    msg.textContent = '❌ 登録できませんでした: ' + err.message;
+  }
+}
+
+// ---- 暗号化（合い言葉から鍵を作る） ----
+async function deriveKey(pass, salt) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITER, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptJson(obj, pass) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await deriveKey(pass, salt);
+  const data = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify(obj))
+  );
+  return { v: 1, iterations: PBKDF2_ITER, salt: b64(salt), iv: b64(iv), data: b64(new Uint8Array(data)) };
+}
+
+async function decryptJson(blob, pass) {
+  const salt = unb64(blob.salt), iv = unb64(blob.iv), data = unb64(blob.data);
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  const key  = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: blob.iterations || PBKDF2_ITER, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+  );
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+function b64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(s);
+}
+function unb64(str) {
+  return Uint8Array.from(atob(str), c => c.charCodeAt(0));
+}
+
+// =====================================================================
+// 設定の読み込み・保存
+// =====================================================================
+async function loadConfig() {
+  try {
+    const res = await fetch(`../${CONFIG_PATH}?t=${Date.now()}`);
+    if (!res.ok) throw new Error('読み込みに失敗しました');
+    cfg = await res.json();
+    // 表示に必要な入れ物を用意（無い場合に備える）
+    cfg.event ||= {}; cfg.theme ||= {}; cfg.features ||= {};
+    cfg.pricing ||= {}; cfg.pricing.options ||= {};
+    cfg.booths ||= []; cfg.categories ||= [];
+    cfg.standardFields ||= {}; cfg.customQuestions ||= []; cfg.email ||= {};
+    originalEdition = String(cfg.event.edition || '').trim();
     return true;
   } catch (err) {
-    console.error(err);
-    setConnectState(`❌ 接続エラー: ${err.message}`, 'var(--red)');
+    setStatus('設定を読み込めませんでした');
+    toast('設定を読み込めませんでした。通信状態を確認して、ページを開き直してください。');
     return false;
   }
 }
 
-async function saveToGitHub() {
-  const settings = loadGhSettings() || currentGhInputs();
-  if (!settings.owner || !settings.repo || !settings.token) {
-    showToast('⚠️ 先に「接続設定」を入力してください');
-    scrollToId('s-connect');
-    return;
-  }
+async function save() {
+  if (!conn) { toast('保存できません。制作者にご連絡ください。'); return; }
 
-  const config = buildConfig();
-  if (!config.event.name) { showToast('⚠️ イベント名を入力してください'); return; }
-  if (!config.event.editionId) { showToast('⚠️ 開催回IDを入力してください'); return; }
+  const err = collect();
+  if (err) { toast(err); return; }
 
-  const btn = document.getElementById('saveGhBtn');
+  const btn = document.getElementById('saveBtn');
   btn.disabled = true;
-  btn.textContent = '⏳ 保存中...';
+  setStatus('保存しています...');
 
   try {
-    // 最新のSHAを取得（他の端末で更新されている場合に備える）
-    const head = await fetch(ghContentsUrl(settings), {
-      headers: { 'Authorization': `Bearer ${settings.token}`, 'Accept': 'application/vnd.github.v3+json' }
-    });
-    if (head.ok) fileSha = (await head.json()).sha;
+    await putFile(CONFIG_PATH, JSON.stringify(cfg, null, 2) + '\n',
+      `設定を更新（${cfg.event.name || ''}）`);
 
-    const res = await fetch(ghContentsUrl(settings), {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${settings.token}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: `設定更新: ${config.event.name}（${config.event.edition || config.event.editionId}）`,
-        content: encodeBase64Utf8(JSON.stringify(config, null, 2)),
-        sha: fileSha || undefined
-      })
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `HTTPエラー: ${res.status}`);
-    }
-
-    fileSha = (await res.json()).content.sha;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    setConnectState(`✅ 保存しました（${new Date().toLocaleTimeString('ja-JP')}）— 反映まで1〜2分`, 'var(--green)');
-    showToast('✅ 保存しました。フォームへの反映まで1〜2分お待ちください');
-
-    // GAS 側のキャッシュも消して即時反映
-    clearGasCache(true);
-
-  } catch (err) {
-    console.error(err);
-    showToast('❌ 保存失敗: ' + err.message);
-    setConnectState(`❌ 保存失敗: ${err.message}`, 'var(--red)');
+    dirty = false;
+    originalEdition = String(cfg.event.edition || '').trim();
+    document.getElementById('editionWarn').hidden = true;
+    document.getElementById('topState').textContent = cfg.event.edition || '';
+    setStatus('保存しました（' + new Date().toLocaleTimeString('ja-JP') + '）');
+    toast('保存しました。申込フォームへの反映まで1〜2分かかります。');
+    clearGasCache();
+  } catch (e) {
+    setStatus('保存できませんでした');
+    toast('保存できませんでした: ' + e.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = '🚀 保存して公開する';
+    updateSaveBtn();
   }
 }
 
-/** GAS の設定キャッシュ（最大30分）を消して即時反映させる */
-async function clearGasCache(silent) {
-  const gasUrl = document.getElementById('gasUrl').value.trim();
-  if (!gasUrl) {
-    if (!silent) showToast('⚠️ GAS デプロイURLが未設定です');
-    return;
+// GitHub にファイルを書き込む
+async function putFile(path, text, message) {
+  const url = `https://api.github.com/repos/${conn.owner}/${conn.repo}/contents/${path}`;
+  const headers = {
+    'Authorization': `Bearer ${conn.token}`,
+    'Accept': 'application/vnd.github+json'
+  };
+
+  let sha;
+  const head = await fetch(`${url}?t=${Date.now()}`, { headers });
+  if (head.ok) sha = (await head.json()).sha;
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, content: toBase64(text), sha })
+  });
+
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.message || `通信エラー (${res.status})`);
   }
-  try {
-    const url = new URL(gasUrl);
-    url.searchParams.set('action', 'clear_cache');
-    const token = localStorage.getItem('admin_gas_token');
-    if (token) url.searchParams.set('token', token);
-    await fetch(url, { method: 'GET', mode: 'no-cors' });
-    if (!silent) showToast('✅ キャッシュクリアを実行しました');
-  } catch (err) {
-    if (!silent) showToast('⚠️ キャッシュクリアに失敗: ' + err.message);
-  }
+  return res.json();
 }
 
-// UTF-8 対応の Base64 変換（イベント名・規約・メール文面に日本語が含まれるため必須）
-function encodeBase64Utf8(str) {
+function toBase64(str) {
   const bytes = new TextEncoder().encode(str);
   let bin = '';
-  // 引数の数に上限があるため、まとめて渡さず分割して連結する
   for (let i = 0; i < bytes.length; i += 0x8000) {
     bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
   }
   return btoa(bin);
 }
-function decodeBase64Utf8(b64) {
-  const bin = atob(String(b64).replace(/\s/g, ''));
-  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+
+// 設定の反映を早めるため、バックエンド側の一時保存を消す
+async function clearGasCache() {
+  const gasUrl = cfg.gasUrl;
+  if (!gasUrl) return;
+  try {
+    const u = new URL(gasUrl);
+    u.searchParams.set('action', 'clear_cache');
+    await fetch(u, { mode: 'no-cors' });
+  } catch { /* 失敗しても保存自体には影響しない */ }
 }
 
-function initNewCategoryOnEnter() {
-  document.getElementById('newCategory').addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); addCategory(); }
-  });
-}
+// =====================================================================
+// 画面 → 設定
+// =====================================================================
+function collect() {
+  const name = val('f-eventName');
+  if (!name) return 'イベント名を入力してください';
 
-function addDefaultData() {
-  // デフォルトブース
-  addBooth({ id:'booth_s', name:'Sブース（1名標準）', location:'標準ブース', regular:10000, earlyBird:9000, maxStaff:0, maxChairs:0, allowPower:true, soldOut:false, prohibitSession:false });
-  addBooth({ id:'booth_m', name:'Mブース（2名標準）', location:'標準ブース', regular:18000, earlyBird:17000, maxStaff:1, maxChairs:1, allowPower:true, soldOut:false, prohibitSession:false });
-  // デフォルトカテゴリ
-  ['占い・スピリチュアル', 'ボディケア・美容', '物販', '飲食・その他'].forEach(c => addCategoryItem(c));
-  // デフォルトカスタム質問
-  addCustomQuestion({ id:'cq_menu', type:'textarea', label:'出展メニュー名', placeholder:'例：タロット占い 20分 2,000円', maxLength:200, required:true, showCounter:true });
-  addCustomQuestion({ id:'cq_intro', type:'textarea', label:'自己紹介', placeholder:'200文字以内でご記入ください', maxLength:200, required:true, showCounter:true });
-  addCustomQuestion({ id:'cq_pr', type:'text', label:'一言PR', placeholder:'35文字以内', maxLength:35, required:true, showCounter:true });
-  // デフォルトメール本文
-  document.getElementById('e-confirmationBodyTemplate').value =
-`{{name}} 様
+  const edition = val('f-edition');
+  if (!edition) return '開催回を入力してください';
 
-この度は「{{eventName}}」へのご出展申込みありがとうございます。
-以下の内容でお申込みを受け付けました。
+  cfg.event.name      = name;
+  cfg.event.edition   = edition;
+  cfg.event.editionId = edition;     // 開催回をそのまま記録用のキーにする
+  cfg.event.date      = val('f-eventDate');
+  cfg.event.location  = val('f-eventPlace');
 
-■ お申込み情報
-お名前: {{name}}
-メールアドレス: {{email}}
-出展ブース: {{boothName}}
+  cfg.theme.primaryColor    = val('c-primary');
+  cfg.theme.accentColor     = val('c-accent');
+  cfg.theme.headerBgColor   = val('c-headBg');
+  cfg.theme.headerTextColor = val('c-headTxt');
 
-■ お支払い金額
-{{breakdown}}
-合計: ¥{{totalFee}}
-
-■ 振込先
-（振込先情報をここに記入してください）
-
-ご不明な点はこのメールへ返信ください。
-{{eventName}} 運営事務局`;
-}
-
-// ========================================
-// オプション料金レンダリング
-// ========================================
-function renderOptions() {
-  const area = document.getElementById('optionsArea');
-  area.innerHTML = '';
-  OPTIONS_DEF.forEach(opt => {
-    const div = document.createElement('div');
-    div.className = 'item-card';
-    div.style.marginBottom = '0.75rem';
-    div.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-        <span style="font-weight:700;font-size:0.9rem">${opt.label}</span>
-        <label class="toggle"><input type="checkbox" id="opt-enabled-${opt.key}" ${opt.defaultEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label>
-      </div>
-      <div class="grid-2">
-        <div class="field-group" style="margin:0">
-          <label class="field-label">ラベル名</label>
-          <input type="text" class="field-input" id="opt-label-${opt.key}" value="${opt.label}">
-        </div>
-        <div class="field-group" style="margin:0">
-          <label class="field-label">料金（円）</label>
-          <input type="number" class="field-input" id="opt-price-${opt.key}" value="${opt.defaultPrice}" min="0">
-        </div>
-      </div>`;
-    area.appendChild(div);
-  });
-}
-
-// ========================================
-// ブース管理
-// ========================================
-function addBooth(data = {}) {
-  const id = data.id || `booth_${boothIdCounter++}`;
-  const booth = {
-    _uid: Date.now() + Math.random(),
-    id: id,
-    name: data.name || '',
-    location: data.location || '',
-    regular: data.regular || 10000,
-    earlyBird: data.earlyBird || 9000,
-    maxStaff: data.maxStaff !== undefined ? data.maxStaff : 0,
-    maxChairs: data.maxChairs !== undefined ? data.maxChairs : 0,
-    allowPower: data.allowPower !== undefined ? data.allowPower : true,
-    soldOut: data.soldOut || false,
-    prohibitSession: data.prohibitSession || false
-  };
-  booths.push(booth);
-  renderBoothList();
-}
-
-function renderBoothList() {
-  const container = document.getElementById('boothList');
-  container.innerHTML = '';
-  booths.forEach((b, idx) => {
-    const div = document.createElement('div');
-    div.className = 'item-card';
-    div.innerHTML = `
-      <div class="item-card-header">
-        <span class="item-card-title">ブース ${idx + 1}: ${b.name || '（未設定）'}</span>
-        <button class="btn btn-danger" onclick="removeBooth(${idx})">削除</button>
-      </div>
-      <div class="grid-2" style="margin-bottom:0.75rem">
-        <div class="field-group" style="margin:0">
-          <label class="field-label">ブースID（英数字・アンダーバー）</label>
-          <input type="text" class="field-input" value="${b.id}" onchange="updateBooth(${idx},'id',this.value)" placeholder="booth_s">
-        </div>
-        <div class="field-group" style="margin:0">
-          <label class="field-label">ブース名（フォームに表示）</label>
-          <input type="text" class="field-input" value="${b.name}" onchange="updateBooth(${idx},'name',this.value)" placeholder="Sブース（1名標準）">
-        </div>
-      </div>
-      <div class="grid-3" style="margin-bottom:0.75rem">
-        <div class="field-group" style="margin:0">
-          <label class="field-label">グループ名（アコーディオン見出し）</label>
-          <input type="text" class="field-input" value="${b.location}" onchange="updateBooth(${idx},'location',this.value)" placeholder="標準ブース">
-        </div>
-        <div class="field-group" style="margin:0">
-          <label class="field-label">通常料金（円）</label>
-          <input type="number" class="field-input" value="${b.regular}" onchange="updateBooth(${idx},'regular',+this.value)" min="0">
-        </div>
-        <div class="field-group" style="margin:0">
-          <label class="field-label">早割料金（円）</label>
-          <input type="number" class="field-input" value="${b.earlyBird}" onchange="updateBooth(${idx},'earlyBird',+this.value)" min="0">
-        </div>
-      </div>
-      <div class="grid-3">
-        <div class="field-group" style="margin:0">
-          <label class="field-label">追加スタッフ上限</label>
-          <input type="number" class="field-input" value="${b.maxStaff}" onchange="updateBooth(${idx},'maxStaff',+this.value)" min="0">
-        </div>
-        <div class="field-group" style="margin:0">
-          <label class="field-label">追加椅子上限</label>
-          <input type="number" class="field-input" value="${b.maxChairs}" onchange="updateBooth(${idx},'maxChairs',+this.value)" min="0">
-        </div>
-        <div style="display:grid;gap:0.5rem">
-          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;cursor:pointer">
-            <input type="checkbox" ${b.allowPower?'checked':''} onchange="updateBooth(${idx},'allowPower',this.checked)" style="accent-color:var(--primary)">電源使用可
-          </label>
-          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;cursor:pointer">
-            <input type="checkbox" ${b.soldOut?'checked':''} onchange="updateBooth(${idx},'soldOut',this.checked)" style="accent-color:var(--red)">満枠
-          </label>
-          <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;cursor:pointer">
-            <input type="checkbox" ${b.prohibitSession?'checked':''} onchange="updateBooth(${idx},'prohibitSession',this.checked)" style="accent-color:var(--yellow)">セッション禁止
-          </label>
-        </div>
-      </div>`;
-    container.appendChild(div);
-  });
-}
-
-function updateBooth(idx, key, val) {
-  booths[idx][key] = val;
-  if (key === 'name') renderBoothList();
-}
-
-function removeBooth(idx) {
-  booths.splice(idx, 1);
-  renderBoothList();
-}
-
-// ========================================
-// カテゴリ管理
-// ========================================
-function addCategoryItem(name) {
-  categories.push(name);
-  renderCategoryTags();
-}
-
-function addCategory() {
-  const input = document.getElementById('newCategory');
-  const val = input.value.trim();
-  if (!val) return;
-  addCategoryItem(val);
-  input.value = '';
-}
-
-function renderCategoryTags() {
-  const container = document.getElementById('categoryTags');
-  container.innerHTML = '';
-  categories.forEach((c, idx) => {
-    const tag = document.createElement('div');
-    tag.className = 'tag';
-    tag.innerHTML = `<span>${c}</span><span class="tag-del" onclick="removeCategory(${idx})">✕</span>`;
-    container.appendChild(tag);
-  });
-}
-
-function removeCategory(idx) { categories.splice(idx, 1); renderCategoryTags(); }
-
-// ========================================
-// カスタム質問管理
-// ========================================
-function addCustomQuestion(data = {}) {
-  const q = {
-    _uid: Date.now() + Math.random(),
-    id: data.id || `cq_${questionIdCounter++}`,
-    type: data.type || 'text',
-    label: data.label || '',
-    placeholder: data.placeholder || '',
-    maxLength: data.maxLength || 100,
-    required: data.required !== undefined ? data.required : true,
-    showCounter: data.showCounter || false,
-    options: data.options || []
-  };
-  customQuestions.push(q);
-  renderCustomQuestions();
-}
-
-function renderCustomQuestions() {
-  const container = document.getElementById('customQuestionList');
-  container.innerHTML = '';
-  customQuestions.forEach((q, idx) => {
-    const isSelect = q.type === 'select';
-    const div = document.createElement('div');
-    div.className = 'item-card';
-    div.innerHTML = `
-      <div class="item-card-header">
-        <span class="item-card-title">質問 ${idx + 1}: ${q.label || '（未設定）'}</span>
-        <button class="btn btn-danger" onclick="removeCustomQuestion(${idx})">削除</button>
-      </div>
-      <div class="grid-2" style="margin-bottom:0.75rem">
-        <div class="field-group" style="margin:0">
-          <label class="field-label">質問ID（英数字・アンダーバー）</label>
-          <input type="text" class="field-input" value="${q.id}" onchange="updateCQ(${idx},'id',this.value)" placeholder="cq_menu">
-        </div>
-        <div class="field-group" style="margin:0">
-          <label class="field-label">入力タイプ</label>
-          <select class="field-input" onchange="updateCQ(${idx},'type',this.value);renderCustomQuestions()">
-            ${['text','textarea','select','number','checkbox'].map(t=>`<option value="${t}" ${q.type===t?'selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="field-group">
-        <label class="field-label">質問文（ラベル）＝スプレッドシートの列名にもなります</label>
-        <input type="text" class="field-input" value="${q.label}" onchange="updateCQ(${idx},'label',this.value)" placeholder="出展メニュー名">
-      </div>
-      <div class="grid-2">
-        <div class="field-group" style="margin:0">
-          <label class="field-label">プレースホルダー</label>
-          <input type="text" class="field-input" value="${q.placeholder}" onchange="updateCQ(${idx},'placeholder',this.value)">
-        </div>
-        <div class="field-group" style="margin:0">
-          <label class="field-label">最大文字数（0=制限なし）</label>
-          <input type="number" class="field-input" value="${q.maxLength||0}" onchange="updateCQ(${idx},'maxLength',+this.value)" min="0">
-        </div>
-      </div>
-      <div style="display:flex;gap:1.5rem;margin-top:0.75rem">
-        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;cursor:pointer">
-          <input type="checkbox" ${q.required?'checked':''} onchange="updateCQ(${idx},'required',this.checked)" style="accent-color:var(--primary)">必須
-        </label>
-        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;cursor:pointer">
-          <input type="checkbox" ${q.showCounter?'checked':''} onchange="updateCQ(${idx},'showCounter',this.checked)" style="accent-color:var(--primary)">文字数カウンター表示
-        </label>
-      </div>
-      ${isSelect ? `
-      <div style="margin-top:0.75rem">
-        <label class="field-label">選択肢（1行ずつ入力）</label>
-        <textarea class="field-input" rows="4" onchange="updateCQ(${idx},'options',this.value.split('\\n').filter(Boolean))">${(q.options||[]).join('\n')}</textarea>
-      </div>` : ''}`;
-    container.appendChild(div);
-  });
-}
-
-function updateCQ(idx, key, val) {
-  customQuestions[idx][key] = val;
-  if (key === 'label') renderCustomQuestions();
-}
-
-function removeCustomQuestion(idx) { customQuestions.splice(idx, 1); renderCustomQuestions(); }
-
-// ========================================
-// JSON 生成
-// ========================================
-function buildConfig() {
-  const v = id => document.getElementById(id)?.value || '';
-  const chk = id => document.getElementById(id)?.checked;
-
-  const pricing_options = {};
-  OPTIONS_DEF.forEach(opt => {
-    pricing_options[opt.key] = {
-      label:   v(`opt-label-${opt.key}`),
-      price:   +v(`opt-price-${opt.key}`) || 0,
-      enabled: chk(`opt-enabled-${opt.key}`)
-    };
-  });
-
-  return {
-    theme: {
-      primaryColor:    v('primaryColor'),
-      accentColor:     v('accentColor'),
-      headerBgColor:   v('headerBgColor'),
-      headerTextColor: v('headerTextColor'),
-      headerImageUrl:  v('headerImageUrl')
-    },
-    event: {
-      name:              v('eventName'),
-      edition:           v('eventEdition'),
-      editionId:         v('eventEditionId'),
-      date:              v('eventDate'),
-      location:          v('eventLocation'),
-      earlyBirdDeadline: v('earlyBirdDeadline')
-    },
-    features: {
-      earlyBird:          chk('f-earlyBird'),
-      repeaterSearch:     chk('f-repeaterSearch'),
-      memberDiscount:     chk('f-memberDiscount'),
-      memberDiscountLabel: v('f-memberDiscountLabel') || '会員割引',
-      stampRally:         chk('f-stampRally'),
-      party:              chk('f-party'),
-      secondaryParty:     chk('f-secondaryParty'),
-      bodyEquipment:      chk('f-bodyEquipment'),
-      liffId:             v('f-liffId')
-    },
-    pricing: {
-      memberDiscount: +v('p-memberDiscount') || 0,
-      options: pricing_options
-    },
-    booths: booths.map(b => ({
-      id: b.id,
-      name: b.name,
-      location: b.location,
-      prices: { regular: b.regular, earlyBird: b.earlyBird },
-      limits: { maxStaff: b.maxStaff, maxChairs: b.maxChairs, allowPower: b.allowPower },
-      soldOut: b.soldOut,
-      prohibitSession: b.prohibitSession
-    })),
-    categories,
-    standardFields: {
-      exhibitorNameLabel:       v('sf-exhibitorNameLabel') || '出展名（セラピスト名・屋号）',
-      exhibitorNamePlaceholder: v('sf-exhibitorNamePlaceholder') || 'ヒーリングサロン〇〇',
-      showPhoneNumber:    chk('sf-showPhoneNumber'),
-      showAddress:        chk('sf-showAddress'),
-      showPhotoUpload:    chk('sf-showPhotoUpload'),
-      showSnsLinks:       chk('sf-showSnsLinks'),
-      showPhotoPermission:chk('sf-showPhotoPermission'),
-      showNotes:          chk('sf-showNotes')
-    },
-    customQuestions: customQuestions.map(q => {
-      const out = { id:q.id, type:q.type, label:q.label, placeholder:q.placeholder, required:q.required, showCounter:q.showCounter };
-      if (q.maxLength) out.maxLength = q.maxLength;
-      if (q.type === 'select') out.options = q.options;
-      return out;
-    }),
-    terms: v('termsText'),
-    email: {
-      adminEmail:                 v('e-adminEmail'),
-      replyToEmail:               v('e-replyToEmail'),
-      adminSenderName:            v('e-adminSenderName'),
-      confirmationSubject:        v('e-confirmationSubject'),
-      confirmationBodyTemplate:   v('e-confirmationBodyTemplate'),
-      adminNotificationSubject:   v('e-adminNotificationSubject')
-    },
-    configJsonUrl: v('configJsonUrl'),
-    gasUrl:        v('gasUrl'),
-    workerUrl:     v('workerUrl'),
-    spreadsheetId: v('spreadsheetId'),
-    databaseSpreadsheetId: v('databaseSpreadsheetId'),
-    driveFolderUrl: v('driveFolderUrl')
-  };
-}
-
-// ========================================
-// ダウンロード
-// ========================================
-function downloadJson() {
-  const config = buildConfig();
-  const json = JSON.stringify(config, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url;
-  a.download = 'config.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('✅ config.json をダウンロードしました');
-}
-
-// ========================================
-// JSONを読み込む
-// ========================================
-function loadJson(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const c = JSON.parse(e.target.result);
-      applyConfig(c);
-      showToast('✅ config.json を読み込みました');
-    } catch (err) {
-      alert('JSONの解析に失敗しました: ' + err.message);
-    }
-  };
-  reader.readAsText(file);
-  event.target.value = '';
-}
-
-function applyConfig(c) {
-  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-  const chk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
-
-  // テーマ
-  set('primaryColor',    c.theme?.primaryColor    || '#9b5de5');
-  set('accentColor',     c.theme?.accentColor     || '#f15bb5');
-  set('headerBgColor',   c.theme?.headerBgColor   || '#1a0a2e');
-  set('headerTextColor', c.theme?.headerTextColor || '#ffffff');
-  set('headerImageUrl',  c.theme?.headerImageUrl  || '');
-
-  // イベント
-  set('eventName',          c.event?.name              || '');
-  set('eventEdition',       c.event?.edition           || '');
-  set('eventEditionId',     c.event?.editionId         || '');
-  set('eventDate',          c.event?.date              || '');
-  set('eventLocation',      c.event?.location          || '');
-  set('earlyBirdDeadline',  c.event?.earlyBirdDeadline || '');
-
-  // Features
-  const f = c.features || {};
-  chk('f-earlyBird',        f.earlyBird);
-  chk('f-repeaterSearch',   f.repeaterSearch);
-  chk('f-memberDiscount',   f.memberDiscount);
-  set('f-memberDiscountLabel', f.memberDiscountLabel || '会員割引');
-  chk('f-stampRally',       f.stampRally);
-  chk('f-party',            f.party);
-  chk('f-secondaryParty',   f.secondaryParty);
-  chk('f-bodyEquipment',    f.bodyEquipment);
-  set('f-liffId',           f.liffId || '');
-
-  // Pricing
-  set('p-memberDiscount', c.pricing?.memberDiscount || 0);
-  const opts = c.pricing?.options || {};
-  OPTIONS_DEF.forEach(opt => {
-    const o = opts[opt.key] || {};
-    const el_lbl = document.getElementById(`opt-label-${opt.key}`);
-    const el_pr  = document.getElementById(`opt-price-${opt.key}`);
-    const el_en  = document.getElementById(`opt-enabled-${opt.key}`);
-    if (el_lbl) el_lbl.value   = o.label   || opt.label;
-    if (el_pr)  el_pr.value    = o.price    !== undefined ? o.price : opt.defaultPrice;
-    if (el_en)  el_en.checked  = o.enabled  !== undefined ? o.enabled : opt.defaultEnabled;
-  });
-
-  // Booths
-  booths = [];
-  (c.booths || []).forEach(b => {
-    booths.push({
-      _uid: Date.now() + Math.random(),
-      id: b.id, name: b.name, location: b.location,
-      regular:   b.prices?.regular   || 0,
-      earlyBird: b.prices?.earlyBird || 0,
-      maxStaff:  b.limits?.maxStaff  || 0,
-      maxChairs: b.limits?.maxChairs || 0,
-      allowPower: b.limits?.allowPower !== false,
-      soldOut: b.soldOut || false,
-      prohibitSession: b.prohibitSession || false
-    });
-  });
-  renderBoothList();
-
-  // Categories
-  categories = [...(c.categories || [])];
-  renderCategoryTags();
-
-  // Standard fields
-  const sf = c.standardFields || {};
-  set('sf-exhibitorNameLabel',       sf.exhibitorNameLabel       || '');
-  set('sf-exhibitorNamePlaceholder', sf.exhibitorNamePlaceholder || '');
-  chk('sf-showPhoneNumber',    sf.showPhoneNumber    !== false);
-  chk('sf-showAddress',        sf.showAddress        !== false);
-  chk('sf-showPhotoUpload',    sf.showPhotoUpload    !== false);
-  chk('sf-showSnsLinks',       sf.showSnsLinks       !== false);
-  chk('sf-showPhotoPermission',sf.showPhotoPermission !== false);
-  chk('sf-showNotes',          sf.showNotes          !== false);
-
-  // Custom questions
-  customQuestions = [];
-  (c.customQuestions || []).forEach(q => customQuestions.push({ ...q, _uid: Date.now() + Math.random() }));
-  renderCustomQuestions();
-
-  // Terms
-  set('termsText', c.terms || '');
-
-  // Email
-  const em = c.email || {};
-  set('e-adminEmail',                em.adminEmail                || '');
-  set('e-replyToEmail',              em.replyToEmail              || '');
-  set('e-adminSenderName',           em.adminSenderName           || '');
-  set('e-confirmationSubject',       em.confirmationSubject       || '');
-  set('e-confirmationBodyTemplate',  em.confirmationBodyTemplate  || '');
-  set('e-adminNotificationSubject',  em.adminNotificationSubject  || '');
-
-  // Infra
-  set('configJsonUrl', c.configJsonUrl || '');
-  set('gasUrl',        c.gasUrl        || '');
-  set('workerUrl',     c.workerUrl     || '');
-  set('spreadsheetId', c.spreadsheetId || '');
-  set('databaseSpreadsheetId', c.databaseSpreadsheetId || '');
-  set('driveFolderUrl', c.driveFolderUrl || c.driveFolderId || '');
-}
-
-// ========================================
-// プレビュー
-// ========================================
-function togglePreview() {
-  const preview = document.getElementById('jsonPreview');
-  const isOpen  = preview.classList.toggle('open');
-  if (isOpen) {
-    const config = buildConfig();
-    document.getElementById('jsonPreviewContent').textContent = JSON.stringify(config, null, 2);
+  // ブース
+  const seen = new Set();
+  for (const b of cfg.booths) {
+    const n = String(b.name || '').trim();
+    if (!n) return 'ブース名が空のものがあります';
+    if (seen.has(n)) return `ブース名「${n}」が重複しています`;
+    seen.add(n);
+    b.id = n;
   }
+  if (!cfg.booths.length) return 'ブースを1つ以上つくってください';
+
+  // 質問
+  const qs = new Set();
+  for (const q of cfg.customQuestions) {
+    const l = String(q.label || '').trim();
+    if (!l) return '質問文が空のものがあります';
+    if (qs.has(l)) return `質問「${l}」が重複しています`;
+    qs.add(l);
+    q.id = l;
+  }
+
+  // 早割・会員割引
+  cfg.features.earlyBird = chk('f-earlyBird');
+  const dl = val('f-earlyDeadline');
+  cfg.event.earlyBirdDeadline = dl ? dl.replace('T', ' ') + ':00' : '';
+
+  cfg.features.memberDiscount      = chk('f-member');
+  cfg.features.memberDiscountLabel = val('f-memberLabel') || '会員割引';
+  cfg.pricing.memberDiscount       = num('f-memberAmount');
+
+  // 申込フォームの項目
+  cfg.standardFields.exhibitorNameLabel       = val('f-exhibitorLabel');
+  cfg.standardFields.exhibitorNamePlaceholder = val('f-exhibitorPh');
+  cfg.standardFields.showPhoneNumber     = chk('sf-phone');
+  cfg.standardFields.showAddress         = chk('sf-address');
+  cfg.standardFields.showPhotoUpload     = chk('sf-photo');
+  cfg.standardFields.showPhotoPermission = chk('sf-photoPerm');
+  cfg.standardFields.showSnsLinks        = chk('sf-sns');
+  cfg.standardFields.showNotes           = chk('sf-notes');
+  cfg.features.stampRally     = chk('f-stamp');
+  cfg.features.repeaterSearch = chk('f-repeater');
+  cfg.features.bodyEquipment  = cfg.booths.some(b => b.askEquipment);
+
+  cfg.terms = val('f-terms');
+
+  cfg.email.adminSenderName          = val('f-senderName');
+  cfg.email.adminEmail               = val('f-adminEmail');
+  cfg.email.replyToEmail             = val('f-replyEmail');
+  cfg.email.confirmationSubject      = val('f-subject');
+  cfg.email.confirmationBodyTemplate = val('f-body');
+  cfg.email.adminNotificationSubject = val('f-adminSubject');
+
+  // 保存先（貼られたURLから内部の識別子を取り出す）
+  const sheet = sheetIdFrom(val('f-sheetUrl'));
+  if (val('f-sheetUrl') && !sheet) return '受付シートのURLが正しくありません';
+  const db = sheetIdFrom(val('f-dbUrl'));
+  if (val('f-dbUrl') && !db) return '出展者データベースのURLが正しくありません';
+
+  cfg.spreadsheetId         = sheet || '';
+  cfg.databaseSpreadsheetId = db || '';
+  cfg.driveFolderUrl        = val('f-driveUrl');
+
+  if (IS_SETUP) {
+    cfg.configJsonUrl = val('d-configUrl');
+    cfg.gasUrl        = val('d-gasUrl');
+    cfg.workerUrl     = val('d-workerUrl');
+  }
+
+  return null;
 }
 
-// ========================================
-// スクロール & ナビゲーション
-// ========================================
-function scrollToId(id) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.classList.toggle('active', el.getAttribute('onclick') === `scrollToId('${id}')`);
+function sheetIdFrom(url) {
+  if (!url) return '';
+  const m = String(url).match(/\/spreadsheets\/d\/([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  return /^[A-Za-z0-9_-]{20,}$/.test(url.trim()) ? url.trim() : '';
+}
+
+// =====================================================================
+// 設定 → 画面
+// =====================================================================
+function render() {
+  set('f-eventName',  cfg.event.name);
+  set('f-edition',    cfg.event.edition || cfg.event.editionId);
+  set('f-eventDate',  cfg.event.date);
+  set('f-eventPlace', cfg.event.location);
+
+  set('c-primary', cfg.theme.primaryColor    || '#650133');
+  set('c-accent',  cfg.theme.accentColor     || '#ffa3da');
+  set('c-headBg',  cfg.theme.headerBgColor   || '#fff475');
+  set('c-headTxt', cfg.theme.headerTextColor || '#160f29');
+  updatePreview();
+
+  renderBooths();
+  renderTags();
+  renderOptions();
+  renderQuestions();
+
+  check('f-earlyBird', cfg.features.earlyBird);
+  document.getElementById('earlyBirdWrap').classList.toggle('hidden', !cfg.features.earlyBird);
+  const dl = String(cfg.event.earlyBirdDeadline || '');
+  set('f-earlyDeadline', dl ? dl.replace(' ', 'T').slice(0, 16) : '');
+
+  check('f-member', cfg.features.memberDiscount);
+  document.getElementById('memberWrap').classList.toggle('hidden', !cfg.features.memberDiscount);
+  set('f-memberLabel',  cfg.features.memberDiscountLabel);
+  set('f-memberAmount', cfg.pricing.memberDiscount ?? 0);
+
+  set('f-exhibitorLabel', cfg.standardFields.exhibitorNameLabel);
+  set('f-exhibitorPh',    cfg.standardFields.exhibitorNamePlaceholder);
+  check('sf-phone',     cfg.standardFields.showPhoneNumber     !== false);
+  check('sf-address',   cfg.standardFields.showAddress         !== false);
+  check('sf-photo',     cfg.standardFields.showPhotoUpload     !== false);
+  check('sf-photoPerm', cfg.standardFields.showPhotoPermission !== false);
+  check('sf-sns',       cfg.standardFields.showSnsLinks        !== false);
+  check('sf-notes',     cfg.standardFields.showNotes           !== false);
+  check('f-stamp',      cfg.features.stampRally);
+  check('f-repeater',   cfg.features.repeaterSearch);
+
+  set('f-terms', cfg.terms);
+
+  set('f-senderName',   cfg.email.adminSenderName);
+  set('f-adminEmail',   cfg.email.adminEmail);
+  set('f-replyEmail',   cfg.email.replyToEmail);
+  set('f-subject',      cfg.email.confirmationSubject);
+  set('f-body',         cfg.email.confirmationBodyTemplate);
+  set('f-adminSubject', cfg.email.adminNotificationSubject);
+
+  set('f-sheetUrl', cfg.spreadsheetId
+    ? `https://docs.google.com/spreadsheets/d/${cfg.spreadsheetId}/edit` : '');
+  set('f-dbUrl', cfg.databaseSpreadsheetId
+    ? `https://docs.google.com/spreadsheets/d/${cfg.databaseSpreadsheetId}/edit` : '');
+  set('f-driveUrl', cfg.driveFolderUrl);
+
+  if (IS_SETUP) {
+    set('d-configUrl', cfg.configJsonUrl);
+    set('d-gasUrl',    cfg.gasUrl);
+    set('d-workerUrl', cfg.workerUrl);
+    set('d-owner', conn?.owner || location.hostname.split('.')[0]);
+    set('d-repo',  conn?.repo  || location.pathname.split('/')[1] || '');
+  }
+
+  dirty = false;
+  updateSaveBtn();
+}
+
+// ---- ブース ----
+function newBooth() {
+  return {
+    id: '', name: '', location: '',
+    prices: { regular: 8000, earlyBird: 8000 },
+    limits: { maxStaff: 0, maxChairs: 0, allowPower: true },
+    soldOut: false, prohibitSession: false, askEquipment: false
+  };
+}
+
+function renderBooths() {
+  const box = document.getElementById('boothList');
+  box.textContent = '';
+
+  cfg.booths.forEach((b, i) => {
+    b.prices ||= {}; b.limits ||= {};
+    const el = document.createElement('div');
+    el.className = 'item';
+
+    el.appendChild(itemHead(`ブース ${i + 1}`, () => {
+      if (!confirm(`「${b.name || '未設定'}」を削除しますか？`)) return;
+      cfg.booths.splice(i, 1); renderBooths(); markDirty();
+    }));
+
+    el.appendChild(fieldText('ブース名', b.name, '内側半テーブル', v => {
+      b.name = v; b.id = v;
+    }, '申込フォームにこの名前で表示されます'));
+
+    const prices = document.createElement('div');
+    prices.className = 'row';
+    prices.appendChild(fieldNumber('料金（円）', b.prices.regular, v => b.prices.regular = v));
+    prices.appendChild(fieldNumber('早割料金（円）', b.prices.earlyBird, v => b.prices.earlyBird = v));
+    el.appendChild(prices);
+
+    const sw = document.createElement('div');
+    sw.appendChild(switchRow('満枠にする', '申込フォームで選べなくなります', b.soldOut, v => b.soldOut = v));
+    sw.appendChild(switchRow('コンセントを使える', '', b.limits.allowPower !== false, v => b.limits.allowPower = v));
+    sw.appendChild(switchRow('持ち込み物品をたずねる', '施術ベッドなどを書いてもらう欄が出ます', !!b.askEquipment, v => b.askEquipment = v));
+    sw.appendChild(switchRow('セッションはできない枠', '占い・ボディを選ぶと注意が出ます', !!b.prohibitSession, v => b.prohibitSession = v));
+    el.appendChild(sw);
+
+    box.appendChild(el);
   });
 }
 
-// ========================================
-// トースト
-// ========================================
-function showToast(msg) {
+// ---- 質問 ----
+function newQuestion() {
+  return { id: '', label: '', type: 'textarea', placeholder: '', required: true, showCounter: true, maxLength: 200 };
+}
+
+function renderQuestions() {
+  const box = document.getElementById('questionList');
+  box.textContent = '';
+
+  cfg.customQuestions.forEach((q, i) => {
+    const el = document.createElement('div');
+    el.className = 'item';
+
+    el.appendChild(itemHead(`質問 ${i + 1}`, () => {
+      if (!confirm(`「${q.label || '未設定'}」を削除しますか？`)) return;
+      cfg.customQuestions.splice(i, 1); renderQuestions(); markDirty();
+    }));
+
+    el.appendChild(fieldText('質問文', q.label, '出展メニュー名', v => {
+      q.label = v; q.id = v;
+    }, 'この文がそのまま集計シートの見出しになります'));
+
+    el.appendChild(fieldText('入力例（うすい文字で出ます）', q.placeholder, '例：タロット占い 20分 2,000円',
+      v => q.placeholder = v));
+
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    const kind = document.createElement('div');
+    kind.className = 'field';
+    kind.innerHTML = '<label>入力のしかた</label>';
+    const sel = document.createElement('select');
+    [['textarea', '長い文章'], ['text', '短い文章'], ['number', '数字']].forEach(([v, t]) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = t; o.selected = (q.type || 'textarea') === v;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', () => { q.type = sel.value; markDirty(); });
+    kind.appendChild(sel);
+    row.appendChild(kind);
+
+    row.appendChild(fieldNumber('最大文字数', q.maxLength || 0, v => q.maxLength = v));
+    el.appendChild(row);
+
+    el.appendChild(switchRow('必ず答えてもらう', '', q.required !== false, v => q.required = v));
+
+    box.appendChild(el);
+  });
+}
+
+// ---- ジャンル ----
+function renderTags() {
+  const box = document.getElementById('tagList');
+  box.textContent = '';
+  cfg.categories.forEach((c, i) => {
+    const t = document.createElement('span');
+    t.className = 'tag';
+    const label = document.createElement('span');
+    label.textContent = c;
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = '✕';
+    del.setAttribute('aria-label', `${c} を削除`);
+    del.addEventListener('click', () => { cfg.categories.splice(i, 1); renderTags(); markDirty(); });
+    t.append(label, del);
+    box.appendChild(t);
+  });
+}
+
+function addTag() {
+  const input = document.getElementById('newTag');
+  const v = input.value.trim();
+  if (!v) return;
+  if (cfg.categories.includes(v)) { toast('同じジャンルがすでにあります'); return; }
+  cfg.categories.push(v);
+  input.value = '';
+  renderTags(); markDirty();
+}
+
+// ---- オプション料金 ----
+const OPTION_LABELS = {
+  power:          ['コンセント', '電源を使う方から追加でいただく金額'],
+  party:          ['懇親会',     '懇親会に出る方からいただく金額'],
+  secondaryParty: ['二次会',     '費用を現地で集める場合は0円のままにしてください'],
+  chair:          ['椅子の追加', ''],
+  staff:          ['参加人数の追加', '']
+};
+
+function renderOptions() {
+  const box = document.getElementById('optionList');
+  box.textContent = '';
+
+  Object.keys(OPTION_LABELS).forEach(key => {
+    const opt = cfg.pricing.options[key] ||= { label: OPTION_LABELS[key][0], price: 0, enabled: false };
+    const [title, hint] = OPTION_LABELS[key];
+
+    const el = document.createElement('div');
+    el.className = 'item';
+
+    el.appendChild(switchRow(title, hint, !!opt.enabled, v => {
+      opt.enabled = v;
+      if (key === 'secondaryParty') cfg.features.secondaryParty = v;
+      body.classList.toggle('hidden', !v);
+    }));
+
+    const body = document.createElement('div');
+    body.className = 'row' + (opt.enabled ? '' : ' hidden');
+    body.appendChild(fieldText('フォームでの呼び方', opt.label, title, v => opt.label = v));
+    body.appendChild(fieldNumber('金額（円）', opt.price || 0, v => opt.price = v));
+    el.appendChild(body);
+
+    box.appendChild(el);
+  });
+}
+
+// =====================================================================
+// 小さな部品
+// =====================================================================
+function itemHead(title, onDelete) {
+  const head = document.createElement('div');
+  head.className = 'item-head';
+  const no = document.createElement('span');
+  no.className = 'no';
+  no.textContent = title;
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'btn btn-del';
+  del.textContent = '削除';
+  del.addEventListener('click', onDelete);
+  head.append(no, del);
+  return head;
+}
+
+function fieldText(label, value, placeholder, onInput, hint) {
+  const f = document.createElement('div');
+  f.className = 'field';
+  const l = document.createElement('label');
+  l.textContent = label;
+  const i = document.createElement('input');
+  i.type = 'text';
+  i.value = value || '';
+  if (placeholder) i.placeholder = placeholder;
+  i.addEventListener('input', () => onInput(i.value));
+  f.append(l, i);
+  if (hint) {
+    const h = document.createElement('span');
+    h.className = 'hint';
+    h.textContent = hint;
+    f.appendChild(h);
+  }
+  return f;
+}
+
+function fieldNumber(label, value, onInput) {
+  const f = document.createElement('div');
+  f.className = 'field';
+  const l = document.createElement('label');
+  l.textContent = label;
+  const i = document.createElement('input');
+  i.type = 'number';
+  i.min = '0';
+  i.inputMode = 'numeric';
+  i.value = value ?? 0;
+  i.addEventListener('input', () => onInput(parseInt(i.value, 10) || 0));
+  f.append(l, i);
+  return f;
+}
+
+function switchRow(title, sub, checked, onChange) {
+  const row = document.createElement('div');
+  row.className = 'switch';
+  const left = document.createElement('div');
+  const t = document.createElement('div');
+  t.className = 'txt';
+  t.textContent = title;
+  left.appendChild(t);
+  if (sub) {
+    const s = document.createElement('div');
+    s.className = 'sub';
+    s.textContent = sub;
+    left.appendChild(s);
+  }
+  const wrap = document.createElement('label');
+  wrap.className = 'toggle';
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = !!checked;
+  input.addEventListener('change', () => onChange(input.checked));
+  wrap.append(input, document.createElement('span'));
+  row.append(left, wrap);
+  return row;
+}
+
+// ---- メールの差し込みボタン ----
+function buildMailChips() {
+  [['chipsSubject', 'f-subject'], ['chipsBody', 'f-body'], ['chipsAdmin', 'f-adminSubject']]
+    .forEach(([boxId, targetId]) => {
+      const box = document.getElementById(boxId);
+      MAIL_VARS.forEach(([label, token]) => {
+        // 件名に本文向けの長い項目は出さない
+        if (boxId !== 'chipsBody' && ['{{breakdown}}', '{{customAnswers}}'].includes(token)) return;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.textContent = '＋ ' + label;
+        b.addEventListener('click', () => insertAtCursor(document.getElementById(targetId), token));
+        box.appendChild(b);
+      });
+    });
+}
+
+function insertAtCursor(el, text) {
+  const start = el.selectionStart ?? el.value.length;
+  const end   = el.selectionEnd   ?? el.value.length;
+  el.value = el.value.slice(0, start) + text + el.value.slice(end);
+  el.focus();
+  el.setSelectionRange(start + text.length, start + text.length);
+  markDirty();
+}
+
+// ---- プレビュー ----
+function updatePreview() {
+  const primary = val('c-primary'), accent = val('c-accent');
+  const headBg  = val('c-headBg'),  headTxt = val('c-headTxt');
+
+  const head = document.getElementById('pvHead');
+  head.style.background = headBg;
+  head.style.color      = headTxt;
+  document.getElementById('pvTitle').textContent = val('f-eventName') || 'イベント名';
+
+  const section = document.getElementById('pvSection');
+  section.style.color = primary;
+  section.style.borderBottomColor = tint(primary, .18);
+
+  const booth = document.getElementById('pvBoothOn');
+  booth.style.borderColor = primary;
+  booth.style.background  = tint(primary, .1);
+  document.getElementById('pvDot').style.borderColor = primary;
+  document.getElementById('pvBoothName').textContent = cfg?.booths?.[0]?.name || 'ブース名';
+  const price = cfg?.booths?.[0]?.prices?.regular;
+  const priceText = '¥' + (price ?? 8000).toLocaleString();
+  document.getElementById('pvBoothPrice').textContent = priceText;
+  document.getElementById('pvTotal').textContent = priceText;
+
+  const btn = document.getElementById('pvBtn');
+  btn.style.background = `linear-gradient(135deg, ${primary}, ${accent})`;
+}
+
+function tint(hex, alpha) {
+  const h = String(hex || '#000000').replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r || 0},${g || 0},${b || 0},${alpha})`;
+}
+
+// ---- 共通 ----
+function val(id)  { return (document.getElementById(id)?.value || '').trim(); }
+function num(id)  { return parseInt(document.getElementById(id)?.value, 10) || 0; }
+function chk(id)  { return !!document.getElementById(id)?.checked; }
+function set(id, v) { const el = document.getElementById(id); if (el) el.value = v ?? ''; }
+function check(id, v) { const el = document.getElementById(id); if (el) el.checked = !!v; }
+
+function markDirty() {
+  if (dirty) return;
+  dirty = true;
+  setStatus('未保存の変更があります');
+  updateSaveBtn();
+}
+
+function updateSaveBtn() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = !dirty || !conn;
+}
+
+function setStatus(text) {
+  document.getElementById('saveStatus').textContent = text;
+}
+
+let toastTimer;
+function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3600);
 }
 </script>
 </body>

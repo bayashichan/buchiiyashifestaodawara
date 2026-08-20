@@ -9,10 +9,11 @@
 
 ## 使う人向け
 
-- **早割ON/OFF・ブースの満枠切り替え** → `admin/quick-settings.html`
-- **料金・ブース・質問項目・メール文面・開催回の切り替え** → `admin/config-editor.html`
+設定画面は1つだけです → `admin/config-editor.html`（スマホ対応）
 
-どちらも初回だけ GitHub の接続設定が必要です。詳しくは
+イベント名・開催回・色・ブース・料金・質問項目・規約・メール文面・保存先を、
+すべてこの画面から変更して「設定内容を保存」で反映します。
+初回だけ合い言葉の入力が必要です。詳しくは
 [`docs/MIGRATION.md`](docs/MIGRATION.md) の「管理画面の使い方」を参照してください。
 
 ## 仕組み
@@ -35,10 +36,12 @@ GAS を触らずに設定を変更できます。
 ## 開発者向け
 
 ```bash
-node gas/tests/mapping.test.js   # 受付シートの列マッピングと重複判定
+node gas/tests/mapping.test.js            # 受付シートの列マッピングと重複判定
 
-npm i --no-save jsdom            # 下のテストに必要（初回のみ）
-node apply/tests/sns.test.mjs    # SNSリンク欄が送信時に拾われるか（実DOM）
+npm i --no-save jsdom                     # 下のテストに必要（初回のみ）
+node apply/tests/sns.test.mjs             # SNSリンク欄が送信時に拾われるか
+node apply/tests/booth.test.mjs           # ブース選択・料金・持ち込み物品の表示
+node admin/tests/config-editor.test.mjs   # 管理画面の読み込み・保存・合い言葉
 ```
 
 - 新しい開催回を始める手順 → [`docs/MIGRATION.md`](docs/MIGRATION.md)

@@ -329,30 +329,48 @@ function initBoothAccordion() {
 }
 
 // ブースオプション要素を生成するヘルパー
+// ブースIDにはブース名がそのまま入るため、引用符や記号が含まれても
+// 壊れないよう、文字列ではなく DOM API で組み立てる
 function createBoothOption(booth) {
   const earlyPrice   = booth.prices.earlyBird;
   const regularPrice = booth.prices.regular;
-  let priceDisplay;
-  if (isEarlyBird()) {
-    priceDisplay = earlyPrice === regularPrice
-      ? `¥${earlyPrice.toLocaleString()}`
-      : `¥${earlyPrice.toLocaleString()} <span class="booth-price-early">（通常¥${regularPrice.toLocaleString()}）</span>`;
-  } else {
-    priceDisplay = `¥${regularPrice.toLocaleString()}`;
-  }
+
   const option = document.createElement('label');
   option.className = 'booth-option' + (booth.soldOut ? ' sold-out' : '');
+
+  const radio = document.createElement('input');
+  radio.type  = 'radio';
+  radio.name  = 'boothRadio';
+  radio.value = booth.id;
+
+  const name = document.createElement('span');
+  name.style.flex = '1';
+  name.textContent = booth.name;
+
+  option.append(radio, name);
+
   if (booth.soldOut) {
-    option.innerHTML = `
-      <input type="radio" name="boothRadio" value="${booth.id}" disabled>
-      <span style="flex:1">${booth.name}</span>
-      <span class="sold-out-badge">満枠</span>`;
+    radio.disabled = true;
+    const badge = document.createElement('span');
+    badge.className = 'sold-out-badge';
+    badge.textContent = '満枠';
+    option.appendChild(badge);
   } else {
-    option.innerHTML = `
-      <input type="radio" name="boothRadio" value="${booth.id}" onchange="selectBooth('${booth.id}')">
-      <span style="flex:1">${booth.name}</span>
-      <span class="booth-price">${priceDisplay}</span>`;
+    radio.addEventListener('change', () => selectBooth(booth.id));
+    const price = document.createElement('span');
+    price.className = 'booth-price';
+    if (isEarlyBird() && earlyPrice !== regularPrice) {
+      price.textContent = `¥${earlyPrice.toLocaleString()} `;
+      const note = document.createElement('span');
+      note.className = 'booth-price-early';
+      note.textContent = `（通常¥${regularPrice.toLocaleString()}）`;
+      price.appendChild(note);
+    } else {
+      price.textContent = `¥${(isEarlyBird() ? earlyPrice : regularPrice).toLocaleString()}`;
+    }
+    option.appendChild(price);
   }
+
   return option;
 }
 
@@ -364,8 +382,8 @@ function selectBooth(boothId) {
   document.getElementById('boothIdInput').value = boothId;
 
   document.querySelectorAll('.booth-option').forEach(opt => {
-    opt.classList.remove('selected');
-    if (opt.querySelector(`input[value="${boothId}"]`)) opt.classList.add('selected');
+    const input = opt.querySelector('input[name="boothRadio"]');
+    opt.classList.toggle('selected', !!input && input.value === boothId);
   });
 
   // オプション値リセット
@@ -389,12 +407,12 @@ function selectBooth(boothId) {
   if (staffCountSec)  staffCountSec.classList.add('hidden');
   if (chairsCountSec) chairsCountSec.classList.add('hidden');
 
-  // BodyEquipment セクション
-  if (CONFIG.features?.bodyEquipment) {
-    const equipSection = document.getElementById('equipmentSection');
-    if (equipSection) {
-      equipSection.classList.toggle('hidden', !boothId.startsWith('body_'));
-    }
+  // 持ち込み物品欄（ブースごとの設定で表示を切り替える）
+  const equipSection = document.getElementById('equipmentSection');
+  if (equipSection) {
+    const ask = selectedBooth?.askEquipment ??
+                (CONFIG.features?.bodyEquipment && String(boothId).includes('ボディ'));
+    equipSection.classList.toggle('hidden', !ask);
   }
 
   updateOptionsUI();
