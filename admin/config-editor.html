@@ -170,6 +170,28 @@
   .pv-foot .total { font-size: .95rem; font-weight: 700; }
   .pv-btn { border: 0; border-radius: 999px; color: #fff; font-weight: 700; padding: .5rem 1.1rem; font-size: .85rem; }
 
+  /* ============ フォルダの構成図 ============ */
+  .folder-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.6rem;
+    padding: 0.7rem 0.85rem;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 0.6rem;
+    font-size: 0.82rem;
+    line-height: 1.6;
+  }
+  .folder-tree-row { display: block; }
+  .folder-tree .indent  { padding-left: 1.1rem; }
+  .folder-tree .indent2 { padding-left: 2.4rem; }
+  .folder-tree-note {
+    color: var(--ink-soft);
+    font-size: 0.76rem;
+    margin-left: 0.4rem;
+  }
+
   /* ============ メールの差し込みボタン ============ */
   .chips { display: flex; flex-wrap: wrap; gap: .4rem; }
   .chip {
@@ -515,9 +537,17 @@
           <span class="hint">これまでの全開催分がたまります。<strong>毎回そのままにしてください</strong></span>
         </div>
         <div class="field">
-          <label for="f-driveUrl">写真の保存フォルダ</label>
+          <label for="f-driveUrl">写真の保存フォルダ（親フォルダ）</label>
           <input type="url" id="f-driveUrl" placeholder="https://drive.google.com/drive/folders/...">
-          <span class="hint">プロフィール写真がここに保存されます</span>
+          <span class="hint">
+            ここは<strong>いちばん外側のフォルダ</strong>です。この中に開催回ごとのフォルダが自動で作られ、
+            プロフィール写真はその中に入ります。<strong>毎回そのままにしてください</strong>
+          </span>
+          <div class="folder-tree" aria-hidden="true">
+            <span class="folder-tree-row">📁 写真の保存フォルダ<span class="folder-tree-note">← ここに設定するフォルダ</span></span>
+            <span class="folder-tree-row indent">└ 📁 <span id="folderTreeEdition">第1回</span><span class="folder-tree-note">← 自動で作られます</span></span>
+            <span class="folder-tree-row indent2">└ 🖼 山田 花子_サロン花.jpg</span>
+          </div>
         </div>
         <div class="note note-info">
           Google で開いたときのURLを、そのままコピーして貼り付けてください。
@@ -609,8 +639,12 @@ const MAIL_VARS = [
   ['合計金額',      '{{totalFee}}'],
   ['料金の内訳',    '{{breakdown}}'],
   ['申込内容',      '{{customAnswers}}'],
-  ['申込日時',      '{{submittedAt}}']
+  ['申込日時',      '{{submittedAt}}'],
+  ['写真のお願い',  '{{photoNotice}}']
 ];
+
+// 件名には入れない、本文だけで使える長い項目
+const BODY_ONLY_VARS = ['{{breakdown}}', '{{customAnswers}}', '{{photoNotice}}'];
 
 // =====================================================================
 // 状態
@@ -1046,6 +1080,9 @@ function render() {
   set('f-body',         cfg.email.confirmationBodyTemplate);
   set('f-adminSubject', cfg.email.adminNotificationSubject);
 
+  // 質問ごとの差し込みボタンは設定を読んでからでないと作れない
+  buildMailChips();
+
   set('f-sheetUrl', cfg.spreadsheetId
     ? `https://docs.google.com/spreadsheets/d/${cfg.spreadsheetId}/edit` : '');
   set('f-dbUrl', cfg.databaseSpreadsheetId
@@ -1115,6 +1152,9 @@ function newQuestion() {
 }
 
 function renderQuestions() {
+  // 質問名が変わると差し込みボタンも変わる
+  if (cfg) buildMailChips();
+
   const box = document.getElementById('questionList');
   box.textContent = '';
 
@@ -1307,17 +1347,34 @@ function buildMailChips() {
   [['chipsSubject', 'f-subject'], ['chipsBody', 'f-body'], ['chipsAdmin', 'f-adminSubject']]
     .forEach(([boxId, targetId]) => {
       const box = document.getElementById(boxId);
+      box.innerHTML = '';
+
+      const isBody = boxId === 'chipsBody';
+
       MAIL_VARS.forEach(([label, token]) => {
         // 件名に本文向けの長い項目は出さない
-        if (boxId !== 'chipsBody' && ['{{breakdown}}', '{{customAnswers}}'].includes(token)) return;
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'chip';
-        b.textContent = '＋ ' + label;
-        b.addEventListener('click', () => insertAtCursor(document.getElementById(targetId), token));
-        box.appendChild(b);
+        if (!isBody && BODY_ONLY_VARS.includes(token)) return;
+        box.appendChild(makeMailChip(label, token, targetId));
       });
+
+      // 本文には、いま設定されている質問の回答も差し込めるようにする
+      if (isBody) {
+        (cfg?.customQuestions || []).forEach(q => {
+          if (!q.label) return;
+          box.appendChild(makeMailChip(q.label, `{{${q.label}}}`, targetId));
+        });
+      }
     });
+}
+
+function makeMailChip(label, token, targetId) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'chip';
+  b.textContent = '＋ ' + label;
+  b.title = token;
+  b.addEventListener('click', () => insertAtCursor(document.getElementById(targetId), token));
+  return b;
 }
 
 function insertAtCursor(el, text) {
@@ -1330,7 +1387,14 @@ function insertAtCursor(el, text) {
 }
 
 // ---- プレビュー ----
+function updateFolderTree() {
+  const el = document.getElementById('folderTreeEdition');
+  if (el) el.textContent = val('f-edition') || '第1回';
+}
+
 function updatePreview() {
+  updateFolderTree();
+
   const primary = val('c-primary'), accent = val('c-accent');
   const headBg  = val('c-headBg'),  headTxt = val('c-headTxt');
 

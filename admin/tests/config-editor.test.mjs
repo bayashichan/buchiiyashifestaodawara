@@ -167,5 +167,40 @@ console.log('\n[6] メールの差し込みボタン');
   ok('差し込みボタンが日本語表示', subjectChips.every(t => !/\{\{/.test(t)), subjectChips.join(','));
 }
 
+console.log('\n[7] 差し込みボタンの追加分とフォルダの説明');
+{
+  const labels = [...doc.querySelectorAll('#chipsBody .chip')].map(b => b.textContent);
+  ok('本文に「＋写真のお願い」がある', labels.includes('＋ 写真のお願い'), labels.join(','));
+  ok('質問名のボタンが並ぶ（出展メニュー名）', labels.includes('＋ 出展メニュー名'), labels.join(','));
+  ok('質問名のボタンが並ぶ（自己紹介）', labels.includes('＋ 自己紹介'));
+  ok('すべて「＋ 」で始まる', labels.every(t => t.startsWith('＋ ')));
+
+  const subjectChips = [...doc.querySelectorAll('#chipsSubject .chip')].map(b => b.textContent);
+  ok('件名には写真のお願いを出さない', !subjectChips.includes('＋ 写真のお願い'));
+
+  // カーソル位置に差し込まれる
+  const body = doc.getElementById('f-body');
+  body.value = 'あいうえお';
+  body.setSelectionRange(2, 2);
+  [...doc.querySelectorAll('#chipsBody .chip')]
+    .find(b => b.textContent === '＋ 写真のお願い')
+    .dispatchEvent(new window.Event('click'));
+  ok('カーソル位置に差し込まれる', body.value === 'あい{{photoNotice}}うえお', body.value);
+
+  // フォルダの説明
+  const tree = doc.querySelector('.folder-tree').textContent;
+  ok('親フォルダであることを図で示す', tree.includes('ここに設定するフォルダ'));
+  ok('自動で作られることを図で示す', tree.includes('自動で作られます'));
+  ok('図に開催回が入る', doc.getElementById('folderTreeEdition').textContent === '第1回');
+
+  doc.getElementById('f-edition').value = '第3回';
+  window.updatePreview();
+  ok('開催回を変えると図も追従する', doc.getElementById('folderTreeEdition').textContent === '第3回');
+
+  const hint = doc.querySelector('#f-driveUrl').parentElement.querySelector('.hint').textContent;
+  ok('いちばん外側のフォルダだと明記', hint.includes('いちばん外側のフォルダ'));
+  ok('毎回そのままでよいと明記', hint.includes('毎回そのままにしてください'));
+}
+
 console.log(ng === 0 ? '\n✅ すべて成功' : `\n❌ ${ng}件失敗`);
 process.exit(ng === 0 ? 0 : 1);
