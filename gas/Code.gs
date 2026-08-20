@@ -42,6 +42,9 @@ const DB_SHEET_EVENTS       = 'events';
 /** config キャッシュ秒数 */
 const CONFIG_CACHE_SEC = 1800;
 
+/** 写真が届いていないときに、写真欄へ入れる目印 */
+const PHOTO_PENDING_LABEL = 'メール送付待ち';
+
 // ---------------------------------------------------------------
 // データベース列定義（1行目のヘッダーとして書き込まれます）
 // 並び順を変えると既存データとずれるため、追加は必ず末尾へ。
@@ -223,6 +226,9 @@ function doPost(e) {
       params.profileImageUrl = saveProfileImage(params, config);
     }
 
+    // 写真を受け取れたか（保存に失敗した場合もここで未受領になる）
+    params.photoPending = !params.profileImageUrl;
+
     // カスタム質問
     params.customAnswers      = safeParseJson_(params.customAnswers, {});
     params.customQuestionDefs = safeParseJson_(params.customQuestionDefs, []);
@@ -256,7 +262,8 @@ function doPost(e) {
       success: true,
       totalFee: calc.totalFee,
       applicationId: dbResult.applicationId || '',
-      databaseSaved: !!dbResult.saved
+      databaseSaved: !!dbResult.saved,
+      photoPending: !!params.photoPending
     };
 
   } catch (err) {
@@ -438,7 +445,7 @@ function buildFieldMap(params, calc, config) {
     '持ち込み物品':     params.equipment || '',
     'SNS':              formatSnsLinks(params.snsLinks),
     '写真掲載可否':     params.photoPermission || '',
-    'プロフィール写真': params.profileImageUrl || '',
+    'プロフィール写真': params.profileImageUrl || PHOTO_PENDING_LABEL,
     '追加スタッフ':     parseInt(params.extraStaff, 10) || 0,
     '追加椅子':         parseInt(params.extraChairs, 10) || 0,
     'コンセント':       params.usePower === '1' ? 'あり' : 'なし',
@@ -563,7 +570,7 @@ function saveToDatabase(params, calc, config) {
     '持ち込み物品':     params.equipment || '',
     'SNS':              formatSnsLinks(params.snsLinks),
     '写真掲載可否':     params.photoPermission || '',
-    'プロフィール写真': params.profileImageUrl || '',
+    'プロフィール写真': params.profileImageUrl || PHOTO_PENDING_LABEL,
     'コンセント':       params.usePower === '1' ? 'あり' : 'なし',
     '懇親会出欠':       params.partyAttend || '欠席',
     '懇親会人数':       parseInt(params.partyCount, 10) || 0,
@@ -998,13 +1005,46 @@ function sendConfirmationEmail(params, calc, config) {
     variables[q.id] = customAnswers[q.id] || '';
   });
 
-  const subject = applyTemplate(emailCfg.confirmationSubject || '【{{eventName}}】お申込みを受け付けました', variables);
-  const body    = applyTemplate(emailCfg.confirmationBodyTemplate || defaultConfirmationTemplate(), variables);
+  // 写真が届いていない場合の案内文
+  // テンプレートに {{photoNotice}} があればその位置に、無ければ本文の先頭に差し込む
+  variables.photoNotice = params.photoPending ? buildPhotoNoticeText_(config) : '';
+
+  const subject  = applyTemplate(emailCfg.confirmationSubject || '【{{eventName}}】お申込みを受け付けました', variables);
+  const template = emailCfg.confirmationBodyTemplate || defaultConfirmationTemplate();
+
+  let body = applyTemplate(template, variables);
+  if (params.photoPending && template.indexOf('{{photoNotice}}') === -1) {
+    body = variables.photoNotice + '\n\n' + body;
+  }
 
   GmailApp.sendEmail(params.email, subject, body, {
     name:    emailCfg.adminSenderName || (eventName + ' 事務局'),
     replyTo: emailCfg.replyToEmail || emailCfg.adminEmail || ''
   });
+}
+
+/**
+ * 写真が届いていないときに、申込者へお願いする文面を作ります。
+ * 送り先は config のメール設定から取ります。
+ */
+function buildPhotoNoticeText_(config) {
+  const emailCfg = config.email || {};
+  const address  = emailCfg.replyToEmail || emailCfg.adminEmail || '';
+
+  return [
+    '━━━━━━━━━━━━━━━━━━━━━━━━',
+    '📷 プロフィール写真をお送りください',
+    '━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    'お申込みは完了しておりますが、プロフィール写真が届いておりません。',
+    'お手数ですが、下記あてにメールで写真をお送りください。',
+    '',
+    address ? '  送り先: ' + address : '  送り先: このメールへのご返信でお送りください',
+    '',
+    '※ お名前と出展名を添えていただけると助かります。',
+    '※ このメールにそのまま返信して、写真を添付いただく形でも結構です。',
+    ''
+  ].join('\n');
 }
 
 function sendAdminEmail(params, calc, config) {
@@ -1065,7 +1105,7 @@ function sendAdminEmail(params, calc, config) {
     '━━ その他 ━━━━━━━━━━━━━━━━━━━━━\n' +
     '備考: ' + (params.notes || 'なし') + '\n' +
     '写真掲載可否: ' + (params.photoPermission || '-') + '\n' +
-    '写真URL: ' + (params.profileImageUrl || '取得失敗') + '\n' +
+    '写真URL: ' + (params.profileImageUrl || '⚠️ 未受領（申込者にメール送付を案内済み）') + '\n' +
     '申込日時: ' + params.submittedAt;
 
   GmailApp.sendEmail(adminEmail, subject, body, {

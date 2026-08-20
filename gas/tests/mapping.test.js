@@ -18,7 +18,8 @@ const Utilities = {
 const wrapped = new Function('Utilities', 'console', src + `
   return { mapRowToHeaders_, buildFieldMap, dateKey_, formatCellDate_, padLeft_, normalizeEmail_,
            formatSnsLinks, buildReceptionHeaders, DB_APPLICATION_HEADERS,
-           sanitizeFileName_, buildPhotoFileName_, getEditionInfo_ };
+           sanitizeFileName_, buildPhotoFileName_, getEditionInfo_,
+           buildPhotoNoticeText_, applyTemplate, PHOTO_PENDING_LABEL };
 `);
 const M = wrapped(Utilities, console);
 
@@ -142,6 +143,28 @@ check('どちらも空なら元のファイル名',
   M.buildPhotoFileName_({ name: '', exhibitorName: '', profileImageName: 'photo.jpg' }), 'photo.jpg');
 check('長すぎる名前は切り詰める',
   M.buildPhotoFileName_({ name: 'あ'.repeat(100), exhibitorName: '' }).length, 84);
+
+// ---------------------------------------------------------------
+// 7. 写真が届かなかった場合の案内
+// ---------------------------------------------------------------
+console.log('\n[7] 写真未受領の案内');
+
+const mailCfg = { email: { adminEmail: 'admin@example.com', replyToEmail: 'reply@example.com' } };
+const notice  = M.buildPhotoNoticeText_(mailCfg);
+
+check('返信先アドレスを案内に載せる', notice.includes('reply@example.com'), true);
+check('返信先が無ければ管理者アドレスを使う',
+  M.buildPhotoNoticeText_({ email: { adminEmail: 'admin@example.com' } }).includes('admin@example.com'), true);
+check('アドレス未設定でも文面が壊れない',
+  M.buildPhotoNoticeText_({}).includes('ご返信でお送りください'), true);
+check('申込が完了している旨を伝える', notice.includes('お申込みは完了'), true);
+check('シートの目印', M.PHOTO_PENDING_LABEL, 'メール送付待ち');
+
+// テンプレートに {{photoNotice}} があればその位置へ差し込まれる
+check('差し込み位置を指定できる',
+  M.applyTemplate('前\n{{photoNotice}}\n後', { photoNotice: '案内文' }), '前\n案内文\n後');
+check('写真ありのときは空になる',
+  M.applyTemplate('前\n{{photoNotice}}\n後', { photoNotice: '' }), '前\n\n後');
 
 console.log(failures === 0 ? '\n✅ すべて成功' : `\n❌ ${failures}件失敗`);
 process.exit(failures === 0 ? 0 : 1);

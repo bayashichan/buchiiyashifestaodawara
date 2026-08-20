@@ -217,6 +217,18 @@
               ※ JPG/PNG 形式、8MB以下<br>
               ※ 顔出し不要の場合はイラスト・風景画でもOK
             </p>
+
+            <!-- 写真がうまく送れないときの逃げ道 -->
+            <div style="margin-top:0.75rem;padding:0.75rem;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:0.5rem">
+              <label class="checkbox-label" style="font-weight:700;color:#92400e">
+                <input type="checkbox" id="photoLater" name="photoLater" value="1" onchange="togglePhotoUpload()">
+                写真をあとからメールで送る
+              </label>
+              <p style="font-size:0.8rem;color:#92400e;margin-top:0.4rem;line-height:1.6">
+                写真がうまく選べない・送信できない場合は、こちらにチェックを入れてお申込みください。<br>
+                お申込み後に、事務局あてメールで写真をお送りいただけます。
+              </p>
+            </div>
           </div>
 
           <!-- 写真掲載可否 -->
@@ -413,6 +425,25 @@
         ご登録のメールアドレスに<br>確認メールをお送りしました。<br>
         内容をご確認ください。
       </p>
+
+      <!-- 写真が届いていない場合のみ表示 -->
+      <div id="photoPendingNotice" class="hidden"
+           style="text-align:left;margin-bottom:1.5rem;padding:1rem;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:0.75rem">
+        <p style="font-weight:700;color:#92400e;margin-bottom:0.5rem">
+          📷 プロフィール写真をお送りください
+        </p>
+        <p style="font-size:0.875rem;color:#92400e;line-height:1.8;margin-bottom:0.75rem">
+          お申込みは完了しています。<br>
+          お手数ですが、プロフィール写真を下のアドレスあてにメールでお送りください。
+          件名やご本文に<strong>お名前と出展名</strong>を添えていただけると助かります。
+        </p>
+        <a id="photoMailLink" href="#" class="submit-btn"
+           style="display:block;width:100%;text-align:center;text-decoration:none;box-sizing:border-box">
+          メールで写真を送る
+        </a>
+        <p id="photoMailAddress" style="font-size:0.8rem;color:#92400e;margin-top:0.5rem;text-align:center;word-break:break-all"></p>
+      </div>
+
       <button onclick="location.reload()" class="submit-btn" style="width:100%">閉じる</button>
     </div>
   </div>

@@ -41,6 +41,7 @@ node gas/tests/mapping.test.js            # 受付シートの列マッピング
 npm i --no-save jsdom                     # 下のテストに必要（初回のみ）
 node apply/tests/sns.test.mjs             # SNSリンク欄が送信時に拾われるか
 node apply/tests/booth.test.mjs           # ブース選択・料金・持ち込み物品の表示
+node apply/tests/photo.test.mjs           # 写真が送れない場合でも申込できるか
 node admin/tests/config-editor.test.mjs   # 管理画面の読み込み・保存・合い言葉
 ```
 
