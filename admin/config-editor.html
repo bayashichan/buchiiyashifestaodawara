@@ -95,28 +95,63 @@ select.field-input{cursor:pointer}
       <input type="file" accept=".json" id="loadFile" style="display:none" onchange="loadJson(event)">
     </label>
     <button class="btn btn-secondary" onclick="togglePreview()">👁 JSONプレビュー</button>
-    <button class="btn btn-success" onclick="downloadJson()">💾 config.jsonをダウンロード</button>
+    <button class="btn btn-secondary" onclick="downloadJson()">💾 ダウンロード</button>
+    <button class="btn btn-primary" onclick="saveToGitHub()" id="saveGhBtn">🚀 保存して公開する</button>
   </div>
 </header>
 
 <div class="app-body">
   <!-- サイドバー -->
   <nav class="sidebar">
-    <div class="nav-item active" onclick="scrollTo('s-theme')">🎨 テーマ</div>
-    <div class="nav-item" onclick="scrollTo('s-event')">📅 イベント情報</div>
-    <div class="nav-item" onclick="scrollTo('s-features')">⚙️ 機能設定</div>
-    <div class="nav-item" onclick="scrollTo('s-pricing')">💰 料金設定</div>
-    <div class="nav-item" onclick="scrollTo('s-booths')">🏪 ブース設定</div>
-    <div class="nav-item" onclick="scrollTo('s-categories')">🗂 カテゴリ</div>
-    <div class="nav-item" onclick="scrollTo('s-stdfields')">📋 標準フィールド</div>
-    <div class="nav-item" onclick="scrollTo('s-custom')">❓ カスタム質問</div>
-    <div class="nav-item" onclick="scrollTo('s-terms')">📜 出展規約</div>
-    <div class="nav-item" onclick="scrollTo('s-email')">📧 メール設定</div>
-    <div class="nav-item" onclick="scrollTo('s-infra')">🔧 インフラ設定</div>
+    <div class="nav-item" onclick="scrollToId('s-connect')">🔗 接続</div>
+    <div class="nav-item active" onclick="scrollToId('s-theme')">🎨 テーマ</div>
+    <div class="nav-item" onclick="scrollToId('s-event')">📅 イベント情報</div>
+    <div class="nav-item" onclick="scrollToId('s-features')">⚙️ 機能設定</div>
+    <div class="nav-item" onclick="scrollToId('s-pricing')">💰 料金設定</div>
+    <div class="nav-item" onclick="scrollToId('s-booths')">🏪 ブース設定</div>
+    <div class="nav-item" onclick="scrollToId('s-categories')">🗂 カテゴリ</div>
+    <div class="nav-item" onclick="scrollToId('s-stdfields')">📋 標準フィールド</div>
+    <div class="nav-item" onclick="scrollToId('s-custom')">❓ カスタム質問</div>
+    <div class="nav-item" onclick="scrollToId('s-terms')">📜 出展規約</div>
+    <div class="nav-item" onclick="scrollToId('s-email')">📧 メール設定</div>
+    <div class="nav-item" onclick="scrollToId('s-infra')">🔧 インフラ設定</div>
   </nav>
 
   <!-- メイン -->
   <main class="main" id="mainArea">
+
+    <!-- 接続設定 -->
+    <div class="section-card" id="s-connect">
+      <div class="section-title">🔗 接続設定（公開中のフォームに直接反映）</div>
+      <div id="connectState" style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">読み込み中...</div>
+      <div class="grid-2">
+        <div class="field-group">
+          <label class="field-label">GitHub ユーザー名 (owner)</label>
+          <input type="text" class="field-input" id="ghOwner" placeholder="bayashichan">
+        </div>
+        <div class="field-group">
+          <label class="field-label">リポジトリ名 (repo)</label>
+          <input type="text" class="field-input" id="ghRepo" placeholder="buchiiyashifestaodawara">
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">GitHub アクセストークン</label>
+        <input type="password" class="field-input" id="ghToken" placeholder="ghp_xxxxxxxxxxxxx" autocomplete="off">
+        <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">
+          ※ このブラウザ内にのみ保存されます。共用パソコンでは使用後に「接続を解除」してください。
+        </p>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="connectGitHub()">接続して最新設定を読み込む</button>
+        <button class="btn btn-secondary" onclick="disconnectGitHub()">接続を解除</button>
+        <button class="btn btn-secondary" onclick="clearGasCache()">フォームへ即時反映（キャッシュクリア）</button>
+      </div>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:0.75rem;line-height:1.6">
+        「保存して公開する」で config.json が更新され、1〜2分でフォームに反映されます。<br>
+        バックエンド(GAS)は設定を最大30分キャッシュするため、料金やブースを変えた直後は
+        「キャッシュクリア」も押してください。
+      </p>
+    </div>
 
     <!-- テーマ -->
     <div class="section-card" id="s-theme">
@@ -154,6 +189,20 @@ select.field-input{cursor:pointer}
       </div>
       <div class="grid-2">
         <div class="field-group">
+          <label class="field-label">開催回（表示用）</label>
+          <input type="text" class="field-input" id="eventEdition" placeholder="第2回">
+        </div>
+        <div class="field-group">
+          <label class="field-label">開催回ID（データベースの管理キー）*</label>
+          <input type="text" class="field-input" id="eventEditionId" placeholder="odawara-02">
+          <p style="font-size:0.72rem;color:var(--yellow);margin-top:0.3rem">
+            ※ 開催回ごとに必ず変更してください（例: odawara-01 → odawara-02）。
+            同じIDのまま次回受付を始めると、前回データと同じ回として記録されます。
+          </p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field-group">
           <label class="field-label">開催日時テキスト</label>
           <input type="text" class="field-input" id="eventDate" placeholder="2025年11月15日（土）10:00〜17:00">
         </div>
@@ -176,7 +225,7 @@ select.field-input{cursor:pointer}
         <label class="toggle"><input type="checkbox" id="f-earlyBird" checked><span class="toggle-slider"></span></label>
       </div>
       <div class="toggle-row">
-        <div><div class="toggle-label">リピーター検索</div><div class="toggle-desc">過去申込者の自動入力機能</div></div>
+        <div><div class="toggle-label">リピーター検索</div><div class="toggle-desc">データベースから前回の申込内容を呼び出して自動入力（第2回以降でON）</div></div>
         <label class="toggle"><input type="checkbox" id="f-repeaterSearch"><span class="toggle-slider"></span></label>
       </div>
       <div class="toggle-row">
@@ -346,9 +395,17 @@ select.field-input{cursor:pointer}
       </div>
       <div class="grid-2">
         <div class="field-group">
-          <label class="field-label">スプレッドシートID (spreadsheetId)</label>
+          <label class="field-label">受付スプレッドシートID (spreadsheetId)</label>
           <input type="text" class="field-input" id="spreadsheetId" placeholder="1Hx...">
+          <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">※ 今回の受付データが入るシート。開催回ごとに新しいシートへ差し替えます</p>
         </div>
+        <div class="field-group">
+          <label class="field-label">データベース スプレッドシートID (databaseSpreadsheetId)</label>
+          <input type="text" class="field-input" id="databaseSpreadsheetId" placeholder="1Qj...">
+          <p style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">※ 全開催回を蓄積する共通データベース。毎回同じIDのままにします</p>
+        </div>
+      </div>
+      <div class="grid-2">
         <div class="field-group">
           <label class="field-label">DriveフォルダURL (driveFolderUrl)</label>
           <input type="url" class="field-input" id="driveFolderUrl" placeholder="https://drive.google.com/drive/folders/1Hx...">
@@ -361,8 +418,11 @@ select.field-input{cursor:pointer}
 
 <!-- フッター -->
 <footer class="app-footer">
-  <div class="footer-note">入力内容は自動保存されません。必ず「💾 JSONをダウンロード」してください。</div>
-  <button class="btn btn-success" onclick="downloadJson()">💾 config.jsonをダウンロード</button>
+  <div class="footer-note" id="footerNote">入力内容は自動保存されません。「🚀 保存して公開する」を押すまで反映されません。</div>
+  <div style="display:flex;gap:0.75rem">
+    <button class="btn btn-secondary" onclick="downloadJson()">💾 ダウンロード</button>
+    <button class="btn btn-primary" onclick="saveToGitHub()">🚀 保存して公開する</button>
+  </div>
 </footer>
 
 <!-- JSONプレビュー -->
@@ -395,14 +455,218 @@ const OPTIONS_DEF = [
   { key: 'secondaryParty', label: '二次会参加費',        defaultPrice: 3000, defaultEnabled: false }
 ];
 
+// GitHub 接続情報（quick-settings.html と共通）
+const STORAGE_KEY = 'qs_github_settings';
+const CONFIG_PATH = 'apply/config.json';
+let fileSha = null;   // GitHub 上のファイルSHA（更新時に必要）
+
 // ========================================
 // 初期化
 // ========================================
 window.onload = () => {
   renderOptions();
-  addDefaultData();
   initNewCategoryOnEnter();
+  initEditor();
 };
+
+async function initEditor() {
+  const settings = loadGhSettings();
+  if (settings) {
+    document.getElementById('ghOwner').value = settings.owner;
+    document.getElementById('ghRepo').value  = settings.repo;
+    document.getElementById('ghToken').value = settings.token;
+    const ok = await loadFromGitHub(settings);
+    if (ok) return;
+  }
+
+  // 未接続時は、公開中の config.json を読み込んで初期表示にする
+  const loaded = await loadPublishedConfig();
+  if (!loaded) {
+    addDefaultData();
+    setConnectState('⚠️ 公開中の設定を読み込めませんでした。初期値を表示しています。', 'var(--yellow)');
+  }
+}
+
+/** 同じサイトに公開されている config.json（読み取り専用の下敷き） */
+async function loadPublishedConfig() {
+  try {
+    const res = await fetch(`../${CONFIG_PATH}?t=${Date.now()}`);
+    if (!res.ok) return false;
+    applyConfig(await res.json());
+    setConnectState('📄 公開中の設定を表示しています（保存するにはGitHub接続が必要です）', 'var(--yellow)');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ========================================
+// GitHub 接続
+// ========================================
+function loadGhSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return (s && s.owner && s.repo && s.token) ? s : null;
+  } catch { return null; }
+}
+
+function currentGhInputs() {
+  return {
+    owner: document.getElementById('ghOwner').value.trim(),
+    repo:  document.getElementById('ghRepo').value.trim(),
+    token: document.getElementById('ghToken').value.trim()
+  };
+}
+
+function setConnectState(msg, color) {
+  const el = document.getElementById('connectState');
+  el.textContent = msg;
+  el.style.color = color || 'var(--muted)';
+}
+
+async function connectGitHub() {
+  const settings = currentGhInputs();
+  if (!settings.owner || !settings.repo || !settings.token) {
+    showToast('⚠️ owner / repo / トークンをすべて入力してください');
+    return;
+  }
+  const ok = await loadFromGitHub(settings);
+  if (ok) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    showToast('✅ 接続しました');
+  }
+}
+
+function disconnectGitHub() {
+  localStorage.removeItem(STORAGE_KEY);
+  document.getElementById('ghToken').value = '';
+  fileSha = null;
+  setConnectState('接続を解除しました（保存はできません）', 'var(--muted)');
+  showToast('接続を解除しました');
+}
+
+function ghContentsUrl(settings) {
+  return `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${CONFIG_PATH}`;
+}
+
+async function loadFromGitHub(settings) {
+  setConnectState('接続中...', 'var(--yellow)');
+  try {
+    const res = await fetch(`${ghContentsUrl(settings)}?ref=HEAD&t=${Date.now()}`, {
+      headers: {
+        'Authorization': `Bearer ${settings.token}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `HTTPエラー: ${res.status}`);
+    }
+    const data = await res.json();
+    fileSha = data.sha;
+    applyConfig(JSON.parse(decodeBase64Utf8(data.content)));
+    setConnectState(`✅ 接続済み（${settings.owner}/${settings.repo}）— 保存すると公開フォームに反映されます`, 'var(--green)');
+    return true;
+  } catch (err) {
+    console.error(err);
+    setConnectState(`❌ 接続エラー: ${err.message}`, 'var(--red)');
+    return false;
+  }
+}
+
+async function saveToGitHub() {
+  const settings = loadGhSettings() || currentGhInputs();
+  if (!settings.owner || !settings.repo || !settings.token) {
+    showToast('⚠️ 先に「接続設定」を入力してください');
+    scrollToId('s-connect');
+    return;
+  }
+
+  const config = buildConfig();
+  if (!config.event.name) { showToast('⚠️ イベント名を入力してください'); return; }
+  if (!config.event.editionId) { showToast('⚠️ 開催回IDを入力してください'); return; }
+
+  const btn = document.getElementById('saveGhBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 保存中...';
+
+  try {
+    // 最新のSHAを取得（他の端末で更新されている場合に備える）
+    const head = await fetch(ghContentsUrl(settings), {
+      headers: { 'Authorization': `Bearer ${settings.token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (head.ok) fileSha = (await head.json()).sha;
+
+    const res = await fetch(ghContentsUrl(settings), {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${settings.token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: `設定更新: ${config.event.name}（${config.event.edition || config.event.editionId}）`,
+        content: encodeBase64Utf8(JSON.stringify(config, null, 2)),
+        sha: fileSha || undefined
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `HTTPエラー: ${res.status}`);
+    }
+
+    fileSha = (await res.json()).content.sha;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    setConnectState(`✅ 保存しました（${new Date().toLocaleTimeString('ja-JP')}）— 反映まで1〜2分`, 'var(--green)');
+    showToast('✅ 保存しました。フォームへの反映まで1〜2分お待ちください');
+
+    // GAS 側のキャッシュも消して即時反映
+    clearGasCache(true);
+
+  } catch (err) {
+    console.error(err);
+    showToast('❌ 保存失敗: ' + err.message);
+    setConnectState(`❌ 保存失敗: ${err.message}`, 'var(--red)');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🚀 保存して公開する';
+  }
+}
+
+/** GAS の設定キャッシュ（最大30分）を消して即時反映させる */
+async function clearGasCache(silent) {
+  const gasUrl = document.getElementById('gasUrl').value.trim();
+  if (!gasUrl) {
+    if (!silent) showToast('⚠️ GAS デプロイURLが未設定です');
+    return;
+  }
+  try {
+    const url = new URL(gasUrl);
+    url.searchParams.set('action', 'clear_cache');
+    const token = localStorage.getItem('admin_gas_token');
+    if (token) url.searchParams.set('token', token);
+    await fetch(url, { method: 'GET', mode: 'no-cors' });
+    if (!silent) showToast('✅ キャッシュクリアを実行しました');
+  } catch (err) {
+    if (!silent) showToast('⚠️ キャッシュクリアに失敗: ' + err.message);
+  }
+}
+
+// UTF-8 対応の Base64 変換（イベント名・規約・メール文面に日本語が含まれるため必須）
+function encodeBase64Utf8(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  // 引数の数に上限があるため、まとめて渡さず分割して連結する
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin);
+}
+function decodeBase64Utf8(b64) {
+  const bin = atob(String(b64).replace(/\s/g, ''));
+  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+}
 
 function initNewCategoryOnEnter() {
   document.getElementById('newCategory').addEventListener('keydown', e => {
@@ -700,6 +964,8 @@ function buildConfig() {
     },
     event: {
       name:              v('eventName'),
+      edition:           v('eventEdition'),
+      editionId:         v('eventEditionId'),
       date:              v('eventDate'),
       location:          v('eventLocation'),
       earlyBirdDeadline: v('earlyBirdDeadline')
@@ -758,6 +1024,7 @@ function buildConfig() {
     gasUrl:        v('gasUrl'),
     workerUrl:     v('workerUrl'),
     spreadsheetId: v('spreadsheetId'),
+    databaseSpreadsheetId: v('databaseSpreadsheetId'),
     driveFolderUrl: v('driveFolderUrl')
   };
 }
@@ -811,6 +1078,8 @@ function applyConfig(c) {
 
   // イベント
   set('eventName',          c.event?.name              || '');
+  set('eventEdition',       c.event?.edition           || '');
+  set('eventEditionId',     c.event?.editionId         || '');
   set('eventDate',          c.event?.date              || '');
   set('eventLocation',      c.event?.location          || '');
   set('earlyBirdDeadline',  c.event?.earlyBirdDeadline || '');
@@ -894,6 +1163,7 @@ function applyConfig(c) {
   set('gasUrl',        c.gasUrl        || '');
   set('workerUrl',     c.workerUrl     || '');
   set('spreadsheetId', c.spreadsheetId || '');
+  set('databaseSpreadsheetId', c.databaseSpreadsheetId || '');
   set('driveFolderUrl', c.driveFolderUrl || c.driveFolderId || '');
 }
 
@@ -912,10 +1182,11 @@ function togglePreview() {
 // ========================================
 // スクロール & ナビゲーション
 // ========================================
-function scrollTo(id) {
+function scrollToId(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  event.target.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('onclick') === `scrollToId('${id}')`);
+  });
 }
 
 // ========================================
