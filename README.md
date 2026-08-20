@@ -35,7 +35,10 @@ GAS を触らずに設定を変更できます。
 ## 開発者向け
 
 ```bash
-node gas/tests/mapping.test.js   # 受付シートの列マッピングと重複判定のテスト
+node gas/tests/mapping.test.js   # 受付シートの列マッピングと重複判定
+
+npm i --no-save jsdom            # 下のテストに必要（初回のみ）
+node apply/tests/sns.test.mjs    # SNSリンク欄が送信時に拾われるか（実DOM）
 ```
 
 - 新しい開催回を始める手順 → [`docs/MIGRATION.md`](docs/MIGRATION.md)
