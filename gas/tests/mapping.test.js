@@ -17,7 +17,8 @@ const Utilities = {
 // 実行方法: node gas/tests/mapping.test.js
 const wrapped = new Function('Utilities', 'console', src + `
   return { mapRowToHeaders_, buildFieldMap, dateKey_, formatCellDate_, padLeft_, normalizeEmail_,
-           formatSnsLinks, buildReceptionHeaders, DB_APPLICATION_HEADERS };
+           formatSnsLinks, buildReceptionHeaders, DB_APPLICATION_HEADERS,
+           sanitizeFileName_, buildPhotoFileName_, getEditionInfo_ };
 `);
 const M = wrapped(Utilities, console);
 
@@ -117,6 +118,30 @@ check('空配列', M.formatSnsLinks('[]'), 'なし');
 console.log('\n[5] DB列定義');
 const dup = M.DB_APPLICATION_HEADERS.filter((h, i, a) => a.indexOf(h) !== i);
 check('applications に重複列名が無い', dup, []);
+
+// ---------------------------------------------------------------
+// 6. 写真の保存先とファイル名
+// ---------------------------------------------------------------
+console.log('\n[6] 写真のフォルダ名・ファイル名');
+
+check('開催回がフォルダ名になる',
+  M.sanitizeFileName_(M.getEditionInfo_({ event: { edition: '第1回', name: 'イベント' } }).edition), '第1回');
+check('開催回が空ならIDを使う',
+  M.getEditionInfo_({ event: { editionId: '第2回', name: 'イベント' } }).editionId, '第2回');
+check('フォルダ名に使えない記号を落とす', M.sanitizeFileName_('第1回/小田原:特設?'), '第1回小田原特設');
+check('前後の空白を落とす', M.sanitizeFileName_('  第1回  '), '第1回');
+check('空欄なら空文字', M.sanitizeFileName_(''), '');
+
+check('ファイル名は氏名_出展名',
+  M.buildPhotoFileName_({ name: '山田 花子', exhibitorName: 'サロン花' }), '山田 花子_サロン花.jpg');
+check('出展名が無ければ氏名だけ',
+  M.buildPhotoFileName_({ name: '山田 花子', exhibitorName: '' }), '山田 花子.jpg');
+check('記号を含む出展名も安全に',
+  M.buildPhotoFileName_({ name: '関', exhibitorName: 'Salon à la lune <特設>' }), '関_Salon à la lune 特設.jpg');
+check('どちらも空なら元のファイル名',
+  M.buildPhotoFileName_({ name: '', exhibitorName: '', profileImageName: 'photo.jpg' }), 'photo.jpg');
+check('長すぎる名前は切り詰める',
+  M.buildPhotoFileName_({ name: 'あ'.repeat(100), exhibitorName: '' }).length, 84);
 
 console.log(failures === 0 ? '\n✅ すべて成功' : `\n❌ ${failures}件失敗`);
 process.exit(failures === 0 ? 0 : 1);

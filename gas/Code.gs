@@ -885,14 +885,12 @@ function saveProfileImage(params, config) {
   try {
     const base64Data = params.profileImageBase64;
     const mimeType   = params.profileImageMimeType || 'image/jpeg';
-    const fileName   = params.profileImageName || (params.name + '_photo.jpg');
 
-    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
+    const blob = Utilities.newBlob(
+      Utilities.base64Decode(base64Data), mimeType, buildPhotoFileName_(params)
+    );
 
-    const folderId = parseDriveFolderId(config.driveFolderUrl || config.driveFolderId);
-    const folder   = folderId ? DriveApp.getFolderById(folderId) : DriveApp.getRootFolder();
-
-    const file = folder.createFile(blob);
+    const file = getPhotoFolder_(config).createFile(blob);
 
     try {
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -905,6 +903,54 @@ function saveProfileImage(params, config) {
     console.error('saveProfileImage error:', err);
     return '';
   }
+}
+
+/**
+ * 写真の保存先フォルダを返します。
+ *
+ * 設定された親フォルダの下に、開催回ごとのフォルダ（例:「第1回」）を作り、
+ * その中に保存します。開催回が未設定の場合は親フォルダへ直接保存します。
+ */
+function getPhotoFolder_(config) {
+  const parentId = parseDriveFolderId(config.driveFolderUrl || config.driveFolderId);
+  const parent   = parentId ? DriveApp.getFolderById(parentId) : DriveApp.getRootFolder();
+
+  const edition = getEditionInfo_(config);
+  const name    = sanitizeFileName_(edition.edition || edition.editionId);
+  if (!name) return parent;
+
+  // 同時に申し込みがあっても、同名フォルダが二重にできないようにする
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+  } catch (e) {
+    console.warn('フォルダ作成のロックを取得できませんでした:', e);
+  }
+
+  try {
+    const found = parent.getFoldersByName(name);
+    return found.hasNext() ? found.next() : parent.createFolder(name);
+  } finally {
+    try { lock.releaseLock(); } catch (e) { /* ロック未取得時は何もしない */ }
+  }
+}
+
+/** 写真のファイル名を「氏名_出展名.jpg」にして、後から探しやすくする */
+function buildPhotoFileName_(params) {
+  const person = sanitizeFileName_(params.name);
+  const shop   = sanitizeFileName_(params.exhibitorName);
+  const base   = [person, shop].filter(Boolean).join('_');
+
+  if (!base) return params.profileImageName || 'photo.jpg';
+  return base.slice(0, 80) + '.jpg';
+}
+
+/** フォルダ名・ファイル名に使えない文字を取り除く */
+function sanitizeFileName_(text) {
+  return String(text === null || text === undefined ? '' : text)
+    .replace(/[\/\\:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function parseDriveFolderId(urlOrId) {
