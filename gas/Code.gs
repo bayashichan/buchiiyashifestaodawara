@@ -1278,6 +1278,7 @@ function handleStatus() {
   const status = {
     success: true,
     version: '2.0.0',
+    configJsonUrl: CONFIG_JSON_URL,
     eventName: edition.eventName,
     edition: edition.edition,
     editionId: edition.editionId,
@@ -1331,7 +1332,12 @@ function setupDatabase() {
   const dbId   = getDatabaseSpreadsheetId_(config);
 
   if (!dbId) {
-    throw new Error('config.json の databaseSpreadsheetId が設定されていません');
+    throw new Error(
+      'config.json に databaseSpreadsheetId がありません。\n' +
+      '読み込み元: ' + CONFIG_JSON_URL + '\n' +
+      'このURLの中身に databaseSpreadsheetId が含まれているか確認してください。\n' +
+      '（設定を更新した直後の場合は clearConfigCache を実行してから再実行してください）'
+    );
   }
 
   const ss    = SpreadsheetApp.openById(dbId);
@@ -1382,10 +1388,20 @@ function setupDatabase() {
 function migrateReceptionToDatabase() {
   const config = getConfig();
   const dbId   = getDatabaseSpreadsheetId_(config);
-  if (!dbId) throw new Error('config.json の databaseSpreadsheetId が設定されていません');
+  if (!dbId) throw new Error(
+      'config.json に databaseSpreadsheetId がありません。\n' +
+      '読み込み元: ' + CONFIG_JSON_URL + '\n' +
+      'このURLの中身に databaseSpreadsheetId が含まれているか確認してください。\n' +
+      '（設定を更新した直後の場合は clearConfigCache を実行してから再実行してください）'
+    );
 
   const edition = getEditionInfo_(config);
-  if (!edition.editionId) throw new Error('config.json の event.editionId が設定されていません');
+  if (!edition.editionId) {
+    throw new Error(
+      'config.json に event.editionId がありません。\n' +
+      '読み込み元: ' + CONFIG_JSON_URL
+    );
+  }
 
   const src = SpreadsheetApp.openById(config.spreadsheetId).getSheetByName(RECEPTION_SHEET_NAME);
   if (!src || src.getLastRow() < 2) {
@@ -1477,7 +1493,12 @@ function migrateReceptionToDatabase() {
 function syncReceptionUpdatesToDatabase() {
   const config = getConfig();
   const dbId   = getDatabaseSpreadsheetId_(config);
-  if (!dbId) throw new Error('config.json の databaseSpreadsheetId が設定されていません');
+  if (!dbId) throw new Error(
+      'config.json に databaseSpreadsheetId がありません。\n' +
+      '読み込み元: ' + CONFIG_JSON_URL + '\n' +
+      'このURLの中身に databaseSpreadsheetId が含まれているか確認してください。\n' +
+      '（設定を更新した直後の場合は clearConfigCache を実行してから再実行してください）'
+    );
 
   const edition = getEditionInfo_(config);
   const src = SpreadsheetApp.openById(config.spreadsheetId).getSheetByName(RECEPTION_SHEET_NAME);

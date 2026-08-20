@@ -25,11 +25,33 @@
 1. [script.google.com](https://script.google.com/) を開き、**新しいプロジェクト**を作成
    （名前の例: `ぶち癒しフェスタ申込フォーム v2`）
 2. 既定の `コード.gs` の中身を全消しして、このリポジトリの **`gas/Code.gs`** を貼り付け
-3. 「プロジェクトの設定」→「`appsscript.json` マニフェスト ファイルをエディタで表示する」にチェックを入れ、
-   `appsscript.json` を **`gas/appsscript.json`** の内容に置き換え
-4. 保存
+3. 保存
+
+`gas/appsscript.json` の編集は不要です。中身は新規プロジェクトの初期値と、
+デプロイ画面で選ぶ内容（自分として実行 / 全員がアクセス可）と同じものです。
+タイムゾーンを確認したい場合だけ「⚙️ プロジェクトの設定」を開き、
+`(GMT+09:00) 日本標準時` になっていることを見てください。
 
 > 現行プロジェクトはそのまま動かし続けます。切り替えは手順5で行います。
+
+### 切り替え前にテストする場合（重要）
+
+`gas/Code.gs` の先頭にある `CONFIG_JSON_URL` は、**公開中（main）の config.json** を指しています。
+移行用の設定（`databaseSpreadsheetId` など）はまだ main に入っていないため、
+そのままだと手順3で「databaseSpreadsheetId がありません」というエラーになります。
+
+テスト中は、この1行を作業ブランチのファイルに向けてください。
+
+```js
+const CONFIG_JSON_URL = 'https://raw.githubusercontent.com/bayashichan/buchiiyashifestaodawara/claude/reception-system-migration-btsevs/apply/config.json';
+```
+
+変更したら **`clearConfigCache` を1回実行**してから次へ進みます（設定は最大30分キャッシュされるため）。
+手順5でブランチを main に取り込んだあとは、**この行を元のURLに戻してください。**
+
+```js
+const CONFIG_JSON_URL = 'https://bayashichan.github.io/buchiiyashifestaodawara/apply/config.json';
+```
 
 ---
 
