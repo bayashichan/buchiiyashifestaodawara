@@ -22,6 +22,8 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const html   = fs.readFileSync(`${REPO}/admin/config-editor.html`, 'utf8');
 const config = JSON.parse(fs.readFileSync(`${REPO}/apply/config.json`, 'utf8'));
 
+const atobUtf8 = b64 => Buffer.from(b64, 'base64').toString('utf8');
+
 let ng = 0;
 const ok = (label, cond, extra='') => {
   console.log(`  ${cond ? '✓' : '✗'} ${label}${cond ? '' : '  → ' + extra}`);
@@ -277,6 +279,68 @@ console.log('\n[9] 本番のメール文面が往復で変わらないこと');
      body.querySelectorAll('.var').length === used.length,
      `${body.querySelectorAll('.var').length} / ${used.length}`);
   ok('振込先などの本文が消えない', back.includes('セブン銀行') === original.includes('セブン銀行'));
+}
+
+console.log('\n[10] 次の開催をはじめる');
+{
+  const { doc, window, saved } = await boot();
+  const v = id => doc.getElementById(id).value;
+
+  ok('入口が見えている', !!doc.getElementById('newEventBtn'));
+  ok('いまの開催回が案内される',
+     doc.getElementById('newEventSub').textContent.includes('第1回'),
+     doc.getElementById('newEventSub').textContent);
+  ok('最初は入力欄が閉じている', doc.getElementById('newEventForm').classList.contains('hidden'));
+
+  doc.getElementById('newEventBtn').dispatchEvent(new window.Event('click'));
+  ok('押すと入力欄が開く', !doc.getElementById('newEventForm').classList.contains('hidden'));
+  ok('次の開催回が先に入っている', v('ne-edition') === '第2回', v('ne-edition'));
+  ok('イベント名も次の回に', v('ne-name') === '第2回ぶち癒しフェスタin小田原', v('ne-name'));
+  ok('会場は引き継がれる', v('ne-place') === config.event.location);
+  ok('開催日時は空（入れ直す）', v('ne-date') === '');
+  ok('受付シートは空（新しいものを入れる）', v('ne-sheet') === '');
+
+  // 前回と同じ開催回は止める
+  let warned = '';
+  window.alert = m => { warned = m; };
+  doc.getElementById('ne-edition').value = '第1回';
+  doc.getElementById('newEventApply').dispatchEvent(new window.Event('click'));
+  ok('前回と同じ開催回は止める', warned.includes('前回と同じ'), warned);
+  ok('止めたときは反映しない', v('f-edition') === '第1回' && v('f-eventName') === config.event.name);
+
+  // 正しく入れて反映する
+  doc.getElementById('ne-edition').value = '第2回';
+  doc.getElementById('ne-name').value    = '第2回ぶち癒しフェスタin小田原';
+  doc.getElementById('ne-date').value    = '2027年5月5日（日）11:00〜16:30';
+  doc.getElementById('ne-sheet').value   = 'https://docs.google.com/spreadsheets/d/NEWSHEET123/edit';
+  doc.getElementById('newEventApply').dispatchEvent(new window.Event('click'));
+
+  ok('開催回が入る', v('f-edition') === '第2回', v('f-edition'));
+  ok('イベント名が入る', v('f-eventName') === '第2回ぶち癒しフェスタin小田原');
+  ok('開催日時が入る', v('f-eventDate') === '2027年5月5日（日）11:00〜16:30');
+  ok('受付シートが差し替わる', v('f-sheetUrl').includes('NEWSHEET123'), v('f-sheetUrl'));
+  ok('リピーター検索がONになる', doc.getElementById('f-repeater').checked);
+  ok('入力欄が閉じる', doc.getElementById('newEventForm').classList.contains('hidden'));
+  ok('保存ボタンが押せるようになる', !doc.getElementById('saveBtn').disabled);
+  ok('何をしたか知らせる', warned.includes('第2回') && warned.includes('保存'), warned.slice(0, 60));
+  ok('変更中だと分かる表示になる',
+     doc.getElementById('newEventSub').textContent.includes('変更中'),
+     doc.getElementById('newEventSub').textContent);
+
+  // 保存すると、引き継ぐものはそのまま
+  doc.getElementById('saveBtn').dispatchEvent(new window.Event('click'));
+  await new Promise(r => setTimeout(r, 120));
+  const body = JSON.parse(atobUtf8(saved.at(-1).content));
+
+  ok('開催回が保存される', body.event.editionId === '第2回' && body.event.edition === '第2回');
+  ok('受付シートが新しいIDになる', body.spreadsheetId === 'NEWSHEET123', body.spreadsheetId);
+  ok('データベースは変わらない', body.databaseSpreadsheetId === config.databaseSpreadsheetId);
+  ok('写真フォルダは変わらない', body.driveFolderUrl === config.driveFolderUrl);
+  ok('ブースはそのまま残る', body.booths.length === config.booths.length);
+  ok('ブースが受付中に戻る', body.booths.every(b => b.soldOut === false));
+  ok('質問はそのまま残る', body.customQuestions.length === config.customQuestions.length);
+  ok('メール文面はそのまま残る', body.email.confirmationBodyTemplate === config.email.confirmationBodyTemplate);
+  ok('規約はそのまま残る', body.terms === config.terms);
 }
 
 console.log(ng === 0 ? '\n✅ すべて成功' : `\n❌ ${ng}件失敗`);
