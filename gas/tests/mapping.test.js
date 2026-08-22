@@ -20,7 +20,7 @@ const wrapped = new Function('Utilities', 'console', src + `
            formatSnsLinks, buildReceptionHeaders, DB_APPLICATION_HEADERS,
            sanitizeFileName_, buildPhotoFileName_, getEditionInfo_,
            buildPhotoNoticeText_, applyTemplate, PHOTO_PENDING_LABEL,
-           buildExhibitorRows_, DB_EXHIBITOR_HEADERS };
+           buildExhibitorRows_, DB_EXHIBITOR_HEADERS, resolveReceptionHeaders_ };
 `);
 const M = wrapped(Utilities, console);
 
@@ -229,6 +229,25 @@ const again = M.buildExhibitorRows_(AH, appRows,
 check('もう一度実行しても増えない', again.length, built.length);
 check('出展回数が増えていかない', get(again.filter(r => get(r,'メールキー')==='ume@example.com')[0], '出展回数'), 2);
 check('IDも変わらない', get(again[0], '出展者ID'), 'EX0001');
+
+// ---------------------------------------------------------------
+// 9. 受付シートのヘッダー解決（取り込みの一括処理で使う）
+// ---------------------------------------------------------------
+console.log('\n[9] 受付シートのヘッダー解決');
+
+const resolved = M.resolveReceptionHeaders_(realHeader);
+check('列数は変わらない', resolved.length, realHeader.length);
+check('ラベル無し列を懇親会人数と解釈', resolved[17], '懇親会人数');
+check('スタッフメモ隣のラベル無し列は空のまま', resolved[27], '');
+check('通常の列はそのまま', resolved[2], '氏名');
+check('二次会出欠の次は元から名前がある', resolved[19], '二次会人数');
+
+// 二次会側がラベル無しの場合も推測できる
+const h2 = ['申込日時', '二次会出欠', '', '氏名'];
+check('二次会人数も推測できる', M.resolveReceptionHeaders_(h2)[2], '二次会人数');
+
+// 先頭が空欄でも落ちない
+check('先頭が空欄でも落ちない', M.resolveReceptionHeaders_(['', '氏名'])[0], '');
 
 console.log(failures === 0 ? '\n✅ すべて成功' : `\n❌ ${failures}件失敗`);
 process.exit(failures === 0 ? 0 : 1);

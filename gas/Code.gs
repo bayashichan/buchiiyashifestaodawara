@@ -1617,40 +1617,63 @@ function migrateReceptionToDatabase() {
     return;
   }
 
-  const dbSs    = SpreadsheetApp.openById(dbId);
+  // ---- 受付シートを1回だけ読む ----
   const headers = src.getRange(1, 1, 1, src.getLastColumn()).getValues()[0];
   const rows    = src.getRange(2, 1, src.getLastRow() - 1, src.getLastColumn()).getValues();
+  const resolved = resolveReceptionHeaders_(headers);
 
-  // ラベル無し列の推測（懇親会人数など）
-  const resolved = [];
-  let prev = '';
-  for (let i = 0; i < headers.length; i++) {
-    const nameCell = String(headers[i] === null || headers[i] === undefined ? '' : headers[i]).trim();
-    if (nameCell === '') {
-      resolved.push(prev === '懇親会出欠' ? '懇親会人数' : (prev === '二次会出欠' ? '二次会人数' : ''));
-    } else {
-      resolved.push(nameCell);
-      prev = nameCell;
-    }
-  }
-
-  const col = function (row, headerName) {
-    const i = resolved.indexOf(headerName);
+  const col = function (row, name) {
+    const i = resolved.indexOf(name);
     return i >= 0 ? row[i] : '';
   };
 
-  let imported = 0;
-  let skipped  = 0;
+  // ---- データベース側も1回だけ読む ----
+  const dbSs     = SpreadsheetApp.openById(dbId);
+  const appSheet = ensureDbSheet_(dbSs, DB_SHEET_APPLICATIONS, DB_APPLICATION_HEADERS);
+  const appHeaders = DB_APPLICATION_HEADERS;
+
+  const seen   = {};   // すでに入っている申込（重複を防ぐ）
+  const prefix = edition.editionId + '-';
+  let   maxSeq = 0;
+
+  if (appSheet.getLastRow() >= 2) {
+    const cur = appSheet.getRange(2, 1, appSheet.getLastRow() - 1, appHeaders.length).getValues();
+    const iId = appHeaders.indexOf('申込ID');
+    const iEd = appHeaders.indexOf('開催回ID');
+    const iMl = appHeaders.indexOf('メールアドレス');
+    const iDt = appHeaders.indexOf('申込日時');
+
+    cur.forEach(function (r) {
+      seen[[String(r[iEd] || ''), normalizeEmail_(r[iMl]), dateKey_(r[iDt])].join('|')] = true;
+      const v = String(r[iId] || '');
+      if (v.indexOf(prefix) === 0) {
+        const n = parseInt(v.slice(prefix.length), 10);
+        if (!isNaN(n) && n > maxSeq) maxSeq = n;
+      }
+    });
+  }
+
+  // ---- 追加ぶんを組み立てる（ここではシートに触らない） ----
+  const now      = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+  const newRows  = [];
+  let   skipped  = 0;
 
   rows.forEach(function (row) {
     const name  = String(col(row, '氏名') || '').trim();
     const email = String(col(row, 'メールアドレス') || '').trim();
     if (!name && !email) { skipped++; return; }
 
+    const when = dateKey_(col(row, '申込日時'));
+    const key  = [edition.editionId, normalizeEmail_(email), when].join('|');
+    if (seen[key]) { skipped++; return; }
+    seen[key] = true;
+
     const record = {
+      '申込ID':           prefix + padLeft_(++maxSeq, 4),
       '開催回ID':         edition.editionId,
       '開催回':           edition.edition,
       'イベント名':       edition.eventName,
+      '出展者ID':         '',
       '申込日時':         formatCellDate_(col(row, '申込日時')),
       '氏名':             name,
       'フリガナ':         col(row, 'フリガナ'),
@@ -1684,14 +1707,83 @@ function migrateReceptionToDatabase() {
       'スタッフメモ':     col(row, 'スタッフメモ'),
       'LINEユーザーID':   col(row, 'LINEユーザーID'),
       'LINE表示名':       col(row, 'LINE表示名'),
-      '登録元':           'migration'
+      '登録元':           'migration',
+      '登録日時':         now
     };
 
-    const result = writeDatabaseRecord_(dbSs, record, edition, config);
-    if (result.saved) imported++; else skipped++;
+    newRows.push(appHeaders.map(function (h) {
+      return record[h] !== undefined && record[h] !== null ? record[h] : '';
+    }));
   });
 
-  console.log('取り込み完了: ' + imported + '件を登録、' + skipped + '件をスキップ（重複・空行）');
+  // ---- まとめて1回で書き込む ----
+  if (newRows.length) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      appSheet.getRange(appSheet.getLastRow() + 1, 1, newRows.length, appHeaders.length)
+        .setValues(newRows);
+    } finally {
+      lock.releaseLock();
+    }
+  }
+
+  // ---- 出展者マスタは applications から数え直す（出展者IDもここで確定） ----
+  const exhibitorCount = refreshExhibitorsFromApplications_(dbSs);
+  fillExhibitorIds_(appSheet);
+  upsertEvent_(dbSs, edition, config);
+
+  console.log('取り込み完了: ' + newRows.length + '件を登録、' + skipped + '件をスキップ（重複・空行）');
+  console.log('出展者マスタ: ' + exhibitorCount + '名');
+}
+
+/**
+ * 受付シートのヘッダーを解決します。
+ * ラベルが空欄の列は、直前の列から推測します（懇親会人数など）。
+ */
+function resolveReceptionHeaders_(headers) {
+  const out = [];
+  let prev = '';
+  for (let i = 0; i < headers.length; i++) {
+    const name = String(headers[i] === null || headers[i] === undefined ? '' : headers[i]).trim();
+    if (name === '') {
+      out.push(prev === '懇親会出欠' ? '懇親会人数' : (prev === '二次会出欠' ? '二次会人数' : ''));
+    } else {
+      out.push(name);
+      prev = name;
+    }
+  }
+  return out;
+}
+
+/** applications の空の「出展者ID」を、exhibitors の割り当てで埋めます */
+function fillExhibitorIds_(appSheet) {
+  if (appSheet.getLastRow() < 2) return;
+
+  const ss      = appSheet.getParent();
+  const exSheet = ss.getSheetByName(DB_SHEET_EXHIBITORS);
+  if (!exSheet || exSheet.getLastRow() < 2) return;
+
+  const exRows = exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).getValues();
+  const idByKey = {};
+  const iKey = DB_EXHIBITOR_HEADERS.indexOf('メールキー');
+  const iId  = DB_EXHIBITOR_HEADERS.indexOf('出展者ID');
+  exRows.forEach(function (r) { idByKey[String(r[iKey])] = r[iId]; });
+
+  const headers = DB_APPLICATION_HEADERS;
+  const iExId = headers.indexOf('出展者ID');
+  const iName = headers.indexOf('氏名');
+  const iMail = headers.indexOf('メールアドレス');
+  const iShop = headers.indexOf('出展名');
+
+  const rows = appSheet.getRange(2, 1, appSheet.getLastRow() - 1, headers.length).getValues();
+  const ids  = rows.map(function (r) {
+    const key = normalizeEmail_(r[iMail]) ||
+                ('name:' + String(r[iName] || '').replace(/\s/g, '') + '/' + String(r[iShop] || '').replace(/\s/g, ''));
+    return [idByKey[key] || r[iExId] || ''];
+  });
+
+  appSheet.getRange(2, iExId + 1, ids.length, 1).setValues(ids);
 }
 
 /**
@@ -1814,17 +1906,44 @@ function rebuildExhibitors() {
   }
 
   const rows = buildExhibitorRows_(appHeaders, appRows, existing);
+  writeExhibitorRows_(exSheet, rows);
 
-  // 1行目を残して書き直す
+  console.log('exhibitors を作り直しました: ' + rows.length + '名');
+  console.log('（applications ' + appRows.length + '件から集計）');
+}
+
+/** exhibitors シートを丸ごと書き直します（1行目は残します） */
+function writeExhibitorRows_(exSheet, rows) {
   if (exSheet.getLastRow() > 1) {
     exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).clearContent();
   }
   if (rows.length) {
     exSheet.getRange(2, 1, rows.length, DB_EXHIBITOR_HEADERS.length).setValues(rows);
   }
+}
 
-  console.log('exhibitors を作り直しました: ' + rows.length + '名');
-  console.log('（applications ' + appRows.length + '件から集計）');
+/** applications を読み直して exhibitors を作り直します（移行の仕上げにも使用） */
+function refreshExhibitorsFromApplications_(ss) {
+  const appSheet = ss.getSheetByName(DB_SHEET_APPLICATIONS);
+  if (!appSheet || appSheet.getLastRow() < 2) return 0;
+
+  const appHeaders = appSheet.getRange(1, 1, 1, appSheet.getLastColumn()).getValues()[0];
+  const appRows    = appSheet.getRange(2, 1, appSheet.getLastRow() - 1, appSheet.getLastColumn()).getValues();
+
+  const exSheet  = ensureDbSheet_(ss, DB_SHEET_EXHIBITORS, DB_EXHIBITOR_HEADERS);
+  const existing = {};
+  if (exSheet.getLastRow() >= 2) {
+    const cur = exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).getValues();
+    cur.forEach(function (row) {
+      const obj = {};
+      DB_EXHIBITOR_HEADERS.forEach(function (h, i) { obj[h] = row[i]; });
+      if (obj['メールキー']) existing[String(obj['メールキー'])] = obj;
+    });
+  }
+
+  const rows = buildExhibitorRows_(appHeaders, appRows, existing);
+  writeExhibitorRows_(exSheet, rows);
+  return rows.length;
 }
 
 /**
