@@ -230,11 +230,11 @@
             <div style="margin-top:0.75rem;padding:0.75rem;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:0.5rem">
               <label class="checkbox-label" style="font-weight:700;color:#92400e">
                 <input type="checkbox" id="photoLater" name="photoLater" value="1" onchange="togglePhotoUpload()">
-                写真をあとからメールで送る
+                写真をあとから公式LINEで送る
               </label>
               <p style="font-size:0.8rem;color:#92400e;margin-top:0.4rem;line-height:1.6">
                 写真がうまく選べない・送信できない場合は、こちらにチェックを入れてお申込みください。<br>
-                お申込み後に、事務局あてメールで写真をお送りいただけます。
+                お申込み後に、<strong>公式LINE</strong>あてに<strong>出展名</strong>と<strong>写真</strong>をお送りください。
               </p>
             </div>
           </div>
@@ -442,14 +442,14 @@
         </p>
         <p style="font-size:0.875rem;color:#92400e;line-height:1.8;margin-bottom:0.75rem">
           お申込みは完了しています。<br>
-          お手数ですが、プロフィール写真を下のアドレスあてにメールでお送りください。
-          件名やご本文に<strong>お名前と出展名</strong>を添えていただけると助かります。
+          お手数ですが、<strong>公式LINE</strong>のトーク画面あてに、
+          <strong>出展名</strong>とプロフィール<strong>写真</strong>を後ほどお送りください。
         </p>
-        <a id="photoMailLink" href="#" class="submit-btn"
+        <a id="photoLineLink" href="#" class="submit-btn hidden" target="_blank" rel="noopener"
            style="display:block;width:100%;text-align:center;text-decoration:none;box-sizing:border-box">
-          メールで写真を送る
+          公式LINEを開く
         </a>
-        <p id="photoMailAddress" style="font-size:0.8rem;color:#92400e;margin-top:0.5rem;text-align:center;word-break:break-all"></p>
+        <p id="photoLineGuide" style="font-size:0.8rem;color:#92400e;margin-top:0.5rem;text-align:center;word-break:break-all"></p>
       </div>
 
       <button onclick="location.reload()" class="submit-btn" style="width:100%">閉じる</button>

@@ -605,6 +605,15 @@
             <label class="toggle"><input type="checkbox" id="f-repeater"><span></span></label></div>
         </div>
 
+        <div class="field">
+          <label for="f-lineUrl">公式LINEのURL（任意）</label>
+          <input type="url" id="f-lineUrl" placeholder="https://lin.ee/xxxxxxx">
+          <span class="hint">
+            写真をうまく送れなかった方に、<strong>公式LINEあてに出展名と写真を送っていただく</strong>案内を出します。
+            ここにURLを入れておくと、申込完了画面と自動返信メールに公式LINEへのリンクが付きます
+          </span>
+        </div>
+
         <div>
           <div style="font-weight:700;margin-bottom:.5rem">自由に聞きたいこと</div>
           <div id="questionList" style="display:flex;flex-direction:column;gap:.85rem"></div>
@@ -1268,6 +1277,7 @@ function collect() {
   cfg.standardFields.showNotes           = chk('sf-notes');
   cfg.features.stampRally     = chk('f-stamp');
   cfg.features.repeaterSearch = chk('f-repeater');
+  cfg.lineOfficialUrl         = val('f-lineUrl');
   cfg.features.bodyEquipment  = cfg.booths.some(b => b.askEquipment);
 
   cfg.terms = val('f-terms');
@@ -1345,6 +1355,7 @@ function render() {
   check('sf-notes',     cfg.standardFields.showNotes           !== false);
   check('f-stamp',      cfg.features.stampRally);
   check('f-repeater',   cfg.features.repeaterSearch);
+  set('f-lineUrl',      cfg.lineOfficialUrl);
 
   set('f-terms', cfg.terms);
 

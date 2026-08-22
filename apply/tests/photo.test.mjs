@@ -2,9 +2,9 @@
  * 写真が送れない場合でも申込を完了できることの回帰テスト（実DOM）
  *
  * 検証すること
- *  - 「あとからメールで送る」を選べば写真なしで申込できる
+ *  - 「あとから公式LINEで送る」を選べば写真なしで申込できる
  *  - 画像の変換に失敗しても申込が止まらない
- *  - 完了画面に、写真をメールで送る案内が出る
+ *  - 完了画面に、公式LINEへ出展名と写真を送る案内が出る
  *
  * 実行方法:
  *   npm i --no-save jsdom
@@ -36,7 +36,7 @@ const expect = (label, cond) => {
  * フォームを起動して、必須項目を埋めた状態を作る
  * failImageConversion=true のとき、画像変換が必ず失敗するようにする
  */
-async function boot({ attachFile = false, sendLater = false, failImageConversion = false, fileSizeMB = 1, scriptSource = null } = {}) {
+async function boot({ attachFile = false, sendLater = false, failImageConversion = false, fileSizeMB = 1, scriptSource = null, configOverride = null } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.test/apply/' });
   const { window } = dom, doc = window.document;
 
@@ -46,7 +46,7 @@ async function boot({ attachFile = false, sendLater = false, failImageConversion
 
   window.fetch = async (url, opts) => {
     if (String(url).includes('config.json')) {
-      return { ok: true, json: async () => config };
+      return { ok: true, json: async () => ({ ...config, ...(configOverride || {}) }) };
     }
     // 送信先。送られた内容を記録する
     sent.body = opts?.body;
@@ -103,7 +103,7 @@ async function boot({ attachFile = false, sendLater = false, failImageConversion
 const fieldOf = (body, key) => (body && typeof body.get === 'function') ? body.get(key) : null;
 
 // ---------------------------------------------------------------
-console.log('\n[1] 写真なし（あとからメールで送る）');
+console.log('\n[1] 写真なし（あとから公式LINEで送る）');
 {
   const { window, doc, sent } = await boot({ sendLater: true });
   expect('バリデーションを通過する', window.validateForm().length === 0);
@@ -114,10 +114,13 @@ console.log('\n[1] 写真なし（あとからメールで送る）');
   expect('写真未受領として送信される', fieldOf(sent.body, 'photoPending') === '1');
   expect('完了画面に写真の案内が出る', !doc.getElementById('photoPendingNotice').classList.contains('hidden'));
 
-  const link = doc.getElementById('photoMailLink').getAttribute('href');
-  expect('メール送信リンクが事務局あてになっている', link.startsWith(`mailto:${config.email.replyToEmail}`));
-  expect('件名に名前と出展名が入っている', decodeURIComponent(link).includes('山田 花子（サロン花）'));
-  expect('送り先アドレスが表示される', doc.getElementById('photoMailAddress').textContent.includes(config.email.replyToEmail));
+  const notice = doc.getElementById('photoPendingNotice').textContent;
+  expect('公式LINEあてに送る案内になっている', notice.includes('公式LINE'));
+  expect('出展名を送るよう案内している', notice.includes('出展名'));
+  expect('メールで送る案内は残っていない', !notice.includes('メール'));
+  expect('入力した出展名が案内に出る', doc.getElementById('photoLineGuide').textContent.includes('サロン花'));
+  expect('URL未設定なら公式LINEボタンは出ない',
+    doc.getElementById('photoLineLink').classList.contains('hidden'));
 }
 
 // ---------------------------------------------------------------
@@ -152,7 +155,7 @@ console.log('\n[4] 写真を付けず、チェックも入れない場合');
   const { window } = await boot();
   const errors = window.validateForm();
   expect('写真が必須として案内される', errors.some(e => e.includes('プロフィール写真')));
-  expect('逃げ道が案内文に含まれる', errors.some(e => e.includes('あとからメールで送る')));
+  expect('逃げ道が案内文に含まれる', errors.some(e => e.includes('あとから公式LINEで送る')));
 }
 
 // ---------------------------------------------------------------
@@ -191,8 +194,19 @@ console.log('\n[6] 読み込めない画像を選んだ場合');
   const { window, doc } = await boot({ attachFile: true, failImageConversion: true });
 
   expect('読み込めない旨が表示される', doc.getElementById('photoStatus').textContent.includes('読み込めませんでした'));
-  expect('「あとからメールで送る」が自動で選ばれる', doc.getElementById('photoLater').checked === true);
+  expect('「あとから公式LINEで送る」が自動で選ばれる', doc.getElementById('photoLater').checked === true);
   expect('そのまま申込を進められる', window.validateForm().length === 0);
+}
+
+// ---------------------------------------------------------------
+console.log('\n[7] 公式LINEのURLが設定されている場合');
+{
+  const { window, doc } = await boot({ sendLater: true, configOverride: { lineOfficialUrl: 'https://lin.ee/example' } });
+  await window.submitForm();
+
+  const link = doc.getElementById('photoLineLink');
+  expect('公式LINEを開くボタンが出る', !link.classList.contains('hidden'));
+  expect('設定したURLが入っている', link.getAttribute('href') === 'https://lin.ee/example');
 }
 
 console.log(failures === 0 ? '\n✅ すべて成功' : `\n❌ ${failures}件失敗`);

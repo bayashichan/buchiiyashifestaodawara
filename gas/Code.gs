@@ -43,7 +43,7 @@ const DB_SHEET_EVENTS       = 'events';
 const CONFIG_CACHE_SEC = 1800;
 
 /** 写真が届いていないときに、写真欄へ入れる目印 */
-const PHOTO_PENDING_LABEL = 'メール送付待ち';
+const PHOTO_PENDING_LABEL = 'LINE送付待ち';
 
 // ---------------------------------------------------------------
 // データベース列定義（1行目のヘッダーとして書き込まれます）
@@ -1027,26 +1027,25 @@ function sendConfirmationEmail(params, calc, config) {
 
 /**
  * 写真が届いていないときに、申込者へお願いする文面を作ります。
- * 送り先は config のメール設定から取ります。
+ * 送り先は公式LINEです。URL が設定されていれば併せて案内します。
  */
 function buildPhotoNoticeText_(config) {
-  const emailCfg = config.email || {};
-  const address  = emailCfg.replyToEmail || emailCfg.adminEmail || '';
+  const lineUrl = config.lineOfficialUrl || '';
 
-  return [
+  const lines = [
     '━━━━━━━━━━━━━━━━━━━━━━━━',
     '📷 プロフィール写真をお送りください',
     '━━━━━━━━━━━━━━━━━━━━━━━━',
     '',
     'お申込みは完了しておりますが、プロフィール写真が届いておりません。',
-    'お手数ですが、下記あてにメールで写真をお送りください。',
-    '',
-    address ? '  送り先: ' + address : '  送り先: このメールへのご返信でお送りください',
-    '',
-    '※ お名前と出展名を添えていただけると助かります。',
-    '※ このメールにそのまま返信して、写真を添付いただく形でも結構です。',
+    'お手数ですが、公式LINEのトーク画面あてに、',
+    '出展名とプロフィール写真を後ほどお送りください。',
     ''
-  ].join('\n');
+  ];
+  if (lineUrl) {
+    lines.push('  公式LINE: ' + lineUrl, '');
+  }
+  return lines.join('\n');
 }
 
 function sendAdminEmail(params, calc, config) {
@@ -1107,7 +1106,7 @@ function sendAdminEmail(params, calc, config) {
     '━━ その他 ━━━━━━━━━━━━━━━━━━━━━\n' +
     '備考: ' + (params.notes || 'なし') + '\n' +
     '写真掲載可否: ' + (params.photoPermission || '-') + '\n' +
-    '写真URL: ' + (params.profileImageUrl || '⚠️ 未受領（申込者にメール送付を案内済み）') + '\n' +
+    '写真URL: ' + (params.profileImageUrl || '⚠️ 未受領（申込者に公式LINEへの送付を案内済み）') + '\n' +
     '申込日時: ' + params.submittedAt;
 
   GmailApp.sendEmail(adminEmail, subject, body, {

@@ -909,14 +909,14 @@ function validateForm() {
     }
   });
 
-  // 写真（「前回の写真を使う」「あとからメールで送る」を選んだ場合は不要）
+  // 写真（「前回の写真を使う」「あとから公式LINEで送る」を選んだ場合は不要）
   if (sf.showPhotoUpload !== false) {
     const photoInput  = form.querySelector('[name="profileImage"]');
     const usePrevious = form.querySelector('[name="usePreviousPhoto"]')?.checked;
     const sendLater   = form.querySelector('[name="photoLater"]')?.checked;
     if (!usePrevious && !sendLater) {
       if (!photoInput?.files?.length) {
-        errors.push('プロフィール写真をアップロードしてください（うまく送れない場合は「写真をあとからメールで送る」にチェックしてください）');
+        errors.push('プロフィール写真をアップロードしてください（うまく送れない場合は「写真をあとから公式LINEで送る」にチェックしてください）');
       } else if (!preparedPhoto) {
         // 縮小がまだ終わっていない、または読み込めなかった
         errors.push('写真の準備が終わっていません。少し待ってからもう一度お試しください');
@@ -1022,7 +1022,7 @@ async function submitForm() {
     formData.set('eventName', CONFIG.event?.name || '');
 
     // 写真処理
-    // 変換に失敗しても申込自体は完了させ、あとからメールで送っていただく
+    // 変換に失敗しても申込自体は完了させ、あとから公式LINEで送っていただく
     const photoInput  = form.querySelector('[name="profileImage"]');
     const sendLater   = form.querySelector('[name="photoLater"]')?.checked;
     const usePrevious = form.querySelector('[name="usePreviousPhoto"]')?.checked;
@@ -1102,7 +1102,7 @@ async function submitForm() {
 }
 
 // 申込完了モーダルを表示する
-// photoPending が true のときだけ、写真をメールで送っていただく案内を出す
+// photoPending が true のときだけ、写真を公式LINEへ送っていただく案内を出す
 function showCompleteModal(photoPending) {
   const modal  = document.getElementById('completeModal');
   const notice = document.getElementById('photoPendingNotice');
@@ -1111,22 +1111,22 @@ function showCompleteModal(photoPending) {
     notice.classList.toggle('hidden', !photoPending);
 
     if (photoPending) {
-      const address = CONFIG?.email?.replyToEmail || CONFIG?.email?.adminEmail || '';
-      const name    = document.getElementById('nameInput')?.value || '';
+      // 公式LINEのURLが設定されていればボタンを出す。無ければ文章だけで案内する
+      const lineUrl = CONFIG?.lineOfficialUrl || '';
       const shop    = document.querySelector('[name="exhibitorName"]')?.value || '';
-      const subject = `【プロフィール写真】${name}${shop ? '（' + shop + '）' : ''}`;
-      const body    = `${CONFIG?.event?.name || ''} に申し込みました ${name} です。\nプロフィール写真を添付いたします。\n\n出展名: ${shop}`;
 
-      const link = document.getElementById('photoMailLink');
+      const link = document.getElementById('photoLineLink');
       if (link) {
-        link.href = address
-          ? `mailto:${address}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-          : '#';
-        link.style.display = address ? 'block' : 'none';
+        link.href = lineUrl || '#';
+        link.classList.toggle('hidden', !lineUrl);
       }
 
-      const addressEl = document.getElementById('photoMailAddress');
-      if (addressEl) addressEl.textContent = address ? `送り先: ${address}` : '送り先は事務局へお問い合わせください';
+      const guideEl = document.getElementById('photoLineGuide');
+      if (guideEl) {
+        guideEl.textContent = shop
+          ? `送るもの: 出展名「${shop}」とプロフィール写真`
+          : '送るもの: 出展名とプロフィール写真';
+      }
     }
   }
 
@@ -1243,7 +1243,7 @@ function initFileSizeCheck() {
       console.error('画像の準備に失敗:', err);
       preparedPhoto = null;
       showPhotoPreview(null);
-      setPhotoStatus('この画像は読み込めませんでした。別の画像を選ぶか、あとからメールでお送りください。', 'ng');
+      setPhotoStatus('この画像は読み込めませんでした。別の画像を選ぶか、あとから公式LINEでお送りください。', 'ng');
 
       // 逃げ道を自動で選択しておく（申込を進められるように）
       const later = document.getElementById('photoLater');

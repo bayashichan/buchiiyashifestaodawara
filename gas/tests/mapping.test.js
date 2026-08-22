@@ -150,16 +150,18 @@ check('長すぎる名前は切り詰める',
 // ---------------------------------------------------------------
 console.log('\n[7] 写真未受領の案内');
 
-const mailCfg = { email: { adminEmail: 'admin@example.com', replyToEmail: 'reply@example.com' } };
-const notice  = M.buildPhotoNoticeText_(mailCfg);
+const lineCfg = { lineOfficialUrl: 'https://lin.ee/example' };
+const notice  = M.buildPhotoNoticeText_(lineCfg);
 
-check('返信先アドレスを案内に載せる', notice.includes('reply@example.com'), true);
-check('返信先が無ければ管理者アドレスを使う',
-  M.buildPhotoNoticeText_({ email: { adminEmail: 'admin@example.com' } }).includes('admin@example.com'), true);
-check('アドレス未設定でも文面が壊れない',
-  M.buildPhotoNoticeText_({}).includes('ご返信でお送りください'), true);
+check('公式LINEのURLを案内に載せる', notice.includes('https://lin.ee/example'), true);
+check('公式LINEあてに送るよう案内する', notice.includes('公式LINE'), true);
+check('出展名と写真を送るよう案内する',
+  notice.includes('出展名') && notice.includes('写真'), true);
+check('URL未設定でも文面が壊れない',
+  M.buildPhotoNoticeText_({}).includes('公式LINEのトーク画面'), true);
+check('メールで送るようには案内しない', notice.includes('メール'), false);
 check('申込が完了している旨を伝える', notice.includes('お申込みは完了'), true);
-check('シートの目印', M.PHOTO_PENDING_LABEL, 'メール送付待ち');
+check('シートの目印', M.PHOTO_PENDING_LABEL, 'LINE送付待ち');
 
 // テンプレートに {{photoNotice}} があればその位置へ差し込まれる
 check('差し込み位置を指定できる',
