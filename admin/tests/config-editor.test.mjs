@@ -157,11 +157,10 @@ console.log('\n[5] 暗号化の往復');
 console.log('\n[6] メールの差し込みボタン');
 {
   const bodyEl = doc.getElementById('f-body');
-  bodyEl.value = '';
-  bodyEl.setSelectionRange(0, 0);
+  window.textToRich(bodyEl, '');
   const chip = [...doc.querySelectorAll('#chipsBody .chip')].find(b => b.textContent.includes('お名前'));
   chip.dispatchEvent(new window.Event('click'));
-  ok('ボタンで差し込み文字が入る', bodyEl.value === '{{name}}', bodyEl.value);
+  ok('ボタンで差し込み文字が入る', window.richToText(bodyEl) === '{{name}}', window.richToText(bodyEl));
   const subjectChips = [...doc.querySelectorAll('#chipsSubject .chip')].map(b => b.textContent);
   ok('件名には長い項目を出さない', !subjectChips.some(t => t.includes('料金の内訳')));
   ok('差し込みボタンが日本語表示', subjectChips.every(t => !/\{\{/.test(t)), subjectChips.join(','));
@@ -180,12 +179,18 @@ console.log('\n[7] 差し込みボタンの追加分とフォルダの説明');
 
   // カーソル位置に差し込まれる
   const body = doc.getElementById('f-body');
-  body.value = 'あいうえお';
-  body.setSelectionRange(2, 2);
+  window.textToRich(body, 'あいうえお');
+  const r = doc.createRange();
+  r.setStart(body.firstChild, 2);
+  r.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges(); sel.addRange(r);
+
   [...doc.querySelectorAll('#chipsBody .chip')]
     .find(b => b.textContent === '＋ 写真のお願い')
     .dispatchEvent(new window.Event('click'));
-  ok('カーソル位置に差し込まれる', body.value === 'あい{{photoNotice}}うえお', body.value);
+  ok('カーソル位置に差し込まれる（末尾ではない）',
+     window.richToText(body) === 'あい{{photoNotice}}うえお', window.richToText(body));
 
   // フォルダの説明
   const tree = doc.querySelector('.folder-tree').textContent;
@@ -200,6 +205,78 @@ console.log('\n[7] 差し込みボタンの追加分とフォルダの説明');
   const hint = doc.querySelector('#f-driveUrl').parentElement.querySelector('.hint').textContent;
   ok('いちばん外側のフォルダだと明記', hint.includes('いちばん外側のフォルダ'));
   ok('毎回そのままでよいと明記', hint.includes('毎回そのままにしてください'));
+}
+
+console.log('\n[8] 本文のタグ表示');
+{
+  const body = doc.getElementById('f-body');
+
+  // 保存されている文章 → 画面のタグ表示
+  window.textToRich(body, 'こんにちは {{name}} さん\n{{eventName}} です');
+  const tags = [...body.querySelectorAll('.var')];
+  ok('差し込み部分がタグになる', tags.length === 2, String(tags.length));
+  ok('タグは日本語で表示される', tags[0].textContent === 'お名前', tags[0].textContent);
+  ok('イベント名のタグ', tags[1].textContent === 'イベント名', tags[1].textContent);
+  ok('タグは編集できない', tags[0].getAttribute('contenteditable') === 'false');
+  ok('画面に中カッコが出ない', !body.textContent.includes('{{'), body.textContent);
+
+  // 画面 → 保存する文章（元に戻る）
+  ok('元の文章に戻せる',
+     window.richToText(body) === 'こんにちは {{name}} さん\n{{eventName}} です',
+     JSON.stringify(window.richToText(body)));
+
+  // 質問名のタグも往復できる
+  window.textToRich(body, '内容: {{出展メニュー名}}');
+  ok('質問名もタグになる', body.querySelector('.var')?.textContent === '出展メニュー名');
+  ok('質問名のタグも元に戻る', window.richToText(body) === '内容: {{出展メニュー名}}');
+
+  // 差し込んでも表示位置が動かない
+  window.textToRich(body, 'あ\n'.repeat(200));
+  body.scrollTop = 500;
+  const before = body.scrollTop;
+  [...doc.querySelectorAll('#chipsBody .chip')]
+    .find(b => b.textContent === '＋ お名前')
+    .dispatchEvent(new window.Event('click'));
+  ok('差し込んでも末尾へスクロールしない', body.scrollTop === before,
+     `${before} → ${body.scrollTop}`);
+
+  // 見えない補助文字が保存内容に混ざらない
+  ok('保存内容に余計な文字が混ざらない', !window.richToText(body).includes('\u200b'));
+
+  // 保存したときに本文が正しく入る
+  window.textToRich(body, '{{name}} 様\nありがとうございます');
+  window.markDirty();
+  ok('保存用の文章として取り出せる',
+     window.val('f-body') === '{{name}} 様\nありがとうございます',
+     JSON.stringify(window.val('f-body')));
+}
+
+console.log('\n[9] 本番のメール文面が往復で変わらないこと');
+{
+  const body     = doc.getElementById('f-body');
+  const original = config.email.confirmationBodyTemplate;
+
+  window.textToRich(body, original);
+  const back = window.richToText(body);
+
+  ok('一字一句変わらない', back === original,
+     back === original ? '' : `長さ ${original.length} → ${back.length}`);
+
+  if (back !== original) {
+    for (let i = 0; i < Math.max(original.length, back.length); i++) {
+      if (original[i] !== back[i]) {
+        console.log(`      最初の差分 ${i}文字目: ${JSON.stringify(original.slice(i-20, i+20))}`);
+        console.log(`                        → ${JSON.stringify(back.slice(i-20, i+20))}`);
+        break;
+      }
+    }
+  }
+
+  const used = (original.match(/\{\{[^{}]+\}\}/g) || []);
+  ok('文面内の差し込みがすべてタグになる',
+     body.querySelectorAll('.var').length === used.length,
+     `${body.querySelectorAll('.var').length} / ${used.length}`);
+  ok('振込先などの本文が消えない', back.includes('セブン銀行') === original.includes('セブン銀行'));
 }
 
 console.log(ng === 0 ? '\n✅ すべて成功' : `\n❌ ${ng}件失敗`);

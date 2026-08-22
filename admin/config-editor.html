@@ -192,6 +192,40 @@
     margin-left: 0.4rem;
   }
 
+  /* ============ メール本文（差し込みタグ入り） ============ */
+  .rich {
+    width: 100%;
+    min-height: 18rem;
+    max-height: 60vh;
+    overflow-y: auto;
+    font: inherit;
+    font-size: 16px;
+    line-height: 1.9;
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding: .65rem .8rem;
+    border: 1.5px solid var(--line);
+    border-radius: .6rem;
+    background: #fff;
+    outline: none;
+  }
+  .rich:focus { border-color: var(--brand); }
+
+  /* 文中に置かれる差し込みタグ（ひとかたまりで消える） */
+  .rich .var {
+    display: inline-block;
+    background: var(--brand);
+    color: #fff;
+    border-radius: .35rem;
+    padding: 0 .45rem;
+    margin: 0 .1rem;
+    font-size: .82em;
+    font-weight: 700;
+    line-height: 1.7;
+    white-space: nowrap;
+    user-select: all;
+  }
+
   /* ============ メールの差し込みボタン ============ */
   .chips { display: flex; flex-wrap: wrap; gap: .4rem; }
   .chip {
@@ -509,9 +543,13 @@
 
         <div class="field">
           <label for="f-body">申込者へのメール本文</label>
-          <span class="hint">下のボタンを押すと、その人の情報が自動で入る場所を追加できます</span>
+          <span class="hint">
+            文中の色つきタグは、送信時にその人の情報に置き換わります。
+            入れたい場所をタップしてから、下のボタンを押してください
+          </span>
           <div class="chips" id="chipsBody"></div>
-          <textarea id="f-body" rows="16"></textarea>
+          <div id="f-body" class="rich" contenteditable="true" role="textbox"
+               aria-multiline="true" aria-labelledby="f-bodyLabel" data-rich="1"></div>
         </div>
 
         <div class="field">
@@ -653,6 +691,7 @@ let cfg   = null;   // 読み込んだ設定（表示していない項目もそ
 let conn  = null;   // { owner, repo, token }
 let dirty = false;
 let originalEdition = '';
+let lastBodyRange = null;   // 本文欄で最後にカーソルがあった位置
 
 // =====================================================================
 // 起動
@@ -686,6 +725,7 @@ async function openApp() {
 // 合い言葉
 // =====================================================================
 function bindEvents() {
+  bindRichBody();
   document.getElementById('unlockBtn').addEventListener('click', unlock);
   document.getElementById('passInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') unlock();
@@ -1378,11 +1418,154 @@ function makeMailChip(label, token, targetId) {
 }
 
 function insertAtCursor(el, text) {
+  // タグ表示の本文欄は、文字ではなくタグとして差し込む
+  if (el.dataset.rich) { insertVarTag(el, text); return; }
+
   const start = el.selectionStart ?? el.value.length;
   const end   = el.selectionEnd   ?? el.value.length;
+
+  // 値を入れ替えると表示位置が先頭や末尾に飛ぶため、元の位置に戻す
+  const keepScroll = el.scrollTop;
   el.value = el.value.slice(0, start) + text + el.value.slice(end);
-  el.focus();
   el.setSelectionRange(start + text.length, start + text.length);
+  el.scrollTop = keepScroll;
+  el.focus({ preventScroll: true });
+  markDirty();
+}
+
+// =====================================================================
+// メール本文（差し込み項目をタグで表示する入力欄）
+// =====================================================================
+
+function bindRichBody() {
+  const el = document.getElementById('f-body');
+  if (!el) return;
+
+  el.addEventListener('input', markDirty);
+
+  // ボタンを押したときに備えて、カーソル位置を覚えておく
+  const remember = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && el.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      lastBodyRange = sel.getRangeAt(0).cloneRange();
+    }
+  };
+  ['keyup', 'mouseup', 'touchend', 'blur'].forEach(ev => el.addEventListener(ev, remember));
+
+  // 貼り付けは書式を落として文字だけにする
+  el.addEventListener('paste', e => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+    const sel  = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(document.createTextNode(text));
+    range.collapse(false);
+    markDirty();
+  });
+}
+
+// 差し込み文字 → 画面に出す名前
+function varLabel(token) {
+  const known = MAIL_VARS.find(([, t]) => t === token);
+  if (known) return known[0];
+  return token.replace(/^\{\{|\}\}$/g, '');   // 質問名など
+}
+
+function makeVarTag(doc, token) {
+  const tag = doc.createElement('span');
+  tag.className = 'var';
+  tag.setAttribute('contenteditable', 'false');
+  tag.dataset.token = token;
+  tag.textContent = varLabel(token);
+  return tag;
+}
+
+/** 保存されている文章を、タグ付きの表示に変換して流し込む */
+function textToRich(el, text) {
+  const doc = el.ownerDocument;
+  el.textContent = '';
+
+  String(text || '').split(/(\{\{[^{}]+\}\})/).forEach(part => {
+    if (!part) return;
+    if (/^\{\{[^{}]+\}\}$/.test(part)) {
+      el.appendChild(makeVarTag(doc, part));
+    } else {
+      el.appendChild(doc.createTextNode(part));
+    }
+  });
+}
+
+/** 表示されている内容を、保存する文章に戻す */
+function richToText(el) {
+  let out = '';
+
+  const walk = node => {
+    node.childNodes.forEach(n => {
+      if (n.nodeType === 3) {                       // 文字
+        out += n.nodeValue;
+      } else if (n.nodeName === 'BR') {             // 改行
+        out += '\n';
+      } else if (n.nodeType === 1) {
+        if (n.dataset && n.dataset.token) {         // 差し込みタグ
+          out += n.dataset.token;
+          return;
+        }
+        // ブラウザが改行を <div> で表すことがある
+        if (/^(DIV|P)$/.test(n.nodeName) && out && !out.endsWith('\n')) out += '\n';
+        walk(n);
+      }
+    });
+  };
+
+  walk(el);
+  return out
+    .replace(/\u200b/g, '')          // タグの後ろに置いた見えない文字を取り除く
+    .replace(/\u00a0/g, ' ');        // 入力中に混ざる特殊な空白を戻す
+}
+
+/** カーソル位置にタグを差し込む（表示位置は動かさない） */
+function insertVarTag(el, token) {
+  const doc  = el.ownerDocument;
+  const win  = doc.defaultView;
+  const keep = el.scrollTop;
+
+  const sel   = win.getSelection ? win.getSelection() : null;
+  let   range = null;
+
+  // 本文欄の中にカーソルがあればその位置、無ければ最後に置いたカーソル位置
+  if (sel && sel.rangeCount && el.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    range = sel.getRangeAt(0);
+  } else if (lastBodyRange && el.contains(lastBodyRange.commonAncestorContainer)) {
+    range = lastBodyRange;
+  }
+
+  const tag   = makeVarTag(doc, token);
+  const space = doc.createTextNode('\u200b');   // タグの直後に文字を打てるようにする
+
+  if (range) {
+    range.deleteContents();
+    range.insertNode(space);
+    range.insertNode(tag);
+  } else {
+    el.appendChild(tag);
+    el.appendChild(space);
+  }
+
+  // 差し込んだ直後にカーソルを置く
+  if (sel) {
+    const after = doc.createRange();
+    after.setStartAfter(space);
+    after.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(after);
+    lastBodyRange = after.cloneRange();
+  }
+
+  el.scrollTop = keep;                      // 末尾へ飛ばさない
+  if (el.focus) el.focus({ preventScroll: true });
+  el.scrollTop = keep;
   markDirty();
 }
 
@@ -1428,10 +1611,20 @@ function tint(hex, alpha) {
 }
 
 // ---- 共通 ----
-function val(id)  { return (document.getElementById(id)?.value || '').trim(); }
+function val(id) {
+  const el = document.getElementById(id);
+  if (!el) return '';
+  if (el.dataset.rich) return richToText(el).trim();
+  return (el.value || '').trim();
+}
 function num(id)  { return parseInt(document.getElementById(id)?.value, 10) || 0; }
 function chk(id)  { return !!document.getElementById(id)?.checked; }
-function set(id, v) { const el = document.getElementById(id); if (el) el.value = v ?? ''; }
+function set(id, v) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.dataset.rich) { textToRich(el, v ?? ''); return; }
+  el.value = v ?? '';
+}
 function check(id, v) { const el = document.getElementById(id); if (el) el.checked = !!v; }
 
 function markDirty() {
