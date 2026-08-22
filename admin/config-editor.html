@@ -835,6 +835,9 @@ const PBKDF2_ITER = 310000;
 
 const IS_SETUP = new URLSearchParams(location.search).has('setup');
 
+// 合い言葉が入っていないと、いくら編集しても保存できない。その理由を出し続ける
+const NO_CONN_STATUS = '⚠️ 保存できません（合い言葉を入れてください）';
+
 // 自動返信メールに差し込める項目（表示名 → 差し込み文字）
 const MAIL_VARS = [
   ['お名前',       '{{name}}'],
@@ -885,7 +888,7 @@ async function openApp() {
   if (!ok) return;
 
   render();
-  setStatus(conn ? '変更はまだありません' : '保存できません（合い言葉が未登録）');
+  setStatus(conn ? '変更はまだありません' : NO_CONN_STATUS);
   document.getElementById('topState').textContent = cfg.event?.edition || '';
 }
 
@@ -2056,13 +2059,15 @@ function check(id, v) { const el = document.getElementById(id); if (el) el.check
 function markDirty() {
   if (dirty) return;
   dirty = true;
-  setStatus('未保存の変更があります');
+  // 合い言葉が無いと保存できない。編集しても理由が消えないようにする
+  setStatus(conn ? '未保存の変更があります' : NO_CONN_STATUS);
   updateSaveBtn();
 }
 
 function updateSaveBtn() {
   const btn = document.getElementById('saveBtn');
   btn.disabled = !dirty || !conn;
+  btn.title = conn ? '' : NO_CONN_STATUS;
 }
 
 function setStatus(text) {

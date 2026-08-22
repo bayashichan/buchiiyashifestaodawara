@@ -226,6 +226,34 @@ console.log('\n[7] 差し込みボタンの追加分とフォルダの説明');
     storeCard.querySelector('summary').textContent.includes('さわらなくて大丈夫'));
 }
 
+// ============================================================
+console.log('\n[7-2] 合い言葉が無いまま編集したとき');
+{
+  // 作成者用URL（?setup）は合い言葉なしでも開けるが、保存はできない
+  const { window: w, doc: d } = await boot({ setup: true, unlocked: false });
+  const btn = d.getElementById('saveBtn');
+  ok('起動時に保存できない理由が出る', d.getElementById('saveStatus').textContent.includes('合い言葉'));
+
+  const rep = d.getElementById('f-repeater');
+  rep.checked = !rep.checked;
+  rep.dispatchEvent(new w.Event('change', { bubbles: true }));
+
+  ok('編集しても保存ボタンは押せないまま', btn.disabled);
+  ok('編集したあとも理由が消えない', d.getElementById('saveStatus').textContent.includes('合い言葉'),
+     d.getElementById('saveStatus').textContent);
+  ok('ボタンにも理由が出る', btn.title.includes('合い言葉'), btn.title);
+}
+
+// ============================================================
+console.log('\n[7-3] 合い言葉があれば切り替えで保存できる');
+{
+  const { window: w, doc: d } = await boot();
+  const rep = d.getElementById('f-repeater');
+  rep.checked = !rep.checked;
+  rep.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ok('リピーター設定の切り替えで保存ボタンが押せる', !d.getElementById('saveBtn').disabled);
+}
+
 console.log('\n[8] 本文のタグ表示');
 {
   const body = doc.getElementById('f-body');
