@@ -149,6 +149,28 @@ GAS エディタで **`renameEditionId`** を1回実行してください
 
 第1回の申込は `applications` にそのまま残り、第2回のデータが追記されていきます。
 
+### 取り込みが途中で止まったとき
+
+GAS には1回の実行が6分までという制限があります。申込件数が多いと
+`migrateReceptionToDatabase` が途中で止まり、次のような状態になることがあります。
+
+- `applications` に入っていない申込がある
+- 申込は無いのに `exhibitors` にだけ名前が残っている
+- `出展回数` が実際より多い
+
+直し方は2手順です。
+
+1. **`migrateReceptionToDatabase`** をもう一度実行する
+   → 入っていない申込だけが追加されます（重複はしません）
+   → 実行ログの「◯件を登録」が 0 になるまで繰り返してください
+2. **`rebuildExhibitors`** を実行する
+   → `applications` を正として `exhibitors` を数え直します
+   → 申込が無い人の行は消え、`出展回数` が正しくなります
+   → 出展者IDと「スタッフメモ」は引き継がれます
+
+`rebuildExhibitors` は何度実行しても同じ結果になります。
+`testDoPost` のテスト行が残っている場合も、これで取り除かれます。
+
 ### 開催後にやること（任意）
 
 座席番号や入金状況を受付スプシで直したあと、GAS で **`syncReceptionUpdatesToDatabase`** を実行すると、

@@ -47,3 +47,4 @@ node admin/tests/config-editor.test.mjs   # 管理画面の読み込み・保存
 
 - 新しい開催回を始める手順 → [`docs/MIGRATION.md`](docs/MIGRATION.md)
 - データベースの列定義 → [`docs/DATABASE.md`](docs/DATABASE.md)
+- 取り込みが途中で止まったときの直し方 → [`docs/MIGRATION.md`](docs/MIGRATION.md) の「取り込みが途中で止まったとき」

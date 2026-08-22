@@ -1656,6 +1656,140 @@ function renameEditionId() {
 }
 
 /**
+ * 【修復用】exhibitors シートを applications から作り直します。
+ *
+ * 取り込みが途中で止まると、申込は入っていないのに出展者だけ登録された行や、
+ * 出展回数が実際より多い行が残ることがあります。
+ * この関数は applications を正として数え直すため、何度実行しても同じ結果になります。
+ *
+ * - 出展者IDと「スタッフメモ」は、いま入っている値を引き継ぎます
+ * - applications に1件も無い人（テスト行など）は取り除かれます
+ */
+function rebuildExhibitors() {
+  const config = getConfig();
+  const dbId   = getDatabaseSpreadsheetId_(config);
+  if (!dbId) throw new Error('databaseSpreadsheetId が設定されていません');
+
+  const ss       = SpreadsheetApp.openById(dbId);
+  const appSheet = ss.getSheetByName(DB_SHEET_APPLICATIONS);
+  if (!appSheet || appSheet.getLastRow() < 2) {
+    console.log('applications にデータがありません。');
+    return;
+  }
+
+  const appHeaders = appSheet.getRange(1, 1, 1, appSheet.getLastColumn()).getValues()[0];
+  const appRows    = appSheet.getRange(2, 1, appSheet.getLastRow() - 1, appSheet.getLastColumn()).getValues();
+
+  const exSheet  = ensureDbSheet_(ss, DB_SHEET_EXHIBITORS, DB_EXHIBITOR_HEADERS);
+  const existing = {};
+  if (exSheet.getLastRow() >= 2) {
+    const cur = exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).getValues();
+    cur.forEach(function (row) {
+      const obj = {};
+      DB_EXHIBITOR_HEADERS.forEach(function (h, i) { obj[h] = row[i]; });
+      if (obj['メールキー']) existing[String(obj['メールキー'])] = obj;
+    });
+  }
+
+  const rows = buildExhibitorRows_(appHeaders, appRows, existing);
+
+  // 1行目を残して書き直す
+  if (exSheet.getLastRow() > 1) {
+    exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).clearContent();
+  }
+  if (rows.length) {
+    exSheet.getRange(2, 1, rows.length, DB_EXHIBITOR_HEADERS.length).setValues(rows);
+  }
+
+  console.log('exhibitors を作り直しました: ' + rows.length + '名');
+  console.log('（applications ' + appRows.length + '件から集計）');
+}
+
+/**
+ * applications の全行から exhibitors の中身を組み立てます。
+ * シートに触れないため、単体で検証できます。
+ */
+function buildExhibitorRows_(appHeaders, appRows, existing) {
+  const col = function (row, name) {
+    const i = appHeaders.indexOf(name);
+    return i >= 0 ? row[i] : '';
+  };
+
+  // 申込日時の古い順に見ていく（初回・最終を正しく出すため）
+  const sorted = appRows.slice().sort(function (a, b) {
+    return dateKey_(col(a, '申込日時')).localeCompare(dateKey_(col(b, '申込日時')));
+  });
+
+  const byKey = {};
+  const order = [];
+
+  sorted.forEach(function (row) {
+    const name  = String(col(row, '氏名') || '').trim();
+    const email = String(col(row, 'メールアドレス') || '').trim();
+    const shop  = String(col(row, '出展名') || '').trim();
+    if (!name && !email) return;
+
+    const key = normalizeEmail_(email) ||
+                ('name:' + name.replace(/\s/g, '') + '/' + shop.replace(/\s/g, ''));
+    const when = dateKey_(col(row, '申込日時'));
+
+    if (!byKey[key]) {
+      byKey[key] = { key: key, count: 0, first: when, last: when, values: {} };
+      order.push(key);
+    }
+
+    const e = byKey[key];
+    e.count += 1;
+    if (!e.first || (when && when < e.first)) e.first = when;
+    if (when && when > e.last) e.last = when;
+
+    // 空の値では上書きしない（新しい申込ほど優先）
+    const keep = function (field, value) {
+      if (value !== '' && value !== null && value !== undefined) e.values[field] = value;
+    };
+    keep('氏名', name);
+    keep('フリガナ',   col(row, 'フリガナ'));
+    keep('メールアドレス', email);
+    keep('電話番号',   col(row, '電話番号'));
+    keep('郵便番号',   col(row, '郵便番号'));
+    keep('住所',       col(row, '住所'));
+    keep('最新出展名',           shop);
+    keep('最新出展カテゴリ',     col(row, '出展カテゴリ'));
+    keep('最新出展メニュー名',   col(row, '出展メニュー名'));
+    keep('最新自己紹介',         col(row, '自己紹介'));
+    keep('最新SNS',              col(row, 'SNS'));
+    keep('最新プロフィール写真', col(row, 'プロフィール写真'));
+    keep('最終開催回',           col(row, '開催回') || col(row, '開催回ID'));
+  });
+
+  // 既にあった出展者IDを引き継ぎ、新しい人には続きの番号を振る
+  let maxId = 0;
+  Object.keys(existing || {}).forEach(function (k) {
+    const m = String(existing[k]['出展者ID'] || '').match(/^EX(\d+)$/);
+    if (m) maxId = Math.max(maxId, parseInt(m[1], 10));
+  });
+
+  return order.map(function (key) {
+    const e   = byKey[key];
+    const old = (existing || {})[key] || {};
+
+    const row = {
+      '出展者ID':   old['出展者ID'] || ('EX' + padLeft_(++maxId, 4)),
+      'メールキー': key,
+      '出展回数':   e.count,
+      '初回申込日時': e.first,
+      '最終申込日時': e.last,
+      'スタッフメモ': old['スタッフメモ'] || ''
+    };
+    Object.keys(e.values).forEach(function (f) { row[f] = e.values[f]; });
+
+    return DB_EXHIBITOR_HEADERS.map(function (h) {
+      return row[h] !== undefined && row[h] !== null ? row[h] : '';
+    });
+  });
+}
+
+/**
  * 【任意】開催が終わったあとに、受付スプシの最終状態（座席番号・入金など）を
  * データベースへ反映します。申込日時をキーに既存行を更新します。
  */
