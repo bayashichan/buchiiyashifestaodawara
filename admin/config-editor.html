@@ -408,8 +408,10 @@
                 <button type="button" class="btn btn-new" id="ne-make">シートを作る</button>
               </div>
               <span class="hint" id="ne-sheetHint">
-                「シートを作る」を押すと、<strong>前回と同じ場所に新しいシートが作られます</strong>。
-                すでに用意してある場合は、そのURLを貼り付けてください
+                <strong>「シートを作る」を押すだけです。</strong>
+                前回と同じ場所に新しいシートが作られ、URLもここに自動で入ります。
+                <strong>フォルダを選んだり作ったりする必要はありません。</strong>
+                すでに用意してある場合だけ、そのURLを貼り付けてください
               </span>
             </div>
 
@@ -423,8 +425,9 @@
             </label>
 
             <div class="note note-info">
-              <strong>そのまま引き継がれるもの</strong><br>
-              出展者データベース／写真の保存フォルダ／料金・ブース／質問／規約／メールの文面
+              <strong>そのまま引き継がれるもの（設定しなくて大丈夫です）</strong><br>
+              出展者データベース／写真の保存フォルダ／料金・ブース／質問／規約／メールの文面<br>
+              写真は、いまのフォルダの中に開催回の名前のフォルダが自動で作られ、その中に保存されます
             </div>
 
             <div class="newevent-actions">
@@ -687,24 +690,36 @@
 
     <!-- ========== 保存先 ========== -->
     <details class="card">
-      <summary>📊 データの保存先</summary>
+      <summary>📊 データの保存先（設定ずみ・さわらなくて大丈夫です）</summary>
       <div class="card-body">
+        <div class="note note-info">
+          <strong>この欄は設定ずみです。ふだんは何も変えなくて大丈夫です。</strong><br>
+          次の開催をはじめるときも、上の「🆕 次の開催をはじめる」で
+          <strong>受付シートは「シートを作る」を押すだけで自動作成</strong>され、URLもここに自動で入ります。<br>
+          <strong>写真の保存フォルダと出展者データベースは、最初の設定のまま変えないでください。</strong>
+        </div>
         <div class="field">
           <label for="f-sheetUrl">今回の受付シート</label>
           <input type="url" id="f-sheetUrl" placeholder="https://docs.google.com/spreadsheets/...">
-          <span class="hint">申込がここに1件ずつ入ります。開催回ごとに新しいシートに差し替えます</span>
+          <span class="hint">
+            申込がここに1件ずつ入ります。開催回ごとに新しいシートに差し替えますが、
+            <strong>「次の開催をはじめる」から作れば自動で入る</strong>ので、手で貼り替える必要はありません
+          </span>
         </div>
         <div class="field">
           <label for="f-dbUrl">出展者データベース</label>
           <input type="url" id="f-dbUrl" placeholder="https://docs.google.com/spreadsheets/...">
-          <span class="hint">これまでの全開催分がたまります。<strong>毎回そのままにしてください</strong></span>
+          <span class="hint">
+            これまでの全開催分がたまります。<strong>設定ずみです。毎回そのままにしてください</strong>
+          </span>
         </div>
         <div class="field">
           <label for="f-driveUrl">写真の保存フォルダ（親フォルダ）</label>
           <input type="url" id="f-driveUrl" placeholder="https://drive.google.com/drive/folders/...">
           <span class="hint">
             ここは<strong>いちばん外側のフォルダ</strong>です。この中に開催回ごとのフォルダが自動で作られ、
-            プロフィール写真はその中に入ります。<strong>毎回そのままにしてください</strong>
+            プロフィール写真はその中に入ります。
+            <strong>設定ずみです。毎回そのままにしてください</strong>
           </span>
           <div class="folder-tree" aria-hidden="true">
             <span class="folder-tree-row">📁 写真の保存フォルダ<span class="folder-tree-note">← ここに設定するフォルダ</span></span>

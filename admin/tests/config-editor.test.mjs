@@ -215,6 +215,15 @@ console.log('\n[7] 差し込みボタンの追加分とフォルダの説明');
   const hint = doc.querySelector('#f-driveUrl').parentElement.querySelector('.hint').textContent;
   ok('いちばん外側のフォルダだと明記', hint.includes('いちばん外側のフォルダ'));
   ok('毎回そのままでよいと明記', hint.includes('毎回そのままにしてください'));
+
+  // 運用する人が保存先を設定しなくてよいことが、カードの先頭に書いてある
+  const storeCard = doc.querySelector('#f-driveUrl').closest('.card');
+  const storeNote = storeCard.querySelector('.note').textContent;
+  ok('保存先は設定ずみだと明記', storeNote.includes('設定ずみ'));
+  ok('受付シートは自動で作られると明記', storeNote.includes('自動作成'));
+  ok('データベースも変えなくてよいと明記', storeNote.includes('出展者データベース'));
+  ok('カードの見出しでも触らなくてよいと分かる',
+    storeCard.querySelector('summary').textContent.includes('さわらなくて大丈夫'));
 }
 
 console.log('\n[8] 本文のタグ表示');
