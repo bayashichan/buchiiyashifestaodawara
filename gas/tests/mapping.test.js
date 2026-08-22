@@ -19,7 +19,8 @@ const wrapped = new Function('Utilities', 'console', src + `
   return { mapRowToHeaders_, buildFieldMap, dateKey_, formatCellDate_, padLeft_, normalizeEmail_,
            formatSnsLinks, buildReceptionHeaders, DB_APPLICATION_HEADERS,
            sanitizeFileName_, buildPhotoFileName_, getEditionInfo_,
-           buildPhotoNoticeText_, applyTemplate, PHOTO_PENDING_LABEL };
+           buildPhotoNoticeText_, applyTemplate, PHOTO_PENDING_LABEL,
+           buildExhibitorRows_, DB_EXHIBITOR_HEADERS };
 `);
 const M = wrapped(Utilities, console);
 
@@ -165,6 +166,69 @@ check('差し込み位置を指定できる',
   M.applyTemplate('前\n{{photoNotice}}\n後', { photoNotice: '案内文' }), '前\n案内文\n後');
 check('写真ありのときは空になる',
   M.applyTemplate('前\n{{photoNotice}}\n後', { photoNotice: '' }), '前\n\n後');
+
+// ---------------------------------------------------------------
+// 8. exhibitors の作り直し（取り込みが途中で止まったときの修復）
+// ---------------------------------------------------------------
+console.log('\n[8] 出展者マスタの作り直し');
+
+const AH = ['開催回ID','開催回','申込日時','氏名','フリガナ','メールアドレス','電話番号',
+            '郵便番号','住所','出展カテゴリ','出展名','出展メニュー名','自己紹介','SNS','プロフィール写真'];
+const appRow = o => AH.map(h => o[h] !== undefined ? o[h] : '');
+
+const appRows = [
+  appRow({ 開催回ID:'第1回', 開催回:'第1回', 申込日時:'2026/05/05 7:31:56', 氏名:'影山愛結美',
+        メールアドレス:'A@Example.com', 出展名:'虹色ユニコーン', 住所:'静岡県' }),
+  appRow({ 開催回ID:'第1回', 開催回:'第1回', 申込日時:'2026/05/10 22:00:44', 氏名:'梅原由紀子',
+        メールアドレス:'ume@example.com', 出展名:'NOEVIR', 電話番号:'090' }),
+  // 同じ人の2件目（あとの申込なので、こちらの内容が優先される）
+  appRow({ 開催回ID:'第1回', 開催回:'第1回', 申込日時:'2026/05/11 0:00:04', 氏名:'梅原由紀子',
+        メールアドレス:'ume@example.com', 出展名:'NOEVIR Revoir', 電話番号:'' }),
+  // メールが無い招待枠
+  appRow({ 開催回ID:'第1回', 開催回:'第1回', 申込日時:'2026/07/09', 氏名:'カンメイさん',
+        出展名:'Kanmei' })
+];
+
+// 取り込みが途中で止まり、申込が無いのに残っている出展者と、テスト行
+const existing = {
+  'a@example.com': { '出展者ID':'EX0001', 'メールキー':'a@example.com', 'スタッフメモ':'常連さん' },
+  'orphan@example.com': { '出展者ID':'EX0050', 'メールキー':'orphan@example.com' },
+  'test@example.com':   { '出展者ID':'EX0069', 'メールキー':'test@example.com' }
+};
+
+const built = M.buildExhibitorRows_(AH, appRows, existing);
+const H = M.DB_EXHIBITOR_HEADERS;
+const get = (r, name) => r[H.indexOf(name)];
+
+check('申込のある人だけになる', built.length, 3);
+check('申込が無い人は消える', built.some(r => get(r,'メールキー').indexOf('orphan') >= 0), false);
+check('テスト行も消える', built.some(r => get(r,'メールキー').indexOf('test@') >= 0), false);
+
+check('出展者IDは引き継がれる', get(built[0], '出展者ID'), 'EX0001');
+check('スタッフメモは残る', get(built[0], 'スタッフメモ'), '常連さん');
+check('メールは小文字で名寄せ', get(built[0], 'メールキー'), 'a@example.com');
+
+const ume = built.filter(r => get(r,'メールキー') === 'ume@example.com')[0];
+check('同じ人は1行にまとまる', built.filter(r => get(r,'メールキー') === 'ume@example.com').length, 1);
+check('出展回数は申込の数どおり', get(ume, '出展回数'), 2);
+check('初回申込日時', get(ume, '初回申込日時'), '2026/05/10 22:00:44');
+check('最終申込日時', get(ume, '最終申込日時'), '2026/05/11 00:00:04');
+check('新しい申込の内容が優先される', get(ume, '最新出展名'), 'NOEVIR Revoir');
+check('空欄では上書きしない（電話番号が残る）', get(ume, '電話番号'), '090');
+
+const kanmei = built.filter(r => String(get(r,'メールキー')).indexOf('name:') === 0)[0];
+check('メールが無い人は氏名と出展名で名寄せ', get(kanmei, 'メールキー'), 'name:カンメイさん/Kanmei');
+// 既存の最大は EX0069。新しい人には申込日時の古い順に続きの番号が振られる
+check('新しい人①（梅原）に続きの番号', get(ume, '出展者ID'), 'EX0070');
+check('新しい人②（カンメイ）にその次の番号', get(kanmei, '出展者ID'), 'EX0071');
+
+// 何度実行しても同じ結果になる
+const again = M.buildExhibitorRows_(AH, appRows,
+  Object.fromEntries(built.map(r => [get(r,'メールキー'),
+    Object.fromEntries(H.map((h,i) => [h, r[i]]))])));
+check('もう一度実行しても増えない', again.length, built.length);
+check('出展回数が増えていかない', get(again.filter(r => get(r,'メールキー')==='ume@example.com')[0], '出展回数'), 2);
+check('IDも変わらない', get(again[0], '出展者ID'), 'EX0001');
 
 console.log(failures === 0 ? '\n✅ すべて成功' : `\n❌ ${failures}件失敗`);
 process.exit(failures === 0 ? 0 : 1);

@@ -180,6 +180,8 @@ function doGet(e) {
       case 'clear_cache':
         result = handleClearCache(params);
         break;
+      case 'create_reception_sheet':
+        return handleCreateReceptionSheet(params);
       case 'status':
         result = handleStatus();
         break;
@@ -1355,6 +1357,126 @@ function handleClearCache(params) {
   return { success: true, message: '設定キャッシュをクリアしました' };
 }
 
+/**
+ * 今回の受付スプレッドシートを新しく作ります。
+ *
+ * 管理画面の「次の開催をはじめる」から呼ばれます。
+ * - いま使っている受付シートと同じフォルダに作ります
+ * - 1行目の見出しも、いまの受付シートからそのまま写します
+ *   （見出しが取れない場合だけ、設定から組み立てます）
+ *
+ * format=html を付けると、ブラウザで開いて結果を確認できる画面を返します。
+ */
+function handleCreateReceptionSheet(params) {
+  const wantHtml = String(params.format || '') === 'html';
+
+  try {
+    const expected = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
+    if (expected && String(params.token || '') !== expected) {
+      throw new Error('管理トークンが正しくありません');
+    }
+
+    const config = getConfig();
+    const info   = createReceptionSpreadsheet_(config, params.name);
+
+    return wantHtml ? createSheetResultPage_(info) : jsonOutput_(Object.assign({ success: true }, info));
+
+  } catch (err) {
+    console.error('handleCreateReceptionSheet error:', err);
+    if (wantHtml) return createSheetResultPage_({ error: err.message });
+    return jsonOutput_({ success: false, error: err.message });
+  }
+}
+
+function createReceptionSpreadsheet_(config, requestedName) {
+  const edition = getEditionInfo_(config);
+  const name    = sanitizeFileName_(requestedName) ||
+                  sanitizeFileName_((edition.eventName || 'イベント') + ' 申込');
+
+  // いまの受付シートの見出しを引き継ぐ（列の並びを変えないため）
+  let headers = null;
+  let sameFolder = null;
+
+  if (config.spreadsheetId) {
+    try {
+      const cur   = SpreadsheetApp.openById(config.spreadsheetId);
+      const sheet = cur.getSheetByName(RECEPTION_SHEET_NAME);
+      if (sheet && sheet.getLastColumn() > 0) {
+        headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      }
+      const parents = DriveApp.getFileById(config.spreadsheetId).getParents();
+      if (parents.hasNext()) sameFolder = parents.next();
+    } catch (e) {
+      console.warn('いまの受付シートを参照できませんでした:', e);
+    }
+  }
+
+  if (!headers || !headers.length) headers = buildReceptionHeaders(config);
+
+  const ss    = SpreadsheetApp.create(name);
+  const sheet = ss.getSheets()[0];
+  sheet.setName(RECEPTION_SHEET_NAME);
+
+  ensureColumnCount_(sheet, headers.length);
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length)
+    .setBackground('#374151')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold');
+  sheet.setFrozenRows(1);
+
+  // いまの受付シートと同じ場所へ置く
+  let folderName = 'マイドライブ';
+  if (sameFolder) {
+    try {
+      const file = DriveApp.getFileById(ss.getId());
+      sameFolder.addFile(file);
+      DriveApp.getRootFolder().removeFile(file);
+      folderName = sameFolder.getName();
+    } catch (e) {
+      console.warn('フォルダの移動に失敗しました:', e);
+    }
+  }
+
+  return {
+    id: ss.getId(),
+    url: ss.getUrl(),
+    name: name,
+    folder: folderName,
+    columns: headers.length
+  };
+}
+
+/** ブラウザで開いたときに見せる結果画面 */
+function createSheetResultPage_(info) {
+  const esc = function (t) {
+    return String(t === null || t === undefined ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+
+  const body = info.error
+    ? '<h1>作成できませんでした</h1><p class="err">' + esc(info.error) + '</p>' +
+      '<p>お手数ですが、この画面を管理者にお知らせください。</p>'
+    : '<h1>受付シートを作成しました</h1>' +
+      '<p><b>' + esc(info.name) + '</b><br>保存先: ' + esc(info.folder) + '</p>' +
+      '<p>下のURLをコピーして、管理画面の「今回の受付シート」に貼り付けてください。</p>' +
+      '<input id="u" value="' + esc(info.url) + '" readonly onclick="this.select()">' +
+      '<button onclick="navigator.clipboard.writeText(document.getElementById(\'u\').value);this.textContent=\'コピーしました\'">URLをコピー</button>' +
+      '<p><a href="' + esc(info.url) + '" target="_blank">シートを開く</a></p>';
+
+  return HtmlService.createHtmlOutput(
+    '<!DOCTYPE html><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<style>body{font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;' +
+    'padding:1.5rem;line-height:1.8;color:#2a1a22;max-width:34rem;margin:0 auto}' +
+    'h1{font-size:1.15rem;color:#650133}' +
+    'input{width:100%;font-size:16px;padding:.6rem;border:1.5px solid #e6dfe4;border-radius:.5rem;margin:.5rem 0}' +
+    'button{font:inherit;font-weight:700;background:#650133;color:#fff;border:0;' +
+    'border-radius:.5rem;padding:.6rem 1rem;cursor:pointer}' +
+    '.err{color:#a3182a;font-weight:700}</style>' + body
+  ).setTitle('受付シートの作成');
+}
+
 /** 稼働状況の確認（設定が正しく読めているかの点検用） */
 function handleStatus() {
   const config  = getConfig();
@@ -1653,6 +1775,140 @@ function renameEditionId() {
   }
 
   console.log('開催回IDを付け替えました: ' + OLD_ID + ' → ' + NEW_ID + '（applications ' + changed + '件）');
+}
+
+/**
+ * 【修復用】exhibitors シートを applications から作り直します。
+ *
+ * 取り込みが途中で止まると、申込は入っていないのに出展者だけ登録された行や、
+ * 出展回数が実際より多い行が残ることがあります。
+ * この関数は applications を正として数え直すため、何度実行しても同じ結果になります。
+ *
+ * - 出展者IDと「スタッフメモ」は、いま入っている値を引き継ぎます
+ * - applications に1件も無い人（テスト行など）は取り除かれます
+ */
+function rebuildExhibitors() {
+  const config = getConfig();
+  const dbId   = getDatabaseSpreadsheetId_(config);
+  if (!dbId) throw new Error('databaseSpreadsheetId が設定されていません');
+
+  const ss       = SpreadsheetApp.openById(dbId);
+  const appSheet = ss.getSheetByName(DB_SHEET_APPLICATIONS);
+  if (!appSheet || appSheet.getLastRow() < 2) {
+    console.log('applications にデータがありません。');
+    return;
+  }
+
+  const appHeaders = appSheet.getRange(1, 1, 1, appSheet.getLastColumn()).getValues()[0];
+  const appRows    = appSheet.getRange(2, 1, appSheet.getLastRow() - 1, appSheet.getLastColumn()).getValues();
+
+  const exSheet  = ensureDbSheet_(ss, DB_SHEET_EXHIBITORS, DB_EXHIBITOR_HEADERS);
+  const existing = {};
+  if (exSheet.getLastRow() >= 2) {
+    const cur = exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).getValues();
+    cur.forEach(function (row) {
+      const obj = {};
+      DB_EXHIBITOR_HEADERS.forEach(function (h, i) { obj[h] = row[i]; });
+      if (obj['メールキー']) existing[String(obj['メールキー'])] = obj;
+    });
+  }
+
+  const rows = buildExhibitorRows_(appHeaders, appRows, existing);
+
+  // 1行目を残して書き直す
+  if (exSheet.getLastRow() > 1) {
+    exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).clearContent();
+  }
+  if (rows.length) {
+    exSheet.getRange(2, 1, rows.length, DB_EXHIBITOR_HEADERS.length).setValues(rows);
+  }
+
+  console.log('exhibitors を作り直しました: ' + rows.length + '名');
+  console.log('（applications ' + appRows.length + '件から集計）');
+}
+
+/**
+ * applications の全行から exhibitors の中身を組み立てます。
+ * シートに触れないため、単体で検証できます。
+ */
+function buildExhibitorRows_(appHeaders, appRows, existing) {
+  const col = function (row, name) {
+    const i = appHeaders.indexOf(name);
+    return i >= 0 ? row[i] : '';
+  };
+
+  // 申込日時の古い順に見ていく（初回・最終を正しく出すため）
+  const sorted = appRows.slice().sort(function (a, b) {
+    return dateKey_(col(a, '申込日時')).localeCompare(dateKey_(col(b, '申込日時')));
+  });
+
+  const byKey = {};
+  const order = [];
+
+  sorted.forEach(function (row) {
+    const name  = String(col(row, '氏名') || '').trim();
+    const email = String(col(row, 'メールアドレス') || '').trim();
+    const shop  = String(col(row, '出展名') || '').trim();
+    if (!name && !email) return;
+
+    const key = normalizeEmail_(email) ||
+                ('name:' + name.replace(/\s/g, '') + '/' + shop.replace(/\s/g, ''));
+    const when = dateKey_(col(row, '申込日時'));
+
+    if (!byKey[key]) {
+      byKey[key] = { key: key, count: 0, first: when, last: when, values: {} };
+      order.push(key);
+    }
+
+    const e = byKey[key];
+    e.count += 1;
+    if (!e.first || (when && when < e.first)) e.first = when;
+    if (when && when > e.last) e.last = when;
+
+    // 空の値では上書きしない（新しい申込ほど優先）
+    const keep = function (field, value) {
+      if (value !== '' && value !== null && value !== undefined) e.values[field] = value;
+    };
+    keep('氏名', name);
+    keep('フリガナ',   col(row, 'フリガナ'));
+    keep('メールアドレス', email);
+    keep('電話番号',   col(row, '電話番号'));
+    keep('郵便番号',   col(row, '郵便番号'));
+    keep('住所',       col(row, '住所'));
+    keep('最新出展名',           shop);
+    keep('最新出展カテゴリ',     col(row, '出展カテゴリ'));
+    keep('最新出展メニュー名',   col(row, '出展メニュー名'));
+    keep('最新自己紹介',         col(row, '自己紹介'));
+    keep('最新SNS',              col(row, 'SNS'));
+    keep('最新プロフィール写真', col(row, 'プロフィール写真'));
+    keep('最終開催回',           col(row, '開催回') || col(row, '開催回ID'));
+  });
+
+  // 既にあった出展者IDを引き継ぎ、新しい人には続きの番号を振る
+  let maxId = 0;
+  Object.keys(existing || {}).forEach(function (k) {
+    const m = String(existing[k]['出展者ID'] || '').match(/^EX(\d+)$/);
+    if (m) maxId = Math.max(maxId, parseInt(m[1], 10));
+  });
+
+  return order.map(function (key) {
+    const e   = byKey[key];
+    const old = (existing || {})[key] || {};
+
+    const row = {
+      '出展者ID':   old['出展者ID'] || ('EX' + padLeft_(++maxId, 4)),
+      'メールキー': key,
+      '出展回数':   e.count,
+      '初回申込日時': e.first,
+      '最終申込日時': e.last,
+      'スタッフメモ': old['スタッフメモ'] || ''
+    };
+    Object.keys(e.values).forEach(function (f) { row[f] = e.values[f]; });
+
+    return DB_EXHIBITOR_HEADERS.map(function (h) {
+      return row[h] !== undefined && row[h] !== null ? row[h] : '';
+    });
+  });
 }
 
 /**

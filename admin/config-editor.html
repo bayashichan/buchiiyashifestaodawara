@@ -170,6 +170,36 @@
   .pv-foot .total { font-size: .95rem; font-weight: 700; }
   .pv-btn { border: 0; border-radius: 999px; color: #fff; font-weight: 700; padding: .5rem 1.1rem; font-size: .85rem; }
 
+  /* ============ 次の開催をはじめる ============ */
+  .newevent {
+    border: 1.5px solid var(--brand);
+    border-radius: .75rem;
+    background: var(--brand-soft);
+    padding: .9rem;
+  }
+  .newevent-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+  .newevent-title { font-size: .95rem; font-weight: 700; }
+  .newevent-sub { font-size: .78rem; color: var(--ink-soft); margin-top: .1rem; }
+  .btn-new { background: var(--brand); color: #fff; border-color: var(--brand); white-space: nowrap; }
+  .btn-new:hover { opacity: .88; background: var(--brand); }
+
+  .newevent-form {
+    margin-top: .9rem; padding-top: .9rem;
+    border-top: 1px solid #e3cdd9;
+    display: flex; flex-direction: column; gap: .85rem;
+    background: #fff; border-radius: .6rem; padding: .9rem;
+  }
+  .newevent-lead { font-size: .82rem; line-height: 1.7; }
+  .ne-check { display: flex; align-items: flex-start; gap: .5rem; font-size: .88rem; cursor: pointer; }
+  .ne-check input { width: 1.15rem; height: 1.15rem; margin-top: .15rem; flex: 0 0 auto; accent-color: var(--brand); }
+  .ne-sheet-row { display: flex; gap: .5rem; align-items: stretch; }
+  .ne-sheet-row input { flex: 1; min-width: 0; }
+  .ne-sheet-row .btn { flex: 0 0 auto; }
+  @media (max-width: 26rem) { .ne-sheet-row { flex-direction: column; } }
+
+  .newevent-actions { display: flex; gap: .6rem; }
+  .newevent-actions .btn { flex: 1; }
+
   /* ============ フォルダの構成図 ============ */
   .folder-tree {
     display: flex;
@@ -318,6 +348,73 @@
     <details class="card" open>
       <summary>📅 イベントのこと</summary>
       <div class="card-body">
+
+        <!-- 次の開催をはじめるための入口 -->
+        <div class="newevent">
+          <div class="newevent-head">
+            <div>
+              <div class="newevent-title">🆕 次の開催をはじめる</div>
+              <div class="newevent-sub" id="newEventSub">いまは「第1回」の受付中です</div>
+            </div>
+            <button type="button" class="btn btn-new" id="newEventBtn">はじめる</button>
+          </div>
+
+          <div class="newevent-form hidden" id="newEventForm">
+            <p class="newevent-lead">
+              次の開催の内容を入れてください。ここで入れた内容が下の欄に反映されます。
+              <strong>「設定内容を保存」を押すまで、いまの受付は変わりません。</strong>
+            </p>
+
+            <div class="field">
+              <label for="ne-edition">開催回</label>
+              <input type="text" id="ne-edition" placeholder="第2回">
+              <span class="hint">前回の申込と混ざらないよう、必ず新しい回の名前にしてください</span>
+            </div>
+            <div class="field">
+              <label for="ne-name">イベント名</label>
+              <input type="text" id="ne-name" placeholder="第2回ぶち癒しフェスタin小田原">
+            </div>
+            <div class="field">
+              <label for="ne-date">開催日時</label>
+              <input type="text" id="ne-date" placeholder="2027年5月5日（日）11:00〜16:30">
+            </div>
+            <div class="field">
+              <label for="ne-place">会場</label>
+              <input type="text" id="ne-place" placeholder="会場名">
+            </div>
+            <div class="field">
+              <label for="ne-sheet">今回の受付シート</label>
+              <div class="ne-sheet-row">
+                <input type="url" id="ne-sheet" placeholder="https://docs.google.com/spreadsheets/...">
+                <button type="button" class="btn btn-new" id="ne-make">シートを作る</button>
+              </div>
+              <span class="hint" id="ne-sheetHint">
+                「シートを作る」を押すと、<strong>前回と同じ場所に新しいシートが作られます</strong>。
+                すでに用意してある場合は、そのURLを貼り付けてください
+              </span>
+            </div>
+
+            <label class="ne-check">
+              <input type="checkbox" id="ne-reopen" checked>
+              <span>すべてのブースを「受付中」に戻す</span>
+            </label>
+            <label class="ne-check">
+              <input type="checkbox" id="ne-repeater" checked>
+              <span>前回の内容を呼び出せるようにする（リピーター向け）</span>
+            </label>
+
+            <div class="note note-info">
+              <strong>そのまま引き継がれるもの</strong><br>
+              出展者データベース／写真の保存フォルダ／料金・ブース／質問／規約／メールの文面
+            </div>
+
+            <div class="newevent-actions">
+              <button type="button" class="btn" id="newEventCancel">やめる</button>
+              <button type="button" class="btn btn-new" id="newEventApply">この内容にする</button>
+            </div>
+          </div>
+        </div>
+
         <div class="field">
           <label for="f-eventName">イベント名</label>
           <input type="text" id="f-eventName" placeholder="第2回ぶち癒しフェスタin小田原">
@@ -606,6 +703,14 @@
           <input type="url" id="d-configUrl" placeholder="https://USER.github.io/REPO/apply/config.json">
         </div>
         <div class="field">
+          <label for="d-gasToken">GAS 管理トークン（任意）</label>
+          <input type="password" id="d-gasToken" placeholder="ADMIN_TOKEN と同じ値" autocomplete="off">
+          <span class="hint">
+            GASの「スクリプト プロパティ」に <code>ADMIN_TOKEN</code> を設定している場合だけ入れてください。
+            合い言葉と一緒に暗号化して保存されます
+          </span>
+        </div>
+        <div class="field">
           <label for="d-gasUrl">GAS ウェブアプリURL</label>
           <input type="url" id="d-gasUrl" placeholder="https://script.google.com/macros/s/.../exec">
         </div>
@@ -726,6 +831,7 @@ async function openApp() {
 // =====================================================================
 function bindEvents() {
   bindRichBody();
+  bindNewEvent();
   document.getElementById('unlockBtn').addEventListener('click', unlock);
   document.getElementById('passInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') unlock();
@@ -822,8 +928,9 @@ async function registerPassphrase() {
 
   msg.textContent = '登録中...';
   try {
-    const blob = await encryptJson({ owner, repo, token }, p1);
-    conn = { owner, repo, token };
+    const gasToken = val('d-gasToken');
+    const blob = await encryptJson({ owner, repo, token, gasToken }, p1);
+    conn = { owner, repo, token, gasToken };
     await putFile(UNLOCK_PATH, JSON.stringify(blob, null, 2), '管理画面の合い言葉を更新');
     localStorage.setItem(STORE_KEY, JSON.stringify(conn));
     msg.textContent = '✅ 登録しました。この合い言葉で管理画面をひらけます。';
@@ -1122,6 +1229,7 @@ function render() {
 
   // 質問ごとの差し込みボタンは設定を読んでからでないと作れない
   buildMailChips();
+  updateNewEventSub();
 
   set('f-sheetUrl', cfg.spreadsheetId
     ? `https://docs.google.com/spreadsheets/d/${cfg.spreadsheetId}/edit` : '');
@@ -1135,6 +1243,7 @@ function render() {
     set('d-workerUrl', cfg.workerUrl);
     set('d-owner', conn?.owner || location.hostname.split('.')[0]);
     set('d-repo',  conn?.repo  || location.pathname.split('/')[1] || '');
+    set('d-gasToken', conn?.gasToken || '');
   }
 
   dirty = false;
@@ -1434,6 +1543,167 @@ function insertAtCursor(el, text) {
 }
 
 // =====================================================================
+// 次の開催をはじめる
+// =====================================================================
+
+function bindNewEvent() {
+  const form = document.getElementById('newEventForm');
+
+  document.getElementById('newEventBtn').addEventListener('click', () => {
+    if (!form.classList.contains('hidden')) { form.classList.add('hidden'); return; }
+    prefillNewEvent();
+    form.classList.remove('hidden');
+    form.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+    document.getElementById('ne-edition').focus({ preventScroll: true });
+  });
+
+  document.getElementById('newEventCancel').addEventListener('click', () => form.classList.add('hidden'));
+  document.getElementById('ne-make').addEventListener('click', createReceptionSheet);
+  document.getElementById('newEventApply').addEventListener('click', applyNewEvent);
+}
+
+/** いまの設定から、次の開催の内容を推測して初期表示する */
+function prefillNewEvent() {
+  const edition = val('f-edition');
+  const next    = nextEditionName(edition);
+
+  document.getElementById('ne-edition').value = next;
+  document.getElementById('ne-name').value    = edition && next
+    ? val('f-eventName').split(edition).join(next)
+    : val('f-eventName');
+  document.getElementById('ne-date').value  = '';
+  document.getElementById('ne-place').value = val('f-eventPlace');
+  document.getElementById('ne-sheet').value = '';
+}
+
+/**
+ * 受付シートをその場で作る。
+ * 作成そのものは GAS（＝クライアントのGoogleドライブ側）が行う。
+ */
+async function createReceptionSheet() {
+  const btn   = document.getElementById('ne-make');
+  const input = document.getElementById('ne-sheet');
+  const hint  = document.getElementById('ne-sheetHint');
+
+  if (!cfg?.gasUrl) {
+    alert('シートの作成先が設定されていません。\n作成者にご連絡ください。');
+    return;
+  }
+  if (input.value.trim() &&
+      !confirm('すでにURLが入っています。\n新しいシートを作って置き換えますか？')) return;
+
+  const name = (document.getElementById('ne-name').value.trim() || val('f-eventName')) + ' 申込';
+
+  const url = new URL(cfg.gasUrl);
+  url.searchParams.set('action', 'create_reception_sheet');
+  url.searchParams.set('name', name);
+  const token = gasAdminToken();
+  if (token) url.searchParams.set('token', token);
+
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = '作成中...';
+  hint.textContent = 'Googleドライブに作成しています。10秒ほどかかります...';
+
+  try {
+    const res  = await fetch(url, { redirect: 'follow' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || '作成に失敗しました');
+
+    input.value = data.url;
+    hint.innerHTML = `✅ <strong>${escapeHtml(data.name)}</strong> を作成しました` +
+                     `（保存先: ${escapeHtml(data.folder)}）`;
+
+  } catch (err) {
+    // ブラウザの制限で結果を受け取れないことがあるため、別画面で作れるようにする
+    console.warn('シート作成の応答を受け取れませんでした:', err);
+    const manual = new URL(url);
+    manual.searchParams.set('format', 'html');
+    hint.innerHTML = 'この画面からは作成結果を受け取れませんでした。' +
+      `<a href="${manual}" target="_blank" rel="noopener"><strong>こちらを開いて作成</strong></a>し、` +
+      '表示されたURLをコピーして上の欄に貼り付けてください。';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
+function gasAdminToken() {
+  return (conn && conn.gasToken) || localStorage.getItem('admin_gas_token') || '';
+}
+
+function escapeHtml(t) {
+  return String(t ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+}
+
+/** 「第1回」→「第2回」。数字が見つからなければ空にする */
+function nextEditionName(edition) {
+  const m = String(edition || '').match(/(\d+)/);
+  if (!m) return '';
+  return edition.replace(m[1], String(parseInt(m[1], 10) + 1));
+}
+
+function applyNewEvent() {
+  const edition = document.getElementById('ne-edition').value.trim();
+  const name    = document.getElementById('ne-name').value.trim();
+  const sheet   = document.getElementById('ne-sheet').value.trim();
+
+  if (!edition) { alert('開催回を入れてください（例: 第2回）'); return; }
+  if (!name)    { alert('イベント名を入れてください'); return; }
+
+  if (edition === val('f-edition')) {
+    alert('開催回が前回と同じです。\n前回の申込と混ざってしまうため、別の名前にしてください。');
+    return;
+  }
+  if (sheet && !sheetIdFrom(sheet)) {
+    alert('受付シートのURLが正しくないようです。\nスプレッドシートを開いたときのURLを貼り付けてください。');
+    return;
+  }
+
+  const changed = [];
+
+  set('f-edition',   edition);   changed.push('開催回を「' + edition + '」に');
+  set('f-eventName', name);      changed.push('イベント名を「' + name + '」に');
+
+  const date = document.getElementById('ne-date').value.trim();
+  if (date) { set('f-eventDate', date); changed.push('開催日時を「' + date + '」に'); }
+
+  const place = document.getElementById('ne-place').value.trim();
+  if (place) { set('f-eventPlace', place); changed.push('会場を「' + place + '」に'); }
+
+  if (sheet) { set('f-sheetUrl', sheet); changed.push('受付シートを新しいものに'); }
+  else       { changed.push('⚠️ 受付シートは前回のままです（あとで差し替えてください）'); }
+
+  if (document.getElementById('ne-reopen').checked) {
+    (cfg.booths || []).forEach(b => { b.soldOut = false; });
+    renderBooths();
+    changed.push('すべてのブースを「受付中」に');
+  }
+
+  if (document.getElementById('ne-repeater').checked) {
+    check('f-repeater', true);
+    changed.push('前回の内容を呼び出せるように');
+  }
+
+  document.getElementById('newEventForm').classList.add('hidden');
+  updatePreview();
+  markDirty();
+  updateNewEventSub();
+
+  alert('次の内容にしました。\n\n・' + changed.join('\n・') +
+        '\n\nまだ保存されていません。\n内容を確認して「設定内容を保存」を押してください。');
+}
+
+function updateNewEventSub() {
+  const el = document.getElementById('newEventSub');
+  if (!el) return;
+  const now = val('f-edition') || '（未設定）';
+  el.textContent = originalEdition && now !== originalEdition
+    ? `「${originalEdition}」から「${now}」に変更中（未保存）`
+    : `いまは「${now}」の受付中です`;
+}
+
+// =====================================================================
 // メール本文（差し込み項目をタグで表示する入力欄）
 // =====================================================================
 
@@ -1577,6 +1847,7 @@ function updateFolderTree() {
 
 function updatePreview() {
   updateFolderTree();
+  updateNewEventSub();
 
   const primary = val('c-primary'), accent = val('c-accent');
   const headBg  = val('c-headBg'),  headTxt = val('c-headTxt');

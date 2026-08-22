@@ -13,6 +13,7 @@
 
 イベント名・開催回・色・ブース・料金・質問項目・規約・メール文面・保存先を、
 すべてこの画面から変更して「設定内容を保存」で反映します。
+次の開催をはじめるときは「📅 イベントのこと」→「🆕 次の開催をはじめる」から。
 初回だけ合い言葉の入力が必要です。詳しくは
 [`docs/MIGRATION.md`](docs/MIGRATION.md) の「管理画面の使い方」を参照してください。
 
@@ -47,3 +48,4 @@ node admin/tests/config-editor.test.mjs   # 管理画面の読み込み・保存
 
 - 新しい開催回を始める手順 → [`docs/MIGRATION.md`](docs/MIGRATION.md)
 - データベースの列定義 → [`docs/DATABASE.md`](docs/DATABASE.md)
+- 取り込みが途中で止まったときの直し方 → [`docs/MIGRATION.md`](docs/MIGRATION.md) の「取り込みが途中で止まったとき」
