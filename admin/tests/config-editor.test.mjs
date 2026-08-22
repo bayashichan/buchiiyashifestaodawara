@@ -30,7 +30,7 @@ const ok = (label, cond, extra='') => {
   if (!cond) ng++;
 };
 
-async function boot({ setup = false, unlocked = true } = {}) {
+async function boot({ setup = false, unlocked = true, registered = true } = {}) {
   const url = 'https://example.test/repo/admin/config-editor.html' + (setup ? '?setup' : '');
   const dom = new JSDOM(html, { runScripts: 'outside-only', url, pretendToBeVisual: true });
   const { window } = dom;
@@ -51,6 +51,14 @@ async function boot({ setup = false, unlocked = true } = {}) {
     }
     if (u.includes('apply/config.json')) {
       return { ok: true, json: async () => JSON.parse(JSON.stringify(config)) };
+    }
+    if (u.includes('admin/unlock.json')) {
+      if (!registered) return { ok: false, json: async () => ({}) };
+      return {
+        ok: true,
+        headers: { get: name => name === 'last-modified' ? 'Thu, 20 Aug 2026 15:24:00 GMT' : null },
+        json: async () => ({ v: 1 })
+      };
     }
     return { ok: false, json: async () => ({}) };
   };
@@ -390,6 +398,50 @@ console.log('\n[11] 受付シートをその場で作る');
   ok('案内先は結果表示用の画面', hint.querySelector('a')?.href.includes('format=html'),
      hint.querySelector('a')?.href || '');
   ok('作成ボタンは押せる状態に戻る', !doc.getElementById('ne-make').disabled);
+}
+
+console.log('\n[12] 作成者用の登録状況');
+{
+  // 合い言葉ファイルがある場合
+  const w = setupMode.window, d = setupMode.doc;
+  await w.renderDevStatus();
+  const text = d.getElementById('devState').textContent;
+  ok('合い言葉が登録ずみと出る', /合い言葉[\s\S]*?登録ずみ/.test(text), text);
+  ok('更新日も出る', text.includes('2026/8/20'), text);
+  ok('トークンも登録ずみと出る', /アクセストークン[\s\S]*?登録ずみ/.test(text), text);
+  ok('トークンは伏せ字で出す', text.includes('****'), text);
+  ok('保存先が出る', text.includes('bayashichan / buchiiyashifestaodawara'), text);
+  ok('config.jsonの公開URLが埋まっている',
+     text.includes(config.configJsonUrl) && !!config.configJsonUrl, text);
+  ok('未登録の警告は出ない', !text.includes('未登録'), text);
+
+  // 合い言葉ファイルが無い場合
+  const fresh = await boot({ setup: true, unlocked: false, registered: false });
+  await fresh.window.renderDevStatus();
+  const t2 = fresh.doc.getElementById('devState').textContent;
+  ok('未登録なら未登録と出る', t2.includes('未登録'), t2);
+  ok('やることが書いてある', t2.includes('合い言葉を登録する'), t2);
+}
+
+console.log('\n[13] トークンを入れ直さずに合い言葉だけ変える');
+{
+  const fresh = await boot({ setup: true });
+  const d = fresh.doc, w = fresh.window;
+  d.getElementById('d-owner').value = 'bayashichan';
+  d.getElementById('d-repo').value  = 'buchiiyashifestaodawara';
+  d.getElementById('d-token').value = '';          // 空のまま
+  d.getElementById('d-pass1').value = 'あたらしい合い言葉です';
+  d.getElementById('d-pass2').value = 'あたらしい合い言葉です';
+  await w.registerPassphrase();
+
+  const msg = d.getElementById('devMsg').textContent;
+  ok('トークン欄が空でも登録できる', msg.includes('登録しました'), msg);
+
+  const put = fresh.saved.find(x => x.message.includes('合い言葉'));
+  const blob = JSON.parse(Buffer.from(put.content, 'base64').toString('utf8'));
+  const back = await w.decryptJson(blob, 'あたらしい合い言葉です');
+  ok('前のトークンが引き継がれる', back.token === 'x', back.token);
+  ok('入力した合い言葉は残さない', d.getElementById('d-pass1').value === '');
 }
 
 console.log(ng === 0 ? '\n✅ すべて成功' : `\n❌ ${ng}件失敗`);

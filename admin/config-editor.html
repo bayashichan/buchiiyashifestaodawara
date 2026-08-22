@@ -315,6 +315,25 @@
   .dev > summary { color: var(--brand); }
   .dev code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .82rem; word-break: break-all; }
 
+  /* 登録ずみかどうかの一覧 */
+  .statelist {
+    background: #fff; border: 1px solid var(--line); border-radius: .6rem;
+    padding: .3rem .8rem; margin-bottom: .3rem;
+  }
+  .stateline {
+    display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap;
+    padding: .55rem 0; font-size: .85rem;
+    border-top: 1px solid var(--line);
+  }
+  .stateline:first-child { border-top: 0; }
+  .stateline .k { font-weight: 700; min-width: 9.5rem; }
+  .stateline .v { color: var(--ink-soft); word-break: break-all; flex: 1; }
+  .stateline .v code { font-size: .8rem; }
+  .mark { font-weight: 700; white-space: nowrap; }
+  .mark-ok   { color: var(--ok); }
+  .mark-ng   { color: var(--danger); }
+  .mark-none { color: var(--ink-soft); }
+
   @media (min-width: 40rem) {
     .wrap { padding: 1.5rem 1.25rem 7rem; }
     .topbar { padding: 1rem 1.5rem; }
@@ -698,9 +717,25 @@
           この欄は制作者が設定します。運用では変更しないでください。
         </div>
 
+        <div style="font-weight:700">いまの登録状況</div>
+        <div class="statelist" id="devState">
+          <div class="stateline"><span class="v">確認中...</span></div>
+        </div>
+        <div class="hint">
+          合い言葉とアクセストークンは暗号化して保存しているため、
+          この画面に元の文字を表示することはできません。
+          入力欄が空でも「登録ずみ」と出ていれば設定は完了しています。
+          <strong>変更したいときだけ</strong>入力してください。
+        </div>
+
         <div class="field">
           <label for="d-configUrl">config.json の公開URL</label>
           <input type="url" id="d-configUrl" placeholder="https://USER.github.io/REPO/apply/config.json">
+          <span class="hint">
+            控えとして書いておく欄です。バックエンド側はこの値ではなく
+            <code>gas/Code.gs</code> の <code>CONFIG_JSON_URL</code> を見るため、
+            空でもフォームは動きます
+          </span>
         </div>
         <div class="field">
           <label for="d-gasToken">GAS 管理トークン（任意）</label>
@@ -730,16 +765,20 @@
         </div>
         <div class="field">
           <label for="d-token">アクセストークン</label>
-          <input type="password" id="d-token" placeholder="github_pat_..." autocomplete="off">
-          <span class="hint">Fine-grained / このリポジトリのみ / Contents: Read and write</span>
+          <input type="password" id="d-token" placeholder="変えるときだけ入力（空のままなら今のものを使います）" autocomplete="off">
+          <span class="hint">
+            すでに登録ずみなら<strong>空のままで大丈夫です</strong>。
+            入れ替えるときだけ貼りつけてください。<br>
+            新しく作る場合は Fine-grained / このリポジトリのみ / Contents: Read and write
+          </span>
         </div>
         <div class="row">
-          <div class="field"><label for="d-pass1">合い言葉</label>
-            <input type="password" id="d-pass1" autocomplete="new-password"></div>
-          <div class="field"><label for="d-pass2">合い言葉（確認）</label>
-            <input type="password" id="d-pass2" autocomplete="new-password"></div>
+          <div class="field"><label for="d-pass1">新しい合い言葉</label>
+            <input type="password" id="d-pass1" placeholder="10文字以上" autocomplete="new-password"></div>
+          <div class="field"><label for="d-pass2">新しい合い言葉（確認）</label>
+            <input type="password" id="d-pass2" placeholder="もう一度" autocomplete="new-password"></div>
         </div>
-        <button type="button" class="btn" id="makeUnlock">合い言葉を登録する</button>
+        <button type="button" class="btn" id="makeUnlock">合い言葉を登録／変更する</button>
         <div class="hint" id="devMsg"></div>
         <div class="note note-warn">
           合い言葉は暗号化してリポジトリに保存されます。
@@ -918,11 +957,14 @@ function readConn() {
 }
 
 async function registerPassphrase() {
-  const owner = val('d-owner'), repo = val('d-repo'), token = val('d-token');
+  const owner = val('d-owner'), repo = val('d-repo');
+  // トークン欄が空のときは、いま使っているものをそのまま使う（合い言葉だけ変えられるように）
+  const token = val('d-token') || conn?.token || '';
   const p1 = val('d-pass1'), p2 = val('d-pass2');
   const msg = document.getElementById('devMsg');
 
-  if (!owner || !repo || !token) { msg.textContent = 'ユーザー名・リポジトリ名・トークンを入力してください'; return; }
+  if (!owner || !repo) { msg.textContent = 'ユーザー名とリポジトリ名を入力してください'; return; }
+  if (!token) { msg.textContent = 'アクセストークンを入力してください（まだ一度も登録されていません）'; return; }
   if (p1.length < 10) { msg.textContent = '合い言葉は10文字以上にしてください'; return; }
   if (p1 !== p2)      { msg.textContent = '合い言葉が一致しません'; return; }
 
@@ -934,11 +976,97 @@ async function registerPassphrase() {
     await putFile(UNLOCK_PATH, JSON.stringify(blob, null, 2), '管理画面の合い言葉を更新');
     localStorage.setItem(STORE_KEY, JSON.stringify(conn));
     msg.textContent = '✅ 登録しました。この合い言葉で管理画面をひらけます。';
+    set('d-token', ''); set('d-pass1', ''); set('d-pass2', '');
+    renderDevStatus();
     setStatus('変更はまだありません');
     updateSaveBtn();
   } catch (err) {
     msg.textContent = '❌ 登録できませんでした: ' + err.message;
   }
+}
+
+// ---- 登録ずみかどうかを一覧で見せる ----
+// 合い言葉とトークンは暗号化して保存しているので元の文字は復元できない。
+// 「入っているかどうか」だけを、はっきり出す。
+async function renderDevStatus() {
+  const box = document.getElementById('devState');
+  if (!box) return;
+
+  const rows = [];
+  const line = (key, ok, value, note) => rows.push({ key, ok, value, note });
+
+  // 合い言葉ファイルがリポジトリにあるか
+  let unlockOk = null;
+  let unlockAt = '';
+  try {
+    const res = await fetch(`../${UNLOCK_PATH}?t=${Date.now()}`);
+    unlockOk = res.ok;
+    if (res.ok) {
+      const d = res.headers?.get?.('last-modified');
+      if (d) {
+        const t = new Date(d);
+        if (!isNaN(t)) unlockAt = `${t.getFullYear()}/${t.getMonth() + 1}/${t.getDate()} に更新`;
+      }
+    }
+  } catch { unlockOk = null; }
+
+  if (unlockOk === true) {
+    line('合い言葉', 'ok', '登録ずみ', unlockAt || 'この合い言葉で管理画面をひらけます');
+  } else if (unlockOk === false) {
+    line('合い言葉', 'ng', '未登録', '下の欄をすべて入力して「合い言葉を登録する」を押してください');
+  } else {
+    line('合い言葉', 'none', '確認できませんでした', '通信できていない可能性があります');
+  }
+
+  // アクセストークン（解錠していれば手元にある）
+  if (conn?.token) {
+    line('アクセストークン', 'ok', `登録ずみ（${maskSecret(conn.token)}）`, '');
+  } else if (unlockOk === true) {
+    line('アクセストークン', 'ok', '登録ずみ',
+      '合い言葉の中に入っています（合い言葉でひらくと末尾を確認できます）');
+  } else {
+    line('アクセストークン', 'ng', '未登録', '');
+  }
+
+  // GAS 管理トークンは任意
+  if (conn?.gasToken) {
+    line('GAS 管理トークン', 'ok', `設定あり（${maskSecret(conn.gasToken)}）`, '');
+  } else if (conn) {
+    line('GAS 管理トークン', 'none', '設定なし', '使っていなければこのままで問題ありません');
+  }
+
+  // 保存先
+  const owner = conn?.owner || val('d-owner');
+  const repo  = conn?.repo  || val('d-repo');
+  if (owner && repo) {
+    line('保存先リポジトリ', 'ok', `${owner} / ${repo}`, conn ? '' : '合い言葉でひらくと確定します');
+  } else {
+    line('保存先リポジトリ', 'ng', '未設定', '');
+  }
+
+  // config.json の公開URL
+  const cu = val('d-configUrl');
+  if (cu) line('config.json の公開URL', 'ok', cu, '');
+  else    line('config.json の公開URL', 'none', '未設定',
+              'この欄は記録用です。空でもフォームとバックエンドは動きます');
+
+  const MARK = { ok: ['mark-ok', '✅'], ng: ['mark-ng', '⚠️'], none: ['mark-none', '—'] };
+  box.innerHTML = rows.map(r => {
+    const [cls, icon] = MARK[r.ok];
+    return `<div class="stateline">
+      <span class="k">${escapeHtml(r.key)}</span>
+      <span class="mark ${cls}">${icon}</span>
+      <span class="v">${escapeHtml(r.value)}${
+        r.note ? `<br><span style="font-size:.78rem">${escapeHtml(r.note)}</span>` : ''
+      }</span>
+    </div>`;
+  }).join('');
+}
+
+// 末尾だけ見せる（同じトークンかどうかの見分けがつく程度に）
+function maskSecret(text) {
+  const t = String(text || '');
+  return t.length <= 4 ? '****' : '****' + t.slice(-4);
 }
 
 // ---- 暗号化（合い言葉から鍵を作る） ----
@@ -1244,6 +1372,7 @@ function render() {
     set('d-owner', conn?.owner || location.hostname.split('.')[0]);
     set('d-repo',  conn?.repo  || location.pathname.split('/')[1] || '');
     set('d-gasToken', conn?.gasToken || '');
+    renderDevStatus();
   }
 
   dirty = false;
