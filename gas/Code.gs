@@ -246,6 +246,10 @@ function doPost(e) {
       dbResult = saveToDatabase(params, calc, config);
     } catch (dbErr) {
       console.error('saveToDatabase error（受付処理は継続します）:', dbErr);
+      dbResult = { saved: false, reason: 'エラー: ' + dbErr.message };
+    }
+    if (!dbResult.saved) {
+      console.warn('データベースへ保存されませんでした: ' + (dbResult.reason || '理由不明'));
     }
 
     // ---- メール送信 ----
@@ -255,7 +259,7 @@ function doPost(e) {
       console.error('sendConfirmationEmail error:', mailErr);
     }
     try {
-      sendAdminEmail(params, calc, config);
+      sendAdminEmail(params, calc, config, dbResult);
     } catch (mailErr) {
       console.error('sendAdminEmail error:', mailErr);
     }
@@ -1048,7 +1052,17 @@ function buildPhotoNoticeText_(config) {
   return lines.join('\n');
 }
 
-function sendAdminEmail(params, calc, config) {
+/**
+ * 事務局メールに出す、データベース保存の結果説明。
+ * 保存されなかったときは理由まで書き、気づけるようにします。
+ */
+function describeDbResult_(dbResult) {
+  const r = dbResult || {};
+  if (r.saved) return 'OK' + (r.applicationId ? '（申込ID: ' + r.applicationId + '）' : '');
+  return '⚠️ 未保存（' + (r.reason || '理由不明') + '）※受付シートには入っています';
+}
+
+function sendAdminEmail(params, calc, config, dbResult) {
   const emailCfg   = config.email || {};
   const eventName  = (config.event && config.event.name) || 'イベント';
   const adminEmail = emailCfg.adminEmail;
@@ -1107,7 +1121,8 @@ function sendAdminEmail(params, calc, config) {
     '備考: ' + (params.notes || 'なし') + '\n' +
     '写真掲載可否: ' + (params.photoPermission || '-') + '\n' +
     '写真URL: ' + (params.profileImageUrl || '⚠️ 未受領（申込者に公式LINEへの送付を案内済み）') + '\n' +
-    '申込日時: ' + params.submittedAt;
+    '申込日時: ' + params.submittedAt + '\n' +
+    'データベース保存: ' + describeDbResult_(dbResult);
 
   GmailApp.sendEmail(adminEmail, subject, body, {
     name: emailCfg.adminSenderName || (eventName + ' 事務局')

@@ -19,7 +19,7 @@ const wrapped = new Function('Utilities', 'console', src + `
   return { mapRowToHeaders_, buildFieldMap, dateKey_, formatCellDate_, padLeft_, normalizeEmail_,
            formatSnsLinks, buildReceptionHeaders, DB_APPLICATION_HEADERS,
            sanitizeFileName_, buildPhotoFileName_, getEditionInfo_,
-           buildPhotoNoticeText_, applyTemplate, PHOTO_PENDING_LABEL,
+           buildPhotoNoticeText_, applyTemplate, PHOTO_PENDING_LABEL, describeDbResult_,
            buildExhibitorRows_, DB_EXHIBITOR_HEADERS, resolveReceptionHeaders_ };
 `);
 const M = wrapped(Utilities, console);
@@ -162,6 +162,14 @@ check('URL未設定でも文面が壊れない',
 check('メールで送るようには案内しない', notice.includes('メール'), false);
 check('申込が完了している旨を伝える', notice.includes('お申込みは完了'), true);
 check('シートの目印', M.PHOTO_PENDING_LABEL, 'LINE送付待ち');
+
+// 事務局メールで、DBに入らなかったことに気づけるか
+check('DB保存OKの表示', M.describeDbResult_({ saved: true, applicationId: 'A-0001' }),
+  'OK（申込ID: A-0001）');
+check('DB未保存は理由つきで警告', M.describeDbResult_({ saved: false, reason: 'databaseSpreadsheetId 未設定' }),
+  '⚠️ 未保存（databaseSpreadsheetId 未設定）※受付シートには入っています');
+check('理由が無くても警告は出す',
+  M.describeDbResult_(undefined).indexOf('⚠️ 未保存') === 0, true);
 
 // テンプレートに {{photoNotice}} があればその位置へ差し込まれる
 check('差し込み位置を指定できる',
