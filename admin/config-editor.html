@@ -192,6 +192,11 @@
   .newevent-lead { font-size: .82rem; line-height: 1.7; }
   .ne-check { display: flex; align-items: flex-start; gap: .5rem; font-size: .88rem; cursor: pointer; }
   .ne-check input { width: 1.15rem; height: 1.15rem; margin-top: .15rem; flex: 0 0 auto; accent-color: var(--brand); }
+  .ne-sheet-row { display: flex; gap: .5rem; align-items: stretch; }
+  .ne-sheet-row input { flex: 1; min-width: 0; }
+  .ne-sheet-row .btn { flex: 0 0 auto; }
+  @media (max-width: 26rem) { .ne-sheet-row { flex-direction: column; } }
+
   .newevent-actions { display: flex; gap: .6rem; }
   .newevent-actions .btn { flex: 1; }
 
@@ -379,10 +384,13 @@
             </div>
             <div class="field">
               <label for="ne-sheet">今回の受付シート</label>
-              <input type="url" id="ne-sheet" placeholder="https://docs.google.com/spreadsheets/...">
-              <span class="hint">
-                <strong>新しいスプレッドシートを用意して</strong>、そのURLを貼り付けてください。
-                前回のシートはそのまま残しておきます
+              <div class="ne-sheet-row">
+                <input type="url" id="ne-sheet" placeholder="https://docs.google.com/spreadsheets/...">
+                <button type="button" class="btn btn-new" id="ne-make">シートを作る</button>
+              </div>
+              <span class="hint" id="ne-sheetHint">
+                「シートを作る」を押すと、<strong>前回と同じ場所に新しいシートが作られます</strong>。
+                すでに用意してある場合は、そのURLを貼り付けてください
               </span>
             </div>
 
@@ -695,6 +703,14 @@
           <input type="url" id="d-configUrl" placeholder="https://USER.github.io/REPO/apply/config.json">
         </div>
         <div class="field">
+          <label for="d-gasToken">GAS 管理トークン（任意）</label>
+          <input type="password" id="d-gasToken" placeholder="ADMIN_TOKEN と同じ値" autocomplete="off">
+          <span class="hint">
+            GASの「スクリプト プロパティ」に <code>ADMIN_TOKEN</code> を設定している場合だけ入れてください。
+            合い言葉と一緒に暗号化して保存されます
+          </span>
+        </div>
+        <div class="field">
           <label for="d-gasUrl">GAS ウェブアプリURL</label>
           <input type="url" id="d-gasUrl" placeholder="https://script.google.com/macros/s/.../exec">
         </div>
@@ -912,8 +928,9 @@ async function registerPassphrase() {
 
   msg.textContent = '登録中...';
   try {
-    const blob = await encryptJson({ owner, repo, token }, p1);
-    conn = { owner, repo, token };
+    const gasToken = val('d-gasToken');
+    const blob = await encryptJson({ owner, repo, token, gasToken }, p1);
+    conn = { owner, repo, token, gasToken };
     await putFile(UNLOCK_PATH, JSON.stringify(blob, null, 2), '管理画面の合い言葉を更新');
     localStorage.setItem(STORE_KEY, JSON.stringify(conn));
     msg.textContent = '✅ 登録しました。この合い言葉で管理画面をひらけます。';
@@ -1226,6 +1243,7 @@ function render() {
     set('d-workerUrl', cfg.workerUrl);
     set('d-owner', conn?.owner || location.hostname.split('.')[0]);
     set('d-repo',  conn?.repo  || location.pathname.split('/')[1] || '');
+    set('d-gasToken', conn?.gasToken || '');
   }
 
   dirty = false;
@@ -1540,6 +1558,7 @@ function bindNewEvent() {
   });
 
   document.getElementById('newEventCancel').addEventListener('click', () => form.classList.add('hidden'));
+  document.getElementById('ne-make').addEventListener('click', createReceptionSheet);
   document.getElementById('newEventApply').addEventListener('click', applyNewEvent);
 }
 
@@ -1555,6 +1574,66 @@ function prefillNewEvent() {
   document.getElementById('ne-date').value  = '';
   document.getElementById('ne-place').value = val('f-eventPlace');
   document.getElementById('ne-sheet').value = '';
+}
+
+/**
+ * 受付シートをその場で作る。
+ * 作成そのものは GAS（＝クライアントのGoogleドライブ側）が行う。
+ */
+async function createReceptionSheet() {
+  const btn   = document.getElementById('ne-make');
+  const input = document.getElementById('ne-sheet');
+  const hint  = document.getElementById('ne-sheetHint');
+
+  if (!cfg?.gasUrl) {
+    alert('シートの作成先が設定されていません。\n作成者にご連絡ください。');
+    return;
+  }
+  if (input.value.trim() &&
+      !confirm('すでにURLが入っています。\n新しいシートを作って置き換えますか？')) return;
+
+  const name = (document.getElementById('ne-name').value.trim() || val('f-eventName')) + ' 申込';
+
+  const url = new URL(cfg.gasUrl);
+  url.searchParams.set('action', 'create_reception_sheet');
+  url.searchParams.set('name', name);
+  const token = gasAdminToken();
+  if (token) url.searchParams.set('token', token);
+
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = '作成中...';
+  hint.textContent = 'Googleドライブに作成しています。10秒ほどかかります...';
+
+  try {
+    const res  = await fetch(url, { redirect: 'follow' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || '作成に失敗しました');
+
+    input.value = data.url;
+    hint.innerHTML = `✅ <strong>${escapeHtml(data.name)}</strong> を作成しました` +
+                     `（保存先: ${escapeHtml(data.folder)}）`;
+
+  } catch (err) {
+    // ブラウザの制限で結果を受け取れないことがあるため、別画面で作れるようにする
+    console.warn('シート作成の応答を受け取れませんでした:', err);
+    const manual = new URL(url);
+    manual.searchParams.set('format', 'html');
+    hint.innerHTML = 'この画面からは作成結果を受け取れませんでした。' +
+      `<a href="${manual}" target="_blank" rel="noopener"><strong>こちらを開いて作成</strong></a>し、` +
+      '表示されたURLをコピーして上の欄に貼り付けてください。';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
+function gasAdminToken() {
+  return (conn && conn.gasToken) || localStorage.getItem('admin_gas_token') || '';
+}
+
+function escapeHtml(t) {
+  return String(t ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 }
 
 /** 「第1回」→「第2回」。数字が見つからなければ空にする */

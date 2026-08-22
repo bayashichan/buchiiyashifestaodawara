@@ -180,6 +180,8 @@ function doGet(e) {
       case 'clear_cache':
         result = handleClearCache(params);
         break;
+      case 'create_reception_sheet':
+        return handleCreateReceptionSheet(params);
       case 'status':
         result = handleStatus();
         break;
@@ -1353,6 +1355,126 @@ function handleClearCache(params) {
   }
   clearConfigCache();
   return { success: true, message: '設定キャッシュをクリアしました' };
+}
+
+/**
+ * 今回の受付スプレッドシートを新しく作ります。
+ *
+ * 管理画面の「次の開催をはじめる」から呼ばれます。
+ * - いま使っている受付シートと同じフォルダに作ります
+ * - 1行目の見出しも、いまの受付シートからそのまま写します
+ *   （見出しが取れない場合だけ、設定から組み立てます）
+ *
+ * format=html を付けると、ブラウザで開いて結果を確認できる画面を返します。
+ */
+function handleCreateReceptionSheet(params) {
+  const wantHtml = String(params.format || '') === 'html';
+
+  try {
+    const expected = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
+    if (expected && String(params.token || '') !== expected) {
+      throw new Error('管理トークンが正しくありません');
+    }
+
+    const config = getConfig();
+    const info   = createReceptionSpreadsheet_(config, params.name);
+
+    return wantHtml ? createSheetResultPage_(info) : jsonOutput_(Object.assign({ success: true }, info));
+
+  } catch (err) {
+    console.error('handleCreateReceptionSheet error:', err);
+    if (wantHtml) return createSheetResultPage_({ error: err.message });
+    return jsonOutput_({ success: false, error: err.message });
+  }
+}
+
+function createReceptionSpreadsheet_(config, requestedName) {
+  const edition = getEditionInfo_(config);
+  const name    = sanitizeFileName_(requestedName) ||
+                  sanitizeFileName_((edition.eventName || 'イベント') + ' 申込');
+
+  // いまの受付シートの見出しを引き継ぐ（列の並びを変えないため）
+  let headers = null;
+  let sameFolder = null;
+
+  if (config.spreadsheetId) {
+    try {
+      const cur   = SpreadsheetApp.openById(config.spreadsheetId);
+      const sheet = cur.getSheetByName(RECEPTION_SHEET_NAME);
+      if (sheet && sheet.getLastColumn() > 0) {
+        headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      }
+      const parents = DriveApp.getFileById(config.spreadsheetId).getParents();
+      if (parents.hasNext()) sameFolder = parents.next();
+    } catch (e) {
+      console.warn('いまの受付シートを参照できませんでした:', e);
+    }
+  }
+
+  if (!headers || !headers.length) headers = buildReceptionHeaders(config);
+
+  const ss    = SpreadsheetApp.create(name);
+  const sheet = ss.getSheets()[0];
+  sheet.setName(RECEPTION_SHEET_NAME);
+
+  ensureColumnCount_(sheet, headers.length);
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length)
+    .setBackground('#374151')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold');
+  sheet.setFrozenRows(1);
+
+  // いまの受付シートと同じ場所へ置く
+  let folderName = 'マイドライブ';
+  if (sameFolder) {
+    try {
+      const file = DriveApp.getFileById(ss.getId());
+      sameFolder.addFile(file);
+      DriveApp.getRootFolder().removeFile(file);
+      folderName = sameFolder.getName();
+    } catch (e) {
+      console.warn('フォルダの移動に失敗しました:', e);
+    }
+  }
+
+  return {
+    id: ss.getId(),
+    url: ss.getUrl(),
+    name: name,
+    folder: folderName,
+    columns: headers.length
+  };
+}
+
+/** ブラウザで開いたときに見せる結果画面 */
+function createSheetResultPage_(info) {
+  const esc = function (t) {
+    return String(t === null || t === undefined ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+
+  const body = info.error
+    ? '<h1>作成できませんでした</h1><p class="err">' + esc(info.error) + '</p>' +
+      '<p>お手数ですが、この画面を管理者にお知らせください。</p>'
+    : '<h1>受付シートを作成しました</h1>' +
+      '<p><b>' + esc(info.name) + '</b><br>保存先: ' + esc(info.folder) + '</p>' +
+      '<p>下のURLをコピーして、管理画面の「今回の受付シート」に貼り付けてください。</p>' +
+      '<input id="u" value="' + esc(info.url) + '" readonly onclick="this.select()">' +
+      '<button onclick="navigator.clipboard.writeText(document.getElementById(\'u\').value);this.textContent=\'コピーしました\'">URLをコピー</button>' +
+      '<p><a href="' + esc(info.url) + '" target="_blank">シートを開く</a></p>';
+
+  return HtmlService.createHtmlOutput(
+    '<!DOCTYPE html><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<style>body{font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;' +
+    'padding:1.5rem;line-height:1.8;color:#2a1a22;max-width:34rem;margin:0 auto}' +
+    'h1{font-size:1.15rem;color:#650133}' +
+    'input{width:100%;font-size:16px;padding:.6rem;border:1.5px solid #e6dfe4;border-radius:.5rem;margin:.5rem 0}' +
+    'button{font:inherit;font-weight:700;background:#650133;color:#fff;border:0;' +
+    'border-radius:.5rem;padding:.6rem 1rem;cursor:pointer}' +
+    '.err{color:#a3182a;font-weight:700}</style>' + body
+  ).setTitle('受付シートの作成');
 }
 
 /** 稼働状況の確認（設定が正しく読めているかの点検用） */

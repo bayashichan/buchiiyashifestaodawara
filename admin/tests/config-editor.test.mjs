@@ -343,5 +343,54 @@ console.log('\n[10] 次の開催をはじめる');
   ok('規約はそのまま残る', body.terms === config.terms);
 }
 
+console.log('\n[11] 受付シートをその場で作る');
+{
+  const { doc, window } = await boot();
+  const calls = [];
+  const origFetch = window.fetch;
+
+  window.fetch = async (input, init) => {
+    const u = String(input);
+    if (u.includes('create_reception_sheet')) {
+      calls.push(u);
+      return { ok: true, json: async () => ({
+        success: true, url: 'https://docs.google.com/spreadsheets/d/NEW999/edit',
+        name: '第2回ぶち癒しフェスタin小田原 申込', folder: '申込フォルダ', id: 'NEW999'
+      }) };
+    }
+    return origFetch(input, init);
+  };
+
+  doc.getElementById('newEventBtn').dispatchEvent(new window.Event('click'));
+  ok('作成ボタンがある', !!doc.getElementById('ne-make'));
+
+  doc.getElementById('ne-make').dispatchEvent(new window.Event('click'));
+  await new Promise(r => setTimeout(r, 60));
+
+  ok('GASに作成を依頼する', calls.length === 1, String(calls.length));
+  ok('依頼先はGASのURL', calls[0].startsWith(config.gasUrl), calls[0].slice(0, 60));
+  // URLの符号化を通さず、実際に渡る値で確かめる
+  const sentName = new URL(calls[0]).searchParams.get('name');
+  ok('イベント名からシート名を作る', sentName === '第2回ぶち癒しフェスタin小田原 申込', sentName);
+  ok('作られたURLが欄に入る',
+     doc.getElementById('ne-sheet').value === 'https://docs.google.com/spreadsheets/d/NEW999/edit',
+     doc.getElementById('ne-sheet').value);
+  ok('作成できたことを知らせる',
+     doc.getElementById('ne-sheetHint').textContent.includes('作成しました'),
+     doc.getElementById('ne-sheetHint').textContent);
+
+  // 応答を受け取れない場合は、別画面で作れるように案内する
+  window.fetch = async () => { throw new Error('CORS'); };
+  doc.getElementById('ne-sheet').value = '';
+  doc.getElementById('ne-make').dispatchEvent(new window.Event('click'));
+  await new Promise(r => setTimeout(r, 60));
+
+  const hint = doc.getElementById('ne-sheetHint');
+  ok('受け取れないときは別画面を案内する', hint.textContent.includes('こちらを開いて作成'), hint.textContent);
+  ok('案内先は結果表示用の画面', hint.querySelector('a')?.href.includes('format=html'),
+     hint.querySelector('a')?.href || '');
+  ok('作成ボタンは押せる状態に戻る', !doc.getElementById('ne-make').disabled);
+}
+
 console.log(ng === 0 ? '\n✅ すべて成功' : `\n❌ ${ng}件失敗`);
 process.exit(ng === 0 ? 0 : 1);
