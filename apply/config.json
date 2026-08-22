@@ -16,7 +16,7 @@
   },
   "features": {
     "earlyBird": false,
-    "repeaterSearch": false,
+    "repeaterSearch": true,
     "memberDiscount": true,
     "memberDiscountLabel": "アーキハピネス協会会員ですか？",
     "stampRally": true,
