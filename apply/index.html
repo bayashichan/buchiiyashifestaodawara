@@ -184,6 +184,13 @@
             <label class="input-label">出展ブース<span class="required">*</span></label>
             <div id="boothAccordion" style="display:grid;gap:0.5rem;margin-top:0.5rem"></div>
             <input type="hidden" name="boothId" id="boothIdInput">
+
+            <!-- 満枠のブースを選んだときだけ表示 -->
+            <div id="waitlistNotice" class="waitlist-notice hidden" role="status">
+              ⏳ <strong>このブースは満枠のため、キャンセル待ちとしての受付になります。</strong><br>
+              空きが出た場合に、事務局から順番にご連絡します。
+              ご連絡があるまで、出展料のお振込みはお待ちください。
+            </div>
           </div>
 
           <!-- ボディケアブース持ち込み物品（features.bodyEquipment） -->
@@ -425,10 +432,17 @@
   <!-- 申込完了モーダル -->
   <div id="completeModal" class="modal-overlay hidden">
     <div class="modal-box" style="text-align:center">
-      <div style="font-size:3.5rem;margin-bottom:1rem">🎊</div>
-      <h2 style="font-size:1.4rem;font-weight:700;color:var(--color-primary);margin-bottom:1rem">
+      <div id="completeIcon" style="font-size:3.5rem;margin-bottom:1rem">🎊</div>
+      <h2 id="completeTitle" style="font-size:1.4rem;font-weight:700;color:var(--color-primary);margin-bottom:1rem">
         お申込みありがとうございます！
       </h2>
+
+      <!-- キャンセル待ちで受け付けた場合のみ表示 -->
+      <div id="waitlistResult" class="hidden"
+           style="text-align:left;margin-bottom:1rem;padding:1rem;background:#fffbeb;border:1.5px solid #fcd34d;border-radius:0.75rem">
+        <p id="waitlistResultText" style="font-size:0.9rem;color:#92400e;line-height:1.8"></p>
+      </div>
+
       <p style="color:#6b7280;margin-bottom:1.5rem;line-height:1.7">
         ご登録のメールアドレスに<br>確認メールをお送りしました。<br>
         内容をご確認ください。

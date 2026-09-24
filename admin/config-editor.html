@@ -71,7 +71,7 @@
   /* ============ 入力 ============ */
   .field { display: flex; flex-direction: column; gap: .35rem; }
   .field > label { font-size: .88rem; font-weight: 700; }
-  .field .hint { font-size: .78rem; color: var(--ink-soft); line-height: 1.6; }
+  .field .hint, .hint { font-size: .78rem; color: var(--ink-soft); line-height: 1.6; }
 
   input[type=text], input[type=url], input[type=email], input[type=number],
   input[type=password], input[type=datetime-local], textarea, select {
@@ -192,13 +192,136 @@
   .newevent-lead { font-size: .82rem; line-height: 1.7; }
   .ne-check { display: flex; align-items: flex-start; gap: .5rem; font-size: .88rem; cursor: pointer; }
   .ne-check input { width: 1.15rem; height: 1.15rem; margin-top: .15rem; flex: 0 0 auto; accent-color: var(--brand); }
-  .ne-sheet-row { display: flex; gap: .5rem; align-items: stretch; }
-  .ne-sheet-row input { flex: 1; min-width: 0; }
-  .ne-sheet-row .btn { flex: 0 0 auto; }
-  @media (max-width: 26rem) { .ne-sheet-row { flex-direction: column; } }
+  .ne-check .hint { font-size: .78rem; color: var(--ink-soft); line-height: 1.6; }
 
   .newevent-actions { display: flex; gap: .6rem; }
-  .newevent-actions .btn { flex: 1; }
+  .newevent-actions .btn { flex: 1; min-height: 48px; font-size: 1rem; }
+
+  /* ============ 申込フォームのURL ============ */
+  .linkcard { padding: 1rem 1.1rem 1.1rem; display: flex; flex-direction: column; gap: .55rem; }
+  .linkcard-title { font-size: 1.02rem; font-weight: 700; }
+  .linkcard-sub { font-weight: 700; margin-top: .4rem; }
+  .linkcard input[readonly] { background: var(--bg); font-size: 15px; color: var(--ink); }
+  .linkactions { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .linkactions .btn { flex: 1 1 10rem; min-height: 48px; font-size: .95rem; }
+  .linkactions a.btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+
+  /* ============ 画面の上に出す警告（受付シートが前の回のまま など） ============ */
+  .alert {
+    border: 1.5px solid #e7b45c; background: var(--warn-soft); color: var(--warn);
+    border-radius: var(--radius); padding: .95rem 1rem; margin-bottom: .85rem;
+    display: flex; flex-direction: column; gap: .65rem; font-size: .88rem; line-height: 1.75;
+  }
+  .alert strong { color: var(--warn); }
+  .alert-title { font-weight: 700; font-size: .98rem; }
+  .alert-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .alert-actions .btn { flex: 1 1 12rem; min-height: 46px; }
+
+  /* ============ ブース（開閉式のカード） ============ */
+  details.booth { padding: 0; gap: 0; }
+  details.booth > summary {
+    list-style: none; cursor: pointer; padding: .85rem .9rem;
+    display: flex; align-items: center; gap: .6rem; min-height: 56px;
+  }
+  details.booth > summary::-webkit-details-marker { display: none; }
+  details.booth > summary::after {
+    content: '⌄'; margin-left: auto; font-size: 1.2rem; color: var(--ink-soft);
+    transition: transform .2s; flex: 0 0 auto;
+  }
+  details.booth[open] > summary::after { transform: rotate(180deg); }
+  details.booth[open] > summary { border-bottom: 1px solid var(--line); }
+  .booth-head { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+  .booth-title { font-weight: 700; font-size: .98rem; word-break: break-all; }
+  .pills { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .pill {
+    font-size: .74rem; font-weight: 700; border-radius: 999px; padding: .08rem .55rem;
+    background: #efe9ed; color: var(--ink-soft); white-space: nowrap;
+  }
+  .pill-on   { background: var(--ok-soft); color: var(--ok); }
+  .pill-warn { background: var(--warn-soft); color: var(--warn); }
+  .booth-body { padding: .9rem; display: flex; flex-direction: column; gap: .9rem; }
+  .group-title { font-size: .9rem; font-weight: 700; margin-bottom: -.3rem; }
+
+  /* オンにしたときだけ出る、ひとつ下の設定 */
+  .subsettings {
+    border-left: 3px solid var(--brand-soft); padding: .3rem 0 .3rem .85rem;
+    display: flex; flex-direction: column; gap: .85rem;
+  }
+
+  /* 数字を −／＋ で変える */
+  .stepper { display: flex; align-items: center; gap: .6rem; }
+  .stepper button {
+    width: 48px; height: 48px; flex: 0 0 auto; border-radius: 50%;
+    border: 1.5px solid var(--brand); background: #fff; color: var(--brand);
+    font: inherit; font-size: 1.5rem; font-weight: 700; line-height: 1; cursor: pointer;
+  }
+  .stepper button:disabled { opacity: .35; cursor: not-allowed; }
+  .stepper input { width: 5.5rem; text-align: center; font-size: 1.15rem; font-weight: 700; }
+  .stepper .unit { font-weight: 700; white-space: nowrap; }
+
+  /* えらぶ（ラジオボタン） */
+  .choices { display: flex; flex-direction: column; gap: .5rem; }
+  .choice {
+    display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+    border: 1.5px solid var(--line); border-radius: .6rem; padding: .7rem .8rem;
+    min-height: 48px; cursor: pointer; font-size: .92rem; background: #fff;
+  }
+  .choice input[type=radio] { width: 1.2rem; height: 1.2rem; accent-color: var(--brand); flex: 0 0 auto; }
+  .choice.on { border-color: var(--brand); background: var(--brand-soft); }
+  .choice-extra { margin-left: 1.9rem; }
+
+  /* 「フォームではこう見えます」の見本 */
+  .example {
+    border: 1px dashed #d8c9d1; border-radius: .6rem; padding: .6rem .75rem; background: #fff;
+    display: flex; flex-direction: column; gap: .4rem;
+  }
+  .example-label { font-size: .74rem; color: var(--ink-soft); font-weight: 700; }
+  .example-row {
+    display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+    border: 1.5px solid #e5e7eb; border-radius: .5rem; padding: .55rem .7rem; font-size: .88rem;
+  }
+  .example-row .grow { flex: 1; font-weight: 700; line-height: 1.6; }
+  .ex-badge {
+    display: inline-block; margin-left: .35rem; vertical-align: .1em;
+    font-size: .74rem; font-weight: 700; border-radius: 999px; padding: .08rem .55rem; white-space: nowrap;
+  }
+  .ex-remaining { background: #fee2e2; color: #b91c1c; }
+  .ex-waitlist  { background: #f59e0b; color: #fff; }
+  .ex-soldout   { background: #9ca3af; color: #fff; }
+
+  .btn-del-wide { width: 100%; min-height: 46px; }
+
+  /* ============ 確認・進み具合（画面の下から出るパネル） ============ */
+  .sheet-overlay {
+    position: fixed; inset: 0; z-index: 100; background: rgba(42,26,34,.5);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .sheet {
+    background: #fff; width: 100%; max-width: 34rem; max-height: 92dvh; overflow-y: auto;
+    border-radius: 1.1rem 1.1rem 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.18);
+    padding: 1.25rem 1.1rem calc(1rem + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  .sheet h2 { font-size: 1.08rem; color: var(--brand); line-height: 1.5; }
+  .sheet p  { font-size: .88rem; line-height: 1.75; }
+  .todo { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
+  .todo li {
+    display: flex; gap: .55rem; font-size: .9rem; line-height: 1.6;
+    background: var(--bg); border-radius: .55rem; padding: .6rem .75rem;
+  }
+  .todo li::before { content: '✓'; color: var(--ok); font-weight: 700; flex: 0 0 auto; }
+  .steps { list-style: none; display: flex; flex-direction: column; gap: .45rem; }
+  .steps li { display: flex; gap: .6rem; align-items: flex-start; font-size: .92rem; padding: .35rem 0; }
+  .steps .icon { width: 1.5rem; text-align: center; flex: 0 0 auto; }
+  .steps .step-note { display: block; font-size: .8rem; color: var(--ink-soft); word-break: break-all; }
+  .steps li.ng .step-note { color: var(--danger); font-weight: 700; }
+  .sheet-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+  .sheet-actions .btn, .sheet-actions .save-btn { flex: 1 1 8rem; min-height: 50px; font-size: 1rem; text-align: center; text-decoration: none; }
+  .sheet-actions a.btn { display: flex; align-items: center; justify-content: center; }
+  @media (min-width: 40rem) {
+    .sheet-overlay { align-items: center; }
+    .sheet { border-radius: 1.1rem; }
+  }
 
   /* ============ フォルダの構成図 ============ */
   .folder-tree {
@@ -363,6 +486,32 @@
 
   <div class="wrap">
 
+    <!-- 受付シートが前の回のままのときなどに出す警告 -->
+    <div class="alert hidden" id="sheetAlert" role="alert"></div>
+
+    <!-- 申込フォームのURL（LINEのリッチメニューなどに貼るため） -->
+    <section class="card linkcard">
+      <div class="linkcard-title">🔗 申込フォームのURL</div>
+      <span class="hint">LINEのリッチメニューやSNSに貼るときは、ここからコピーしてください</span>
+      <input type="text" id="formUrl" readonly aria-label="申込フォームのURL">
+      <div class="linkactions">
+        <button type="button" class="btn btn-new" id="copyFormUrl">📋 URLをコピー</button>
+        <a class="btn" id="openFormUrl" target="_blank" rel="noopener">開いて確かめる</a>
+      </div>
+
+      <div id="liffLinkBox" class="hidden" style="display:flex;flex-direction:column;gap:.5rem">
+        <div class="linkcard-sub">LINEアプリ用のURL</div>
+        <span class="hint">
+          LINEのリッチメニューには、こちらがおすすめです。
+          LINEから開いた方の、LINEでの名前が申込と一緒に記録されます
+        </span>
+        <input type="text" id="liffUrl" readonly aria-label="LINEアプリ用のURL">
+        <div class="linkactions">
+          <button type="button" class="btn btn-new" id="copyLiffUrl">📋 LINE用のURLをコピー</button>
+        </div>
+      </div>
+    </section>
+
     <!-- ========== イベントのこと ========== -->
     <details class="card" open>
       <summary>📅 イベントのこと</summary>
@@ -380,8 +529,9 @@
 
           <div class="newevent-form hidden" id="newEventForm">
             <p class="newevent-lead">
-              次の開催の内容を入れてください。ここで入れた内容が下の欄に反映されます。
-              <strong>「設定内容を保存」を押すまで、いまの受付は変わりません。</strong>
+              次の開催の内容を入れて、いちばん下の<strong>「この内容ではじめる」</strong>を押してください。
+              確認の画面が出たあと、<strong>受付シートの作成から保存まで</strong>をまとめて行います。
+              確認の画面で「はじめる」を押すまで、いまの受付は変わりません。
             </p>
 
             <div class="field">
@@ -396,28 +546,23 @@
             <div class="field">
               <label for="ne-date">開催日時</label>
               <input type="text" id="ne-date" placeholder="2027年5月5日（日）11:00〜16:30">
+              <span class="hint">空のままにすると、前回の日時のままになります（あとで直せます）</span>
             </div>
             <div class="field">
               <label for="ne-place">会場</label>
               <input type="text" id="ne-place" placeholder="会場名">
             </div>
-            <div class="field">
-              <label for="ne-sheet">今回の受付シート</label>
-              <div class="ne-sheet-row">
-                <input type="url" id="ne-sheet" placeholder="https://docs.google.com/spreadsheets/...">
-                <button type="button" class="btn btn-new" id="ne-make">シートを作る</button>
-              </div>
-              <span class="hint" id="ne-sheetHint">
-                <strong>「シートを作る」を押すだけです。</strong>
-                前回と同じ場所に新しいシートが作られ、URLもここに自動で入ります。
-                <strong>フォルダを選んだり作ったりする必要はありません。</strong>
-                すでに用意してある場合だけ、そのURLを貼り付けてください
-              </span>
+
+            <div class="note note-info">
+              <strong>受付シートは自動で作られます。</strong>
+              前回と同じフォルダに、前回と同じ見出しで新しいシートができます。
+              フォルダを選んだり、URLを貼ったりする必要はありません。
             </div>
 
             <label class="ne-check">
               <input type="checkbox" id="ne-reopen" checked>
-              <span>すべてのブースを「受付中」に戻す</span>
+              <span>すべてのブースを「受付中」に戻す<br>
+                <span class="hint">手動で締め切ったブースも受付を再開します。残り枠は新しい受付シートで0から数え直します</span></span>
             </label>
             <label class="ne-check">
               <input type="checkbox" id="ne-repeater" checked>
@@ -432,7 +577,7 @@
 
             <div class="newevent-actions">
               <button type="button" class="btn" id="newEventCancel">やめる</button>
-              <button type="button" class="btn btn-new" id="newEventApply">この内容にする</button>
+              <button type="button" class="btn btn-new" id="newEventApply">この内容ではじめる</button>
             </div>
           </div>
         </div>
@@ -449,7 +594,9 @@
         </div>
         <div class="note note-warn" id="editionWarn" hidden>
           <strong>開催回を変更しました。</strong>
-          新しい申込は別の回として記録されます。次の開催の準備であれば、このまま保存してください。
+          新しい申込は別の回として記録されます。
+          次の開催の準備なら、上の<strong>「🆕 次の開催をはじめる」</strong>を使ってください。
+          受付シートも一緒に作られます（ここで開催回だけ変えると、受付シートは前の回のままです）。
         </div>
         <div class="field">
           <label for="f-eventDate">開催日時</label>
@@ -514,11 +661,23 @@
     <details class="card">
       <summary>🏪 ブース（出展枠）</summary>
       <div class="card-body">
+        <div>
+          <div class="switch">
+            <div>
+              <div class="txt">満枠のブースは「キャンセル待ち」で受け付ける</div>
+              <div class="sub" id="waitlistSub"></div>
+            </div>
+            <label class="toggle"><input type="checkbox" id="f-waitlist"><span></span></label>
+          </div>
+        </div>
+
+        <span class="hint">ブースをタップすると、料金や残り枠の設定がひらきます</span>
         <div id="boothList" style="display:flex;flex-direction:column;gap:.85rem"></div>
         <button type="button" class="btn btn-add" id="addBooth">＋ ブースを追加</button>
         <div class="note note-warn">
           <strong>受付中はブース名を変えないでください。</strong>
           変えると、その瞬間に申込画面を開いていた方が送信できなくなることがあります。
+          また、残り枠はブース名で数えているため、名前を変えると0から数え直しになります。
         </div>
       </div>
     </details>
@@ -684,6 +843,29 @@
           <label for="f-adminSubject">事務局へのお知らせメールの件名</label>
           <input type="text" id="f-adminSubject" placeholder="新しい申込がありました">
           <div class="chips" id="chipsAdmin"></div>
+          <span class="hint">キャンセル待ちの申込のときは、件名の先頭に自動で【キャンセル待ち】が付きます</span>
+        </div>
+
+        <hr style="border:0;border-top:1px solid var(--line)">
+
+        <div>
+          <div style="font-weight:700">⏳ キャンセル待ちの方へのメール</div>
+          <span class="hint">
+            満枠のブースに申し込んだ方には、上のメールの代わりにこちらが届きます。
+            <strong>振込の案内は入れないでください</strong>（空きが出るまでお支払いは不要なため）
+          </span>
+        </div>
+        <div class="field">
+          <label for="f-waitSubject">件名</label>
+          <input type="text" id="f-waitSubject">
+          <div class="chips" id="chipsWaitSubject"></div>
+          <span class="hint">空のままなら「【イベント名】キャンセル待ちで受け付けました」になります</span>
+        </div>
+        <div class="field">
+          <label for="f-waitBody">本文</label>
+          <div class="chips" id="chipsWaitBody"></div>
+          <div id="f-waitBody" class="rich" contenteditable="true" role="textbox"
+               aria-multiline="true" aria-label="キャンセル待ちの方へのメール本文" data-rich="1"></div>
         </div>
       </div>
     </details>
@@ -694,8 +876,8 @@
       <div class="card-body">
         <div class="note note-info">
           <strong>この欄は設定ずみです。ふだんは何も変えなくて大丈夫です。</strong><br>
-          次の開催をはじめるときも、上の「🆕 次の開催をはじめる」で
-          <strong>受付シートは「シートを作る」を押すだけで自動作成</strong>され、URLもここに自動で入ります。<br>
+          次の開催をはじめるときも、上の「🆕 次の開催をはじめる」を使えば
+          <strong>受付シートは自動作成</strong>され、URLもここに自動で入ります。<br>
           <strong>写真の保存フォルダと出展者データベースは、最初の設定のまま変えないでください。</strong>
         </div>
         <div class="field">
@@ -822,6 +1004,15 @@
   </div>
 </div>
 
+<!-- 確認・進み具合を出すパネル -->
+<div class="sheet-overlay hidden" id="dialog">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+    <h2 id="dialogTitle"></h2>
+    <div id="dialogBody" style="display:flex;flex-direction:column;gap:.85rem"></div>
+    <div class="sheet-actions" id="dialogActions"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -855,14 +1046,59 @@ const MAIL_VARS = [
 // 件名には入れない、本文だけで使える長い項目
 const BODY_ONLY_VARS = ['{{breakdown}}', '{{customAnswers}}', '{{photoNotice}}'];
 
+// 差し込みボタンの置き場所 [ボタンを並べる場所, 差し込む欄, 本文か]
+const MAIL_CHIP_BOXES = [
+  ['chipsSubject',     'f-subject',      false],
+  ['chipsBody',        'f-body',         true],
+  ['chipsAdmin',       'f-adminSubject', false],
+  ['chipsWaitSubject', 'f-waitSubject',  false],
+  ['chipsWaitBody',    'f-waitBody',     true]
+];
+
+// キャンセル待ちの方へのメール（未設定のときに入れておく文面。GAS 側の既定と同じ）
+const DEFAULT_WAITLIST_SUBJECT = '【{{eventName}}】キャンセル待ちで受け付けました';
+const DEFAULT_WAITLIST_BODY = [
+  '{{name}} 様',
+  '',
+  'この度は「{{eventName}}」へのお申込みありがとうございます。',
+  '',
+  'お選びいただいた「{{boothName}}」は満枠のため、',
+  'キャンセル待ちとして受け付けました。',
+  '',
+  '空きが出ましたら、事務局より順番にご連絡いたします。',
+  'ご連絡があるまで、出展料のお振込みはお控えください。',
+  '',
+  '■ お申込み内容',
+  'お名前: {{name}}',
+  '出展名: {{exhibitorName}}',
+  '出展ブース: {{boothName}}',
+  '{{customAnswers}}',
+  '受付日時: {{submittedAt}}',
+  '',
+  'ご不明な点はこのメールへ返信ください。',
+  '',
+  '{{eventName}} 運営事務局'
+].join('\n');
+
+// 出展者データベースに記録し、次回の「前回の内容を呼び出す」で使う質問
+const DB_KEY_QUESTIONS = ['出展メニュー名', '自己紹介'];
+
+// 残り枠の設定が無いブースに入れておく初期値
+const DEFAULT_SEATS = { enabled: false, total: 10, show: true, showWhenAtMost: 0 };
+
+// 保存後、申込フォームに反映されたかを確かめる間隔と回数（6秒 × 30回 = 最大3分）
+var TIMING = { publishPollMs: 6000, publishTries: 30 };
+
 // =====================================================================
 // 状態
 // =====================================================================
 let cfg   = null;   // 読み込んだ設定（表示していない項目もそのまま持ち続ける）
 let conn  = null;   // { owner, repo, token }
 let dirty = false;
+let busy  = false;          // 次の開催の準備など、まとめて処理している最中
 let originalEdition = '';
-let lastBodyRange = null;   // 本文欄で最後にカーソルがあった位置
+let lastPublish = Promise.resolve(null);   // 保存後の反映確認
+const lastRanges = new WeakMap();          // 本文欄ごとに、最後にカーソルがあった位置
 
 // =====================================================================
 // 起動
@@ -902,7 +1138,13 @@ function bindEvents() {
   document.getElementById('passInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') unlock();
   });
-  document.getElementById('saveBtn').addEventListener('click', save);
+  document.getElementById('saveBtn').addEventListener('click', () => save());
+  bindFormLinks();
+  document.getElementById('f-waitlist').addEventListener('change', e => {
+    cfg.features.waitlist = e.target.checked;
+    updateWaitlistSub();
+    renderBooths();   // 「手動で締め切る」の説明と見本が変わる
+  });
   document.getElementById('makeUnlock').addEventListener('click', registerPassphrase);
 
   document.getElementById('addBooth').addEventListener('click', () => {
@@ -946,7 +1188,7 @@ function bindEvents() {
   });
 
   window.addEventListener('beforeunload', e => {
-    if (dirty) { e.preventDefault(); e.returnValue = ''; }
+    if (dirty || busy) { e.preventDefault(); e.returnValue = ''; }
   });
 }
 
@@ -1159,15 +1401,24 @@ async function loadConfig() {
   }
 }
 
+/**
+ * 設定を保存します。成功したら true を返します。
+ * 保存のあと、申込フォームに反映されるのを待ってから、バックエンドの一時保存を消します
+ * （その結果は lastPublish で受け取れます）。
+ */
 async function save() {
-  if (!conn) { toast('保存できません。制作者にご連絡ください。'); return; }
+  if (!conn) { toast('保存できません。制作者にご連絡ください。'); return false; }
 
   const err = collect();
-  if (err) { toast(err); return; }
+  if (err) { toast(err); return false; }
 
   const btn = document.getElementById('saveBtn');
   btn.disabled = true;
   setStatus('保存しています...');
+
+  // 反映されたかを見分けるための印
+  const savedAt = new Date().toISOString();
+  cfg.savedAt = savedAt;
 
   try {
     await putFile(CONFIG_PATH, JSON.stringify(cfg, null, 2) + '\n',
@@ -1177,14 +1428,65 @@ async function save() {
     originalEdition = String(cfg.event.edition || '').trim();
     document.getElementById('editionWarn').hidden = true;
     document.getElementById('topState').textContent = cfg.event.edition || '';
-    setStatus('保存しました（' + new Date().toLocaleTimeString('ja-JP') + '）');
+    updateNewEventSub();
+    updateSheetAlert();
+    setStatus('保存しました。申込フォームに反映しています…（1〜2分）');
     toast('保存しました。申込フォームへの反映まで1〜2分かかります。');
-    clearGasCache();
+    lastPublish = waitForPublish(savedAt);
+    return true;
   } catch (e) {
     setStatus('保存できませんでした');
     toast('保存できませんでした: ' + e.message);
+    return false;
   } finally {
     updateSaveBtn();
+  }
+}
+
+/**
+ * 保存した設定が申込フォームに届くのを待ち、そのあとバックエンドの一時保存を消します。
+ * 早く消しすぎると、古い設定をもう一度覚えてしまうため、届いたのを確かめてから消します。
+ */
+async function waitForPublish(savedAt) {
+  let live = false;
+  for (let i = 0; i < TIMING.publishTries && !live; i++) {
+    await new Promise(r => setTimeout(r, TIMING.publishPollMs));
+    if (cfg.savedAt !== savedAt) return { live: false, superseded: true };   // その後また保存した
+    try {
+      const res = await fetch(`../${CONFIG_PATH}?t=${Date.now()}`);
+      if (res.ok) live = (await res.json()).savedAt === savedAt;
+    } catch { /* 通信が不安定なときは次の回に確かめる */ }
+  }
+
+  const refreshed = await refreshBackend();
+  const added = refreshed?.addedColumns || [];
+
+  if (cfg.savedAt === savedAt && !dirty) {
+    setStatus(live
+      ? '✅ 申込フォームに反映しました（' + new Date().toLocaleTimeString('ja-JP') + '）'
+      : '保存しました（反映まで数分かかることがあります）');
+  }
+  if (added.length) toast('受付シートに見出しを追加しました: ' + added.join('、'));
+
+  return { live, addedColumns: added };
+}
+
+// バックエンドの一時保存を消して、新しい設定を読み直してもらう
+// （あわせて、質問を増やしたときなどの受付シートの見出しも追加されます）
+async function refreshBackend() {
+  if (!cfg.gasUrl) return null;
+  const u = new URL(cfg.gasUrl);
+  u.searchParams.set('action', 'clear_cache');
+  const token = gasAdminToken();
+  if (token) u.searchParams.set('token', token);
+
+  try {
+    const res = await fetch(u, { redirect: 'follow' });
+    return await res.json();
+  } catch {
+    // 結果を受け取れない環境でも、依頼だけは届ける
+    try { await fetch(u, { mode: 'no-cors' }); } catch { /* 失敗しても保存自体には影響しない */ }
+    return null;
   }
 }
 
@@ -1222,17 +1524,6 @@ function toBase64(str) {
   return btoa(bin);
 }
 
-// 設定の反映を早めるため、バックエンド側の一時保存を消す
-async function clearGasCache() {
-  const gasUrl = cfg.gasUrl;
-  if (!gasUrl) return;
-  try {
-    const u = new URL(gasUrl);
-    u.searchParams.set('action', 'clear_cache');
-    await fetch(u, { mode: 'no-cors' });
-  } catch { /* 失敗しても保存自体には影響しない */ }
-}
-
 // =====================================================================
 // 画面 → 設定
 // =====================================================================
@@ -1262,8 +1553,17 @@ function collect() {
     if (seen.has(n)) return `ブース名「${n}」が重複しています`;
     seen.add(n);
     b.id = n;
+
+    const s = b.seats || {};
+    b.seats = {
+      enabled: !!s.enabled,
+      total: Math.max(1, parseInt(s.total, 10) || 1),
+      show: s.show !== false,
+      showWhenAtMost: Math.max(0, parseInt(s.showWhenAtMost, 10) || 0)
+    };
   }
   if (!cfg.booths.length) return 'ブースを1つ以上つくってください';
+  cfg.features.waitlist = chk('f-waitlist');
 
   // 質問
   const qs = new Set();
@@ -1306,12 +1606,17 @@ function collect() {
   cfg.email.confirmationSubject      = val('f-subject');
   cfg.email.confirmationBodyTemplate = val('f-body');
   cfg.email.adminNotificationSubject = val('f-adminSubject');
+  cfg.email.waitlistSubject          = val('f-waitSubject');
+  cfg.email.waitlistBodyTemplate     = val('f-waitBody');
 
   // 保存先（貼られたURLから内部の識別子を取り出す）
   const sheet = sheetIdFrom(val('f-sheetUrl'));
   if (val('f-sheetUrl') && !sheet) return '受付シートのURLが正しくありません';
   const db = sheetIdFrom(val('f-dbUrl'));
   if (val('f-dbUrl') && !db) return '出展者データベースのURLが正しくありません';
+
+  // 受付シートを差し替えたら、それは「いまの開催回」のシート
+  if (sheet && sheet !== cfg.spreadsheetId) cfg.spreadsheetEdition = edition;
 
   cfg.spreadsheetId         = sheet || '';
   cfg.databaseSpreadsheetId = db || '';
@@ -1383,10 +1688,19 @@ function render() {
   set('f-subject',      cfg.email.confirmationSubject);
   set('f-body',         cfg.email.confirmationBodyTemplate);
   set('f-adminSubject', cfg.email.adminNotificationSubject);
+  set('f-waitSubject',  cfg.email.waitlistSubject);
+  document.getElementById('f-waitSubject').placeholder = DEFAULT_WAITLIST_SUBJECT;
+  // 未設定なら、実際に送られる文面を見えるように入れておく
+  set('f-waitBody',     cfg.email.waitlistBodyTemplate || DEFAULT_WAITLIST_BODY);
+
+  check('f-waitlist', cfg.features.waitlist !== false);
+  updateWaitlistSub();
 
   // 質問ごとの差し込みボタンは設定を読んでからでないと作れない
   buildMailChips();
   updateNewEventSub();
+  updateSheetAlert();
+  renderFormLinks();
 
   set('f-sheetUrl', cfg.spreadsheetId
     ? `https://docs.google.com/spreadsheets/d/${cfg.spreadsheetId}/edit` : '');
@@ -1414,42 +1728,233 @@ function newBooth() {
     id: '', name: '', location: '',
     prices: { regular: 8000, earlyBird: 8000 },
     limits: { maxStaff: 0, maxChairs: 0, allowPower: true },
+    seats: { ...DEFAULT_SEATS },
     soldOut: false, prohibitSession: false, askEquipment: false
   };
 }
 
+function isWaitlistOn() {
+  return cfg?.features?.waitlist !== false;
+}
+
+/** 「満枠のブースはキャンセル待ちで受け付ける」の説明（オン・オフで変える） */
+function updateWaitlistSub() {
+  const el = document.getElementById('waitlistSub');
+  if (!el) return;
+  el.textContent = chk('f-waitlist')
+    ? 'オン：満枠のブースも選べます。申込は「キャンセル待ち」として受付シートに記録され、専用の自動返信メールが届きます'
+    : 'オフ：満枠のブースは選べなくなり、申込を受け付けません';
+}
+
+/** ブースを閉じているときに出す、ひとことの要約 */
+function boothPills(b) {
+  const s = b.seats || {};
+  const pills = [['¥' + (b.prices?.regular ?? 0).toLocaleString(), '']];
+  if (b.soldOut) {
+    pills.push([isWaitlistOn() ? '締切中（キャンセル待ち）' : '締切中', 'pill-warn']);
+  }
+  if (s.enabled) {
+    pills.push([`定員${s.total}枠`, 'pill-on']);
+    pills.push([!s.show ? '残り枠は出さない'
+      : (s.showWhenAtMost > 0 ? `残り${s.showWhenAtMost}枠から表示` : '残り枠をいつも表示'), '']);
+  } else {
+    pills.push(['定員なし', '']);
+  }
+  return pills;
+}
+
 function renderBooths() {
   const box = document.getElementById('boothList');
+  // 描き直しても、開いていたブースは開いたままにする
+  const wasOpen = [...box.querySelectorAll('details.booth')].map(d => d.open);
   box.textContent = '';
 
   cfg.booths.forEach((b, i) => {
     b.prices ||= {}; b.limits ||= {};
-    const el = document.createElement('div');
-    el.className = 'item';
+    b.seats = { ...DEFAULT_SEATS, ...(b.seats || {}) };
 
-    el.appendChild(itemHead(`ブース ${i + 1}`, () => {
-      if (!confirm(`「${b.name || '未設定'}」を削除しますか？`)) return;
-      cfg.booths.splice(i, 1); renderBooths(); markDirty();
-    }));
+    const el = document.createElement('details');
+    el.className = 'item booth';
+    el.open = wasOpen[i] ?? !b.name;
 
-    el.appendChild(fieldText('ブース名', b.name, '内側半テーブル', v => {
-      b.name = v; b.id = v;
+    // ---- 閉じているときの見出し ----
+    const sum   = document.createElement('summary');
+    const head  = document.createElement('div');
+    head.className = 'booth-head';
+    const title = document.createElement('div');
+    title.className = 'booth-title';
+    const pills = document.createElement('div');
+    pills.className = 'pills';
+    head.append(title, pills);
+    sum.appendChild(head);
+    el.appendChild(sum);
+
+    const refreshHead = () => {
+      title.textContent = b.name || `ブース ${i + 1}（名前を入れてください）`;
+      pills.textContent = '';
+      boothPills(b).forEach(([text, cls]) => {
+        const p = document.createElement('span');
+        p.className = 'pill ' + cls;
+        p.textContent = text;
+        pills.appendChild(p);
+      });
+    };
+    refreshHead();
+
+    const body = document.createElement('div');
+    body.className = 'booth-body';
+    el.appendChild(body);
+
+    // ---- 名前と料金 ----
+    body.appendChild(fieldText('ブース名', b.name, '内側半テーブル', v => {
+      b.name = v; b.id = v; refreshHead(); updateSeatExample();
     }, '申込フォームにこの名前で表示されます'));
 
     const prices = document.createElement('div');
     prices.className = 'row';
-    prices.appendChild(fieldNumber('料金（円）', b.prices.regular, v => b.prices.regular = v));
+    prices.appendChild(fieldNumber('料金（円）', b.prices.regular, v => {
+      b.prices.regular = v; refreshHead(); updateSeatExample();
+    }));
     prices.appendChild(fieldNumber('早割料金（円）', b.prices.earlyBird, v => b.prices.earlyBird = v));
-    el.appendChild(prices);
+    body.appendChild(prices);
 
+    // ---- 残り枠 ----
+    const seatGroup = document.createElement('div');
+    seatGroup.appendChild(switchRow('残り枠を数える',
+      'オンにすると申込の数を数えて、定員に達したら自動で満枠に切り替わります。' +
+      'キャンセル・キャンセル待ちの申込は数えません',
+      b.seats.enabled, v => {
+        b.seats.enabled = v; seatSub.classList.toggle('hidden', !v); refreshHead(); updateSeatExample();
+      }));
+
+    const seatSub = document.createElement('div');
+    seatSub.className = 'subsettings' + (b.seats.enabled ? '' : ' hidden');
+
+    seatSub.appendChild(fieldStepper('定員（何枠まで受け付けるか）', b.seats.total, 1, 999, '枠', v => {
+      b.seats.total = v; refreshHead(); updateSeatExample();
+    }));
+
+    seatSub.appendChild(switchRow('フォームに「残りあと◯枠」を出す',
+      'オフにすると数は出さず、裏で数えるだけになります（満枠になれば自動で切り替わります）',
+      b.seats.show, v => {
+        b.seats.show = v; timing.classList.toggle('hidden', !v); refreshHead(); updateSeatExample();
+      }));
+
+    // 表示しはじめるタイミング
+    const timing = document.createElement('div');
+    timing.className = 'field' + (b.seats.show ? '' : ' hidden');
+    const tLabel = document.createElement('label');
+    tLabel.textContent = '表示しはじめるタイミング';
+    const choices = document.createElement('div');
+    choices.className = 'choices';
+    const radioName = `seat-timing-${i}`;
+    const always = choiceRow(radioName, 'いつも出す', b.seats.showWhenAtMost <= 0);
+    const fromN  = choiceRow(radioName, '残りが少なくなってから出す', b.seats.showWhenAtMost > 0);
+    const nStep  = fieldStepper('残りが何枠以下になったら出すか', b.seats.showWhenAtMost > 0 ? b.seats.showWhenAtMost : 3, 1, 999, '枠', v => {
+      b.seats.showWhenAtMost = v; refreshHead(); updateSeatExample();
+    });
+    nStep.classList.add('choice-extra');
+    nStep.classList.toggle('hidden', b.seats.showWhenAtMost <= 0);
+    const pickTiming = useThreshold => {
+      b.seats.showWhenAtMost = useThreshold ? (parseInt(nStep.querySelector('input').value, 10) || 3) : 0;
+      always.row.classList.toggle('on', !useThreshold);
+      fromN.row.classList.toggle('on', useThreshold);
+      nStep.classList.toggle('hidden', !useThreshold);
+      refreshHead(); updateSeatExample(); markDirty();
+    };
+    always.input.addEventListener('change', () => pickTiming(false));
+    fromN.input.addEventListener('change', () => pickTiming(true));
+    choices.append(always.row, fromN.row, nStep);
+    timing.append(tLabel, choices);
+    seatSub.appendChild(timing);
+
+    // フォームではこう見えます
+    const example = document.createElement('div');
+    example.className = 'example';
+    seatSub.appendChild(example);
+    const updateSeatExample = () => renderSeatExample(example, b);
+    updateSeatExample();
+
+    seatGroup.appendChild(seatSub);
+    body.appendChild(seatGroup);
+
+    // ---- 手動で締め切る・そのほか ----
     const sw = document.createElement('div');
-    sw.appendChild(switchRow('満枠にする', '申込フォームで選べなくなります', b.soldOut, v => b.soldOut = v));
+    sw.appendChild(switchRow('手動で締め切る',
+      isWaitlistOn()
+        ? 'オンにすると、空きがあっても満枠として扱い、キャンセル待ちの受付になります'
+        : 'オンにすると、空きがあっても満枠として扱い、申込フォームで選べなくなります',
+      b.soldOut, v => { b.soldOut = v; refreshHead(); updateSeatExample(); }));
     sw.appendChild(switchRow('コンセントを使える', '', b.limits.allowPower !== false, v => b.limits.allowPower = v));
     sw.appendChild(switchRow('持ち込み物品をたずねる', '施術ベッドなどを書いてもらう欄が出ます', !!b.askEquipment, v => b.askEquipment = v));
     sw.appendChild(switchRow('セッションはできない枠', '占い・ボディを選ぶと注意が出ます', !!b.prohibitSession, v => b.prohibitSession = v));
-    el.appendChild(sw);
+    body.appendChild(sw);
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn btn-del btn-del-wide';
+    del.textContent = 'このブースを削除';
+    del.addEventListener('click', () => {
+      if (!confirm(`「${b.name || '未設定'}」を削除しますか？`)) return;
+      cfg.booths.splice(i, 1); renderBooths(); markDirty();
+    });
+    body.appendChild(del);
 
     box.appendChild(el);
+  });
+}
+
+/** 申込フォームでの見え方の見本 */
+function renderSeatExample(box, b) {
+  box.textContent = '';
+  const label = document.createElement('div');
+  label.className = 'example-label';
+  label.textContent = 'フォームではこう見えます';
+
+  const row = document.createElement('div');
+  row.className = 'example-row';
+  const name = document.createElement('span');
+  name.className = 'grow';
+  name.textContent = b.name || 'ブース名';
+  row.appendChild(name);
+
+  // 申込フォームと同じく、印はブース名のすぐ後ろに付ける
+  const s = b.seats || {};
+  const badge = (text, cls) => {
+    const el = document.createElement('span');
+    el.className = 'ex-badge ' + cls;
+    el.textContent = text;
+    name.appendChild(el);
+  };
+  const price = document.createElement('span');
+  price.textContent = '¥' + (b.prices?.regular ?? 0).toLocaleString();
+
+  const lines = [];
+  if (b.soldOut) {
+    badge(isWaitlistOn() ? '満枠・キャンセル待ち' : '満枠', isWaitlistOn() ? 'ex-waitlist' : 'ex-soldout');
+    lines.push('いまは手動で締め切っています');
+  } else if (s.enabled && s.show) {
+    const n = s.showWhenAtMost > 0 ? Math.min(s.showWhenAtMost, s.total) : Math.min(3, s.total);
+    badge(`残りあと${n}枠`, 'ex-remaining');
+    lines.push(s.showWhenAtMost > 0
+      ? `残りが${s.showWhenAtMost}枠以下になると、このように出ます（それまでは数を出しません）`
+      : '空きがある間は、いつも残りの数が出ます（上は残り' + n + '枠のとき）');
+  } else if (s.enabled) {
+    lines.push('残りの数は出しません');
+  }
+  // 締め切っていてキャンセル待ちも受け付けないときは、フォームに料金が出ない
+  if (!(b.soldOut && !isWaitlistOn())) row.appendChild(price);
+
+  if (s.enabled && !b.soldOut) {
+    lines.push(`${s.total}枠うまったら「${isWaitlistOn() ? '満枠・キャンセル待ち' : '満枠'}」に切り替わります`);
+  }
+
+  box.append(label, row);
+  lines.forEach(t => {
+    const p = document.createElement('div');
+    p.className = 'hint';
+    p.textContent = t;
+    box.appendChild(p);
   });
 }
 
@@ -1474,9 +1979,23 @@ function renderQuestions() {
       cfg.customQuestions.splice(i, 1); renderQuestions(); markDirty();
     }));
 
+    // 出展者データベースに残す質問は、文言を変えると前回の内容を呼び出せなくなる
+    const keyLabel = DB_KEY_QUESTIONS.includes(q.label) ? q.label : '';
+    const keyNote  = document.createElement('div');
+    const updateKeyNote = () => {
+      if (!keyLabel) { keyNote.className = 'note hidden'; return; }
+      const changed = q.label !== keyLabel;
+      keyNote.className = 'note ' + (changed ? 'note-warn' : 'note-info');
+      keyNote.textContent = changed
+        ? `⚠️ 質問文が「${keyLabel}」から変わっています。このままだと、この質問の答えは出展者データベースに残らず、次回「前回の内容を呼び出す」でも入らなくなります。`
+        : `📌 前回の内容を呼び出すときに使う質問です。質問文（「${keyLabel}」）は変えないでください。`;
+    };
+
     el.appendChild(fieldText('質問文', q.label, '出展メニュー名', v => {
-      q.label = v; q.id = v;
+      q.label = v; q.id = v; updateKeyNote();
     }, 'この文がそのまま集計シートの見出しになります'));
+    updateKeyNote();
+    el.appendChild(keyNote);
 
     el.appendChild(fieldText('入力例（うすい文字で出ます）', q.placeholder, '例：タロット占い 20分 2,000円',
       v => q.placeholder = v));
@@ -1624,6 +2143,69 @@ function fieldNumber(label, value, onInput) {
   return f;
 }
 
+/** 数字を −／＋ ボタンで変える欄（スマホでキーボードを出さずに変えられる） */
+function fieldStepper(label, value, min, max, unit, onChange) {
+  const f = document.createElement('div');
+  f.className = 'field';
+  if (label) {
+    const l = document.createElement('label');
+    l.textContent = label;
+    f.appendChild(l);
+  }
+
+  const row = document.createElement('div');
+  row.className = 'stepper';
+  const minus = document.createElement('button');
+  minus.type = 'button';
+  minus.textContent = '−';
+  minus.setAttribute('aria-label', (label || unit) + 'をへらす');
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.inputMode = 'numeric';
+  input.min = String(min);
+  input.max = String(max);
+  input.value = value;
+  if (label) input.setAttribute('aria-label', label);
+  const plus = document.createElement('button');
+  plus.type = 'button';
+  plus.textContent = '＋';
+  plus.setAttribute('aria-label', (label || unit) + 'をふやす');
+  const u = document.createElement('span');
+  u.className = 'unit';
+  u.textContent = unit;
+
+  const apply = n => {
+    const v = Math.min(max, Math.max(min, parseInt(n, 10) || min));
+    input.value = v;
+    minus.disabled = v <= min;
+    plus.disabled  = v >= max;
+    onChange(v);
+  };
+  minus.addEventListener('click', () => { apply((parseInt(input.value, 10) || min) - 1); markDirty(); });
+  plus.addEventListener('click',  () => { apply((parseInt(input.value, 10) || min) + 1); markDirty(); });
+  input.addEventListener('change', () => apply(input.value));
+  minus.disabled = value <= min;
+  plus.disabled  = value >= max;
+
+  row.append(minus, input, plus, u);
+  f.appendChild(row);
+  return f;
+}
+
+/** えらぶ欄（ラジオボタン1つ分）。{ row, input } を返す */
+function choiceRow(name, label, checked) {
+  const row = document.createElement('label');
+  row.className = 'choice' + (checked ? ' on' : '');
+  const input = document.createElement('input');
+  input.type = 'radio';
+  input.name = name;
+  input.checked = !!checked;
+  const t = document.createElement('span');
+  t.textContent = label;
+  row.append(input, t);
+  return { row, input };
+}
+
 function switchRow(title, sub, checked, onChange) {
   const row = document.createElement('div');
   row.className = 'switch';
@@ -1651,12 +2233,11 @@ function switchRow(title, sub, checked, onChange) {
 
 // ---- メールの差し込みボタン ----
 function buildMailChips() {
-  [['chipsSubject', 'f-subject'], ['chipsBody', 'f-body'], ['chipsAdmin', 'f-adminSubject']]
-    .forEach(([boxId, targetId]) => {
+  MAIL_CHIP_BOXES
+    .forEach(([boxId, targetId, isBody]) => {
       const box = document.getElementById(boxId);
+      if (!box) return;
       box.innerHTML = '';
-
-      const isBody = boxId === 'chipsBody';
 
       MAIL_VARS.forEach(([label, token]) => {
         // 件名に本文向けの長い項目は出さない
@@ -1716,7 +2297,6 @@ function bindNewEvent() {
   });
 
   document.getElementById('newEventCancel').addEventListener('click', () => form.classList.add('hidden'));
-  document.getElementById('ne-make').addEventListener('click', createReceptionSheet);
   document.getElementById('newEventApply').addEventListener('click', applyNewEvent);
 }
 
@@ -1731,59 +2311,6 @@ function prefillNewEvent() {
     : val('f-eventName');
   document.getElementById('ne-date').value  = '';
   document.getElementById('ne-place').value = val('f-eventPlace');
-  document.getElementById('ne-sheet').value = '';
-}
-
-/**
- * 受付シートをその場で作る。
- * 作成そのものは GAS（＝クライアントのGoogleドライブ側）が行う。
- */
-async function createReceptionSheet() {
-  const btn   = document.getElementById('ne-make');
-  const input = document.getElementById('ne-sheet');
-  const hint  = document.getElementById('ne-sheetHint');
-
-  if (!cfg?.gasUrl) {
-    alert('シートの作成先が設定されていません。\n作成者にご連絡ください。');
-    return;
-  }
-  if (input.value.trim() &&
-      !confirm('すでにURLが入っています。\n新しいシートを作って置き換えますか？')) return;
-
-  const name = (document.getElementById('ne-name').value.trim() || val('f-eventName')) + ' 申込';
-
-  const url = new URL(cfg.gasUrl);
-  url.searchParams.set('action', 'create_reception_sheet');
-  url.searchParams.set('name', name);
-  const token = gasAdminToken();
-  if (token) url.searchParams.set('token', token);
-
-  btn.disabled = true;
-  const label = btn.textContent;
-  btn.textContent = '作成中...';
-  hint.textContent = 'Googleドライブに作成しています。10秒ほどかかります...';
-
-  try {
-    const res  = await fetch(url, { redirect: 'follow' });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || '作成に失敗しました');
-
-    input.value = data.url;
-    hint.innerHTML = `✅ <strong>${escapeHtml(data.name)}</strong> を作成しました` +
-                     `（保存先: ${escapeHtml(data.folder)}）`;
-
-  } catch (err) {
-    // ブラウザの制限で結果を受け取れないことがあるため、別画面で作れるようにする
-    console.warn('シート作成の応答を受け取れませんでした:', err);
-    const manual = new URL(url);
-    manual.searchParams.set('format', 'html');
-    hint.innerHTML = 'この画面からは作成結果を受け取れませんでした。' +
-      `<a href="${manual}" target="_blank" rel="noopener"><strong>こちらを開いて作成</strong></a>し、` +
-      '表示されたURLをコピーして上の欄に貼り付けてください。';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = label;
-  }
 }
 
 function gasAdminToken() {
@@ -1801,55 +2328,73 @@ function nextEditionName(edition) {
   return edition.replace(m[1], String(parseInt(m[1], 10) + 1));
 }
 
+function receptionSheetName(eventName) {
+  return `${eventName || 'イベント'} 申込`;
+}
+
+/** 「この内容ではじめる」: 入力を確かめてから、確認のパネルを出す */
 function applyNewEvent() {
-  const edition = document.getElementById('ne-edition').value.trim();
-  const name    = document.getElementById('ne-name').value.trim();
-  const sheet   = document.getElementById('ne-sheet').value.trim();
+  const plan = {
+    edition:  document.getElementById('ne-edition').value.trim(),
+    name:     document.getElementById('ne-name').value.trim(),
+    date:     document.getElementById('ne-date').value.trim(),
+    place:    document.getElementById('ne-place').value.trim(),
+    reopen:   document.getElementById('ne-reopen').checked,
+    repeater: document.getElementById('ne-repeater').checked
+  };
 
-  if (!edition) { alert('開催回を入れてください（例: 第2回）'); return; }
-  if (!name)    { alert('イベント名を入れてください'); return; }
-
-  if (edition === val('f-edition')) {
+  if (!plan.edition) { alert('開催回を入れてください（例: 第2回）'); return; }
+  if (!plan.name)    { alert('イベント名を入れてください'); return; }
+  if (plan.edition === val('f-edition') || plan.edition === originalEdition) {
     alert('開催回が前回と同じです。\n前回の申込と混ざってしまうため、別の名前にしてください。');
     return;
   }
-  if (sheet && !sheetIdFrom(sheet)) {
-    alert('受付シートのURLが正しくないようです。\nスプレッドシートを開いたときのURLを貼り付けてください。');
+  if (!conn) {
+    alert('このままでは保存できません。\n合い言葉を入れてから、もう一度お試しください。');
+    return;
+  }
+  if (!cfg.gasUrl) {
+    alert('受付シートの作成先が設定されていません。\n作成者にご連絡ください。');
     return;
   }
 
-  const changed = [];
+  const sheetName = receptionSheetName(plan.name);
+  const items = [
+    `受付シート「${sheetName}」を新しく作ります（前回と同じフォルダ・同じ見出し）`,
+    `開催回を「${plan.edition}」に切り替えます`,
+    `イベント名を「${plan.name}」にします`,
+    plan.date ? `開催日時を「${plan.date}」にします` : '開催日時は前回のままにします（あとで直せます）',
+    plan.place && plan.place !== val('f-eventPlace') ? `会場を「${plan.place}」にします` : null,
+    plan.reopen ? 'すべてのブースを「受付中」に戻します（残り枠も0から数え直します）' : null,
+    plan.repeater ? '前回の内容を呼び出せるようにします' : null,
+    '設定を保存して、申込フォームに反映します'
+  ];
 
-  set('f-edition',   edition);   changed.push('開催回を「' + edition + '」に');
-  set('f-eventName', name);      changed.push('イベント名を「' + name + '」に');
+  confirmSteps(`「${plan.edition}」をはじめます`, items, {
+    title: `「${plan.edition}」の準備をしています`,
+    sheetName,
+    apply: url => applyPlanToForm(plan, url)
+  });
+}
 
-  const date = document.getElementById('ne-date').value.trim();
-  if (date) { set('f-eventDate', date); changed.push('開催日時を「' + date + '」に'); }
+/** 確かめた内容を、画面の各欄に入れる（保存は別） */
+function applyPlanToForm(plan, sheetUrl) {
+  set('f-edition',   plan.edition);
+  set('f-eventName', plan.name);
+  if (plan.date)  set('f-eventDate',  plan.date);
+  if (plan.place) set('f-eventPlace', plan.place);
+  set('f-sheetUrl', sheetUrl);
 
-  const place = document.getElementById('ne-place').value.trim();
-  if (place) { set('f-eventPlace', place); changed.push('会場を「' + place + '」に'); }
-
-  if (sheet) { set('f-sheetUrl', sheet); changed.push('受付シートを新しいものに'); }
-  else       { changed.push('⚠️ 受付シートは前回のままです（あとで差し替えてください）'); }
-
-  if (document.getElementById('ne-reopen').checked) {
+  if (plan.reopen) {
     (cfg.booths || []).forEach(b => { b.soldOut = false; });
     renderBooths();
-    changed.push('すべてのブースを「受付中」に');
   }
-
-  if (document.getElementById('ne-repeater').checked) {
-    check('f-repeater', true);
-    changed.push('前回の内容を呼び出せるように');
-  }
+  if (plan.repeater) check('f-repeater', true);
 
   document.getElementById('newEventForm').classList.add('hidden');
   updatePreview();
   markDirty();
   updateNewEventSub();
-
-  alert('次の内容にしました。\n\n・' + changed.join('\n・') +
-        '\n\nまだ保存されていません。\n内容を確認して「設定内容を保存」を押してください。');
 }
 
 function updateNewEventSub() {
@@ -1862,20 +2407,410 @@ function updateNewEventSub() {
 }
 
 // =====================================================================
+// 申込フォームのURL（LINEのリッチメニューなどに貼るため）
+// =====================================================================
+
+/** この管理画面と同じ場所で公開されている申込フォームのURL */
+function formPageUrl() {
+  return new URL('../apply/', location.href).href;
+}
+
+function renderFormLinks() {
+  const url = formPageUrl();
+  set('formUrl', url);
+  document.getElementById('openFormUrl').href = url;
+
+  // LINE連携（LIFF）を設定しているときは、LINEアプリ用のURLも出す
+  const liffId = String(cfg?.features?.liffId || '').trim();
+  document.getElementById('liffLinkBox').classList.toggle('hidden', !liffId);
+  set('liffUrl', liffId ? `https://liff.line.me/${liffId}` : '');
+}
+
+function bindFormLinks() {
+  // タップしたら全体を選んでおく（長押しでもコピーしやすいように）
+  ['formUrl', 'liffUrl'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('focus', () => el.select());
+  });
+  document.getElementById('copyFormUrl').addEventListener('click', e =>
+    copyText(val('formUrl'), e.currentTarget));
+  document.getElementById('copyLiffUrl').addEventListener('click', e =>
+    copyText(val('liffUrl'), e.currentTarget));
+}
+
+async function copyText(text, btn) {
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    copied = true;
+  } catch {
+    // 古い端末などで使えないときは、選択してコピーする
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { copied = document.execCommand('copy'); } catch { /* 下で案内する */ }
+    ta.remove();
+  }
+
+  if (!copied) {
+    toast('コピーできませんでした。URLの欄を長押ししてコピーしてください');
+    return;
+  }
+  toast('コピーしました');
+  if (btn) {
+    const label = btn.textContent;
+    btn.textContent = '✅ コピーしました';
+    setTimeout(() => { btn.textContent = label; }, 2000);
+  }
+}
+
+// =====================================================================
+// 受付シートが前の回のままのときの警告
+// =====================================================================
+
+/**
+ * 保存されている開催回と、受付シートを作った開催回が違うときに警告を出す。
+ * （開催回だけを変えて保存すると、申込が前の回のシートに入ってしまうため）
+ */
+function updateSheetAlert() {
+  const el = document.getElementById('sheetAlert');
+  if (!el || !cfg) return;
+
+  const live     = originalEdition;
+  const sheetFor = String(cfg.spreadsheetEdition || '').trim();
+  const show     = !!live && !!cfg.spreadsheetId && sheetFor !== live;
+  el.classList.toggle('hidden', !show);
+  if (!show) return;
+
+  const title = document.createElement('div');
+  title.className = 'alert-title';
+  title.textContent = sheetFor
+    ? `⚠️ 今回（${live}）用の受付シートがまだありません`
+    : `⚠️ 今回（${live}）用の受付シートか確認できません`;
+
+  const text = document.createElement('div');
+  text.textContent = sheetFor
+    ? `いまの受付シートは「${sheetFor}」のものです。このままだと、${live}の申込が前の回のシートに入ります。`
+    : `開催回を切り替えたときに、受付シートが前の回のままになっている可能性があります。` +
+      `このままだと、${live}の申込が前の回のシートに入ります。`;
+
+  const actions = document.createElement('div');
+  actions.className = 'alert-actions';
+  const make = document.createElement('button');
+  make.type = 'button';
+  make.className = 'btn btn-new';
+  make.id = 'sheetAlertMake';
+  make.textContent = `${live}の受付シートを作る`;
+  make.addEventListener('click', confirmSheetOnly);
+  const keep = document.createElement('button');
+  keep.type = 'button';
+  keep.className = 'btn';
+  keep.id = 'sheetAlertKeep';
+  keep.textContent = 'いまのシートのまま使う';
+  keep.addEventListener('click', () => {
+    if (!confirm(`いまの受付シートを「${live}」の受付シートとして使います。よろしいですか？`)) return;
+    cfg.spreadsheetEdition = live;
+    markDirty();
+    updateSheetAlert();
+    toast('「設定内容を保存」を押すと確定します');
+  });
+  actions.append(make, keep);
+
+  el.replaceChildren(title, text, actions);
+}
+
+/** いまの開催回の受付シートだけを作って、保存する */
+function confirmSheetOnly() {
+  if (!conn) { alert('このままでは保存できません。\n合い言葉を入れてから、もう一度お試しください。'); return; }
+  if (!cfg.gasUrl) { alert('受付シートの作成先が設定されていません。\n作成者にご連絡ください。'); return; }
+
+  const sheetName = receptionSheetName(cfg.event.name);
+  confirmSteps(`${originalEdition}の受付シートを作ります`, [
+    `受付シート「${sheetName}」を新しく作ります（前回と同じフォルダ・同じ見出し）`,
+    `これを${originalEdition}の受付シートにして、設定を保存します`
+  ], {
+    title: '受付シートを作っています',
+    sheetName,
+    apply: url => { set('f-sheetUrl', url); markDirty(); }
+  });
+}
+
+// =====================================================================
+// まとめて行う処理（受付シートの作成 → 反映 → 保存 → フォームへの反映）
+// =====================================================================
+
+/** やることを箇条書きで見せて、「はじめる」で実行する */
+function confirmSteps(title, items, job) {
+  const lead = para('次のことを、まとめて行います。');
+  const list = document.createElement('ul');
+  list.className = 'todo';
+  items.filter(Boolean).forEach(t => {
+    const li = document.createElement('li');
+    li.textContent = t;
+    list.appendChild(li);
+  });
+
+  const nodes = [lead, list];
+  if (dirty) {
+    const n = document.createElement('div');
+    n.className = 'note note-warn';
+    n.textContent = 'ほかに保存していない変更があります。それも一緒に保存されます。';
+    nodes.push(n);
+  }
+  nodes.push(para('1分ほどかかります。終わるまで、この画面を閉じないでください。'));
+
+  openDialog(title, nodes, [
+    { label: 'やめる', onClick: closeDialog },
+    { label: 'はじめる', primary: true, id: 'dialogStart', onClick: () => runSteps(job) }
+  ]);
+}
+
+const STEP_LIST = [
+  ['sheet',   '受付シートを作る'],
+  ['apply',   '設定に反映する'],
+  ['save',    '保存する'],
+  ['publish', '申込フォームに反映する（1〜2分）']
+];
+
+async function runSteps(job) {
+  busy = true;
+  showProgress(job.title, STEP_LIST);
+  setStep('sheet', 'doing', 'Googleドライブに作成しています…');
+
+  let made;
+  try {
+    made = await requestReceptionSheet(job.sheetName);
+  } catch (err) {
+    setStep('sheet', 'ng', err.message);
+    showSheetFallback(job, err);
+    return;
+  }
+  setStep('sheet', 'ok', `「${made.name}」を作りました（保存先: ${made.folder || 'マイドライブ'}）`);
+  await finishSteps(job, made.url);
+}
+
+/** シートができたあとの、反映・保存・フォームへの反映 */
+async function finishSteps(job, sheetUrl) {
+  const seq = dialogSeq;
+  setActions([]);
+
+  setStep('apply', 'doing');
+  job.apply(sheetUrl);
+  setStep('apply', 'ok');
+
+  setStep('save', 'doing');
+  const ok = await save();
+  if (!ok) {
+    busy = false;
+    setStep('save', 'ng',
+      '保存できませんでした。入れた内容は画面に残っています。' +
+      'このパネルを閉じて、下の「設定内容を保存」をもう一度押してください。');
+    setActions([{ label: '閉じる', primary: true, onClick: closeDialog }]);
+    return;
+  }
+  setStep('save', 'ok');
+
+  busy = false;
+  setStep('publish', 'doing', '申込フォームに届くのを待っています（このパネルは閉じても大丈夫です）');
+  setActions([{ label: '閉じる', onClick: closeDialog }]);
+
+  const result = await lastPublish;
+  if (seq !== dialogSeq) return;   // 別のパネルを開いた
+
+  if (result?.live) {
+    setStep('publish', 'ok', '申込フォームに反映しました');
+  } else {
+    setStep('publish', 'wait', '反映に時間がかかっています。数分たってから申込フォームを開いて確かめてください');
+  }
+  setActions([
+    { label: '受付シートを開く', href: sheetUrl },
+    { label: '閉じる', primary: true, onClick: closeDialog }
+  ]);
+}
+
+/** GAS に受付シートの作成を頼む。できたら { url, name, folder } を返す */
+async function requestReceptionSheet(name) {
+  let data;
+  try {
+    const res = await fetch(sheetRequestUrl(name), { redirect: 'follow' });
+    data = await res.json();
+  } catch {
+    // ブラウザの制限で、作成の結果を受け取れないことがある
+    const err = new Error('この画面からは作成の結果を受け取れませんでした');
+    err.unreachable = true;
+    throw err;
+  }
+  if (data?.success && !data.url) {
+    // 受付シートを作る機能が入る前のバックエンドは、何もせず「稼働中」とだけ返す
+    throw new Error('バックエンド（GAS）が古いため、受付シートを作れませんでした。作成者にGASの更新を依頼してください');
+  }
+  if (!data?.success) throw new Error(data?.error || '受付シートを作れませんでした');
+  return data;
+}
+
+function sheetRequestUrl(name, asPage) {
+  const url = new URL(cfg.gasUrl);
+  url.searchParams.set('action', 'create_reception_sheet');
+  url.searchParams.set('name', name);
+  const token = gasAdminToken();
+  if (token) url.searchParams.set('token', token);
+  if (asPage) url.searchParams.set('format', 'html');
+  return url;
+}
+
+/** 受付シートを作れなかったとき：別の画面で作って、URLを貼ってもらう */
+function showSheetFallback(job, err) {
+  const box = document.createElement('div');
+  box.id = 'sheetFallback';
+  box.style.cssText = 'display:flex;flex-direction:column;gap:.7rem';
+
+  const safe = document.createElement('div');
+  safe.className = 'note note-info';
+  safe.textContent = 'まだ何も変わっていません（いまの受付はそのまま動いています）。';
+  box.appendChild(safe);
+
+  box.appendChild(para(err.unreachable
+    ? '下の「別の画面で作る」を押すと、受付シートが作られてURLが表示されます。' +
+      'そのURLをコピーして、ここに貼り付けてください。'
+    : '下の「別の画面で作る」を試すか、この画面を作成者にお知らせください。'));
+
+  const open = document.createElement('a');
+  open.className = 'btn';
+  open.id = 'sheetFallbackOpen';
+  open.href = sheetRequestUrl(job.sheetName, true);
+  open.target = '_blank';
+  open.rel = 'noopener';
+  open.textContent = '別の画面で作る';
+  open.style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:48px;text-decoration:none';
+  box.appendChild(open);
+
+  const f = document.createElement('div');
+  f.className = 'field';
+  const l = document.createElement('label');
+  l.textContent = '作った受付シートのURL';
+  l.htmlFor = 'sheetFallbackUrl';
+  const input = document.createElement('input');
+  input.type = 'url';
+  input.id = 'sheetFallbackUrl';
+  input.placeholder = 'https://docs.google.com/spreadsheets/...';
+  f.append(l, input);
+  box.appendChild(f);
+
+  document.getElementById('dialogBody').appendChild(box);
+
+  setActions([
+    { label: 'やめる', onClick: closeDialog },
+    { label: 'このURLで続ける', primary: true, id: 'sheetFallbackGo', onClick: () => {
+      const url = input.value.trim();
+      if (!sheetIdFrom(url)) {
+        alert('受付シートのURLが正しくないようです。\nスプレッドシートを開いたときのURLを貼り付けてください。');
+        return;
+      }
+      box.remove();
+      setStep('sheet', 'ok', '貼り付けたシートを使います');
+      finishSteps(job, url);
+    } }
+  ]);
+}
+
+// ---- パネルの部品 ----
+let dialogSeq = 0;
+
+function openDialog(title, nodes, actions) {
+  dialogSeq++;
+  document.getElementById('dialogTitle').textContent = title;
+  document.getElementById('dialogBody').replaceChildren(...nodes);
+  setActions(actions);
+  document.getElementById('dialog').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDialog() {
+  dialogSeq++;
+  busy = false;
+  document.getElementById('dialog').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function setActions(actions) {
+  const box = document.getElementById('dialogActions');
+  box.textContent = '';
+  (actions || []).forEach(a => {
+    let el;
+    if (a.href) {
+      el = document.createElement('a');
+      el.href = a.href;
+      el.target = '_blank';
+      el.rel = 'noopener';
+    } else {
+      el = document.createElement('button');
+      el.type = 'button';
+      el.addEventListener('click', a.onClick);
+    }
+    el.className = a.primary ? 'save-btn' : 'btn';
+    if (a.id) el.id = a.id;
+    el.textContent = a.label;
+    box.appendChild(el);
+  });
+}
+
+function showProgress(title, steps) {
+  const list = document.createElement('ul');
+  list.className = 'steps';
+  list.setAttribute('aria-live', 'polite');
+  steps.forEach(([key, label]) => {
+    const li = document.createElement('li');
+    li.dataset.step = key;
+    li.className = 'pending';
+    const icon = document.createElement('span');
+    icon.className = 'icon';
+    icon.textContent = '・';
+    const text = document.createElement('span');
+    text.textContent = label;
+    const note = document.createElement('span');
+    note.className = 'step-note';
+    text.appendChild(note);
+    li.append(icon, text);
+    list.appendChild(li);
+  });
+  openDialog(title, [list], []);
+}
+
+const STEP_ICONS = { pending: '・', doing: '⏳', ok: '✅', ng: '❌', wait: '⌛' };
+
+function setStep(key, state, note) {
+  const li = document.querySelector(`#dialogBody li[data-step="${key}"]`);
+  if (!li) return;
+  li.className = state;
+  li.querySelector('.icon').textContent = STEP_ICONS[state] || '・';
+  li.querySelector('.step-note').textContent = note || '';
+}
+
+function para(text) {
+  const p = document.createElement('p');
+  p.textContent = text;
+  return p;
+}
+
+// =====================================================================
 // メール本文（差し込み項目をタグで表示する入力欄）
 // =====================================================================
 
 function bindRichBody() {
-  const el = document.getElementById('f-body');
-  if (!el) return;
+  document.querySelectorAll('[data-rich]').forEach(bindRichEditor);
+}
 
+function bindRichEditor(el) {
   el.addEventListener('input', markDirty);
 
   // ボタンを押したときに備えて、カーソル位置を覚えておく
   const remember = () => {
     const sel = window.getSelection();
     if (sel && sel.rangeCount && el.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-      lastBodyRange = sel.getRangeAt(0).cloneRange();
+      lastRanges.set(el, sel.getRangeAt(0).cloneRange());
     }
   };
   ['keyup', 'mouseup', 'touchend', 'blur'].forEach(ev => el.addEventListener(ev, remember));
@@ -1963,10 +2898,11 @@ function insertVarTag(el, token) {
   let   range = null;
 
   // 本文欄の中にカーソルがあればその位置、無ければ最後に置いたカーソル位置
+  const last = lastRanges.get(el);
   if (sel && sel.rangeCount && el.contains(sel.getRangeAt(0).commonAncestorContainer)) {
     range = sel.getRangeAt(0);
-  } else if (lastBodyRange && el.contains(lastBodyRange.commonAncestorContainer)) {
-    range = lastBodyRange;
+  } else if (last && el.contains(last.commonAncestorContainer)) {
+    range = last;
   }
 
   const tag   = makeVarTag(doc, token);
@@ -1988,7 +2924,7 @@ function insertVarTag(el, token) {
     after.collapse(true);
     sel.removeAllRanges();
     sel.addRange(after);
-    lastBodyRange = after.cloneRange();
+    lastRanges.set(el, after.cloneRange());
   }
 
   el.scrollTop = keep;                      // 末尾へ飛ばさない
