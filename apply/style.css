@@ -573,3 +573,36 @@ textarea.input-field {
   .total-price span { font-size: 1.2rem; }
   .submit-btn { padding: 0.65rem 1.25rem; font-size: 0.9rem; }
 }
+
+/* ========================================
+   残り枠・キャンセル待ち
+   ======================================== */
+.booth-name { line-height: 1.5; }
+
+.remaining-badge,
+.waitlist-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.1rem 0.55rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+  vertical-align: 0.1em;
+}
+.remaining-badge { background: #fee2e2; color: #b91c1c; }
+.waitlist-badge  { background: #f59e0b; color: #fff; }
+
+.booth-option.waitlist { background: #fffbeb; border-color: #fcd34d; }
+.booth-option.waitlist.selected { border-color: #f59e0b; background: #fef3c7; }
+
+.waitlist-notice {
+  padding: 0.75rem 1rem;
+  background: #fef3c7;
+  border: 1.5px solid #f59e0b;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: #92400e;
+  margin-top: 0.75rem;
+}

@@ -12,6 +12,12 @@
  *      受付スプシしか無い場合は自動的にそちらへフォールバックします。
  *   4. データベースへの書き込みが失敗しても、受付への保存とメール送信は止めません。
  *
+ * v2.1 の変更点
+ *   5. 受付シートに足りない見出しは右端に自動で追加します（質問を増やした場合など）。
+ *   6. データベースも「見出しの名前」で書き込みます。列を並べ替えても別の列に入りません。
+ *   7. ブースごとに定員を決めて残り枠を数え、満枠ならキャンセル待ちとして受け付けます。
+ *      満枠の判定は受付シートに書き込む直前に行うため、同時に申込があっても定員を超えません。
+ *
  * 【デプロイ】
  *   - ウェブアプリとしてデプロイ
  *     「次のユーザーとして実行」: 自分
@@ -28,6 +34,12 @@
 // 設定
 // ================================================================
 
+/**
+ * バックエンドの版。?action=status で確認できます。
+ * 2.1.0 … 残り枠・キャンセル待ち、見出しの自動追加、見出し名でのDB書き込み
+ */
+const BACKEND_VERSION = '2.1.0';
+
 /** 唯一のハードコード設定。config.json の公開URL。 */
 const CONFIG_JSON_URL = 'https://bayashichan.github.io/buchiiyashifestaodawara/apply/config.json';
 
@@ -39,11 +51,23 @@ const DB_SHEET_APPLICATIONS = 'applications';
 const DB_SHEET_EXHIBITORS   = 'exhibitors';
 const DB_SHEET_EVENTS       = 'events';
 
-/** config キャッシュ秒数 */
-const CONFIG_CACHE_SEC = 1800;
+/**
+ * config キャッシュ秒数
+ * 管理画面で保存すると、公開の完了を待ってからキャッシュを消します。
+ * それが届かなかった場合でも、この時間がたてば新しい設定に切り替わります。
+ */
+const CONFIG_CACHE_SEC = 300;
 
 /** 写真が届いていないときに、写真欄へ入れる目印 */
 const PHOTO_PENDING_LABEL = 'LINE送付待ち';
+
+/** 受付シート・データベースの「ステータス」に入れる言葉 */
+const STATUS_APPLIED  = '申込';
+const STATUS_WAITLIST = 'キャンセル待ち';
+
+/** ブースの残り枠をまとめて返すときの一時保存（秒） */
+const BOOTH_STATUS_CACHE_KEY = 'booth_status';
+const BOOTH_STATUS_CACHE_SEC = 30;
 
 // ---------------------------------------------------------------
 // データベース列定義（1行目のヘッダーとして書き込まれます）
@@ -137,7 +161,8 @@ function getConfig() {
     try { return JSON.parse(cached); } catch (e) { /* 壊れていたら取り直す */ }
   }
 
-  const res = UrlFetchApp.fetch(CONFIG_JSON_URL, {
+  // 配信側の一時保存（最大10分）を通さず、公開直後の内容を読む
+  const res = UrlFetchApp.fetch(CONFIG_JSON_URL + '?t=' + Date.now(), {
     muteHttpExceptions: true,
     headers: { 'Cache-Control': 'no-cache' }
   });
@@ -182,11 +207,14 @@ function doGet(e) {
         break;
       case 'create_reception_sheet':
         return handleCreateReceptionSheet(params);
+      case 'booth_status':
+        result = handleBoothStatus(getConfig());
+        break;
       case 'status':
         result = handleStatus();
         break;
       default:
-        result = { success: true, message: '申込フォーム バックエンド 稼働中', version: '2.0.0' };
+        result = { success: true, message: '申込フォーム バックエンド 稼働中', version: BACKEND_VERSION };
     }
   } catch (err) {
     console.error('doGet error:', err);
@@ -237,8 +265,8 @@ function doPost(e) {
 
     const calc = calculatePrice(params, config);
 
-    // ---- 受付スプレッドシートへ保存（最優先） ----
-    saveToReceptionSheet(params, calc, config);
+    // ---- 受付スプレッドシートへ保存（最優先。満枠ならここでキャンセル待ちになる） ----
+    const reception = saveToReceptionSheet(params, calc, config);
 
     // ---- データベースへ保存（失敗しても受付は止めない） ----
     let dbResult = { saved: false };
@@ -269,7 +297,8 @@ function doPost(e) {
       totalFee: calc.totalFee,
       applicationId: dbResult.applicationId || '',
       databaseSaved: !!dbResult.saved,
-      photoPending: !!params.photoPending
+      photoPending: !!params.photoPending,
+      waitlisted: !!reception.waitlisted
     };
 
   } catch (err) {
@@ -363,7 +392,14 @@ function calculatePrice(params, config) {
 
 /**
  * 受付シートの「現在の1行目」に合わせて1行追記します。
- * ヘッダーの書き換えは行いません（既存の運用列・手入力列を壊さないため）。
+ *
+ * - 既存の見出しの並び替え・書き換えは行いません（運用列・手入力列を壊さないため）
+ * - フォームで集めている項目の見出しが足りなければ、右端に追加します
+ *   （質問を増やした場合など）
+ * - 満枠かどうかは、このロックの中で数え直してから判定します。
+ *   同時に申込があっても、定員を超えて「申込」にはなりません
+ *
+ * 満枠でキャンセル待ちを受け付けない設定のときは、エラーにして書き込みません。
  */
 function saveToReceptionSheet(params, calc, config) {
   const ss = SpreadsheetApp.openById(config.spreadsheetId);
@@ -372,35 +408,144 @@ function saveToReceptionSheet(params, calc, config) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    // 受付シートがまだ無い（または空）の場合のみ、config からヘッダーを作成
     if (!sheet) sheet = ss.insertSheet(RECEPTION_SHEET_NAME);
 
-    if (sheet.getLastRow() === 0) {
-      const headers = buildReceptionHeaders(config);
-      ensureColumnCount_(sheet, headers.length);
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      sheet.getRange(1, 1, 1, headers.length)
-        .setBackground('#374151')
-        .setFontColor('#ffffff')
-        .setFontWeight('bold');
-      sheet.setFrozenRows(1);
+    const headerRow = ensureReceptionHeaders_(sheet, config);
+
+    const booth  = findBooth_(config, params.boothId);
+    const counts = countReceptionSheetByBooth_(sheet, headerRow);
+    const seat   = boothSeatStatus_(booth, counts[calc.boothName] || 0);
+
+    if (seat.full && !isWaitlistEnabled_(config)) {
+      throw new Error('申し訳ありません。「' + calc.boothName + '」は満枠になりました。別のブースをお選びください。');
     }
+    params.applicationStatus = seat.full ? STATUS_WAITLIST : STATUS_APPLIED;
 
-    const headerRow = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
-    const fieldMap  = buildFieldMap(params, calc, config);
-    const rowData   = mapRowToHeaders_(headerRow, fieldMap);
+    const fieldMap = buildFieldMap(params, calc, config);
+    sheet.appendRow(mapRowToHeaders_(headerRow, fieldMap));
 
-    sheet.appendRow(rowData);
+    CacheService.getScriptCache().remove(BOOTH_STATUS_CACHE_KEY);
   } finally {
     lock.releaseLock();
   }
+
+  return { waitlisted: params.applicationStatus === STATUS_WAITLIST };
 }
 
 /**
- * 受付シートを新規作成する場合のヘッダー（現行の並びを踏襲）
+ * 受付シートの見出しを確かめ、足りない見出しを右端に追加します。
+ * 追加後の見出し行を返します。
+ */
+function ensureReceptionHeaders_(sheet, config) {
+  const lastCol = sheet.getLastColumn();
+  const current = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+  const missing = missingReceptionHeaders_(current, buildReceptionHeaders(config));
+  if (!missing.length) return current;
+
+  ensureColumnCount_(sheet, current.length + missing.length);
+  sheet.getRange(1, current.length + 1, 1, missing.length)
+    .setValues([missing])
+    .setBackground('#374151')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold');
+  if (!current.length) sheet.setFrozenRows(1);
+
+  console.log('受付シートに見出しを追加しました: ' + missing.join(', '));
+  return current.concat(missing);
+}
+
+/**
+ * いまの見出しに無いものを、追加すべき順に返します。
+ * 空欄の見出し（懇親会出欠の右の人数列など）は、推測した名前で「ある」とみなします。
+ */
+function missingReceptionHeaders_(currentHeaders, requiredHeaders) {
+  const resolved = resolveReceptionHeaders_(currentHeaders || []);
+  const out = [];
+  (requiredHeaders || []).forEach(function (h) {
+    if (h && resolved.indexOf(h) < 0 && out.indexOf(h) < 0) out.push(h);
+  });
+  return out;
+}
+
+/** 設定からブースを探す（見つからなければ null） */
+function findBooth_(config, boothId) {
+  return (config.booths || []).filter(function (b) { return b.id === boothId; })[0] || null;
+}
+
+/** 満枠のブースをキャンセル待ちとして受け付けるか（設定が無ければ受け付ける） */
+function isWaitlistEnabled_(config) {
+  return !config.features || config.features.waitlist !== false;
+}
+
+/**
+ * ブースの枠の状況を返します。
+ *
+ * booth.seats = {
+ *   enabled: 残り枠を数えるか,
+ *   total:   定員,
+ *   show:    フォームに残り枠を出すか,
+ *   showWhenAtMost: 残りがこの数以下になったら出す（0 ならいつも出す）
+ * }
+ * booth.soldOut は「手動で締め切る」。空きがあっても満枠として扱います。
+ */
+function boothSeatStatus_(booth, taken) {
+  const s        = (booth && booth.seats) || {};
+  const total    = parseInt(s.total, 10) || 0;
+  const counting = !!s.enabled && total > 0;
+  const used     = parseInt(taken, 10) || 0;
+  const remaining = counting ? Math.max(0, total - used) : null;
+  const closed   = !!(booth && booth.soldOut);
+  const full     = closed || (counting && remaining <= 0);
+
+  const threshold = parseInt(s.showWhenAtMost, 10) || 0;
+  const visible   = counting && !full && !!s.show && (threshold <= 0 || remaining <= threshold);
+
+  return {
+    counting:  counting,
+    total:     total,
+    taken:     used,
+    remaining: remaining,
+    closed:    closed,
+    full:      full,
+    showRemaining: visible
+  };
+}
+
+/** 受付シートの申込をブースごとに数える（シートを読む部分） */
+function countReceptionSheetByBooth_(sheet, headerRow) {
+  if (sheet.getLastRow() < 2) return {};
+  const width = Math.max(headerRow.length, sheet.getLastColumn());
+  const rows  = sheet.getRange(2, 1, sheet.getLastRow() - 1, width).getValues();
+  return countBoothRows_(headerRow, rows);
+}
+
+/**
+ * 申込をブースごとに数えます（シートに触れない部分）。
+ * ステータスに「キャンセル」を含む行（キャンセル・キャンセル待ち）は数えません。
+ */
+function countBoothRows_(headerRow, rows) {
+  const resolved  = resolveReceptionHeaders_(headerRow || []);
+  const iBooth    = resolved.indexOf('出展ブース');
+  const iStatus   = resolved.indexOf('ステータス');
+  const counts    = {};
+  if (iBooth < 0) return counts;
+
+  (rows || []).forEach(function (row) {
+    const booth = String(row[iBooth] === null || row[iBooth] === undefined ? '' : row[iBooth]).trim();
+    if (!booth) return;
+    const status = iStatus >= 0 ? String(row[iStatus] || '') : '';
+    if (status.indexOf('キャンセル') >= 0) return;
+    counts[booth] = (counts[booth] || 0) + 1;
+  });
+  return counts;
+}
+
+/**
+ * 受付シートで使う見出しの一覧です。
+ * 新しく作るシートはこの並びになり、既存のシートには足りないものだけ右端に追加されます。
  */
 function buildReceptionHeaders(config) {
-  const headers = ['座席番号', '申込日時', '氏名', 'フリガナ', 'メールアドレス'];
+  const headers = ['座席番号', 'ステータス', '申込日時', '氏名', 'フリガナ', 'メールアドレス'];
   const sf   = config.standardFields || {};
   const f    = config.features       || {};
   const opts = (config.pricing && config.pricing.options) || {};
@@ -440,6 +585,7 @@ function buildFieldMap(params, calc, config) {
 
   const map = {
     '座席番号':         '',
+    'ステータス':       params.applicationStatus || STATUS_APPLIED,
     '申込日時':         params.submittedAt || '',
     '氏名':             params.name || '',
     'フリガナ':         params.furigana || '',
@@ -590,7 +736,7 @@ function saveToDatabase(params, calc, config) {
     '合計金額':         calc.totalFee,
     '入金確認':         '',
     '入金日':           '',
-    'ステータス':       '申込',
+    'ステータス':       params.applicationStatus || STATUS_APPLIED,
     'スタッフメモ':     '',
     'LINEユーザーID':   params.lineUserId || '',
     'LINE表示名':       params.lineDisplayName || '',
@@ -608,7 +754,7 @@ function writeDatabaseRecord_(ss, record, edition, config) {
   lock.waitLock(30000);
   try {
     const appSheet = ensureDbSheet_(ss, DB_SHEET_APPLICATIONS, DB_APPLICATION_HEADERS);
-    const headers  = DB_APPLICATION_HEADERS;
+    const headers  = sheetHeaders_(appSheet);
 
     // 重複チェック（開催回ID + メール + 申込日時）
     const dedupeKey = [
@@ -629,9 +775,7 @@ function writeDatabaseRecord_(ss, record, edition, config) {
     record['出展者ID']  = exhibitorId;
     record['登録日時']  = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
 
-    appSheet.appendRow(headers.map(function (h) {
-      return record[h] !== undefined && record[h] !== null ? record[h] : '';
-    }));
+    appSheet.appendRow(rowFromRecord_(headers, record));
 
     upsertEvent_(ss, edition, config);
 
@@ -641,34 +785,51 @@ function writeDatabaseRecord_(ss, record, edition, config) {
   }
 }
 
-/** 指定シートが無ければヘッダー付きで作成、あればヘッダー不足分を補完 */
+/**
+ * 指定シートが無ければ見出し付きで作成し、あれば足りない見出しを右端に追加します。
+ *
+ * データベースは「見出しの名前」で読み書きするため、
+ * 列を並べ替えたり、途中に列を足したりしても、別の列に入ることはありません。
+ * 既存の見出しを書き換えることもしません。
+ */
 function ensureDbSheet_(ss, sheetName, headers) {
   let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) sheet = ss.insertSheet(sheetName);
 
-  if (!sheet) {
-    sheet = ss.insertSheet(sheetName);
-    ensureColumnCount_(sheet, headers.length);
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    styleDbHeader_(sheet, headers.length);
-    return sheet;
-  }
+  const current = sheetHeaders_(sheet);
+  const missing = headers.filter(function (h) { return current.indexOf(h) < 0; });
+  if (!missing.length) return sheet;
 
-  ensureColumnCount_(sheet, headers.length);
-
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    styleDbHeader_(sheet, headers.length);
-    return sheet;
-  }
-
-  // 末尾に列が増えた場合のみ補完（既存列の並びは動かさない）
-  const current = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  if (current.length < headers.length) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    styleDbHeader_(sheet, headers.length);
-  }
-
+  ensureColumnCount_(sheet, current.length + missing.length);
+  sheet.getRange(1, current.length + 1, 1, missing.length).setValues([missing]);
+  styleDbHeader_(sheet, current.length + missing.length);
   return sheet;
+}
+
+/** 1行目の見出しを返します（前後の空白は取り除きます） */
+function sheetHeaders_(sheet) {
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return [];
+  return sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) {
+    return String(h === null || h === undefined ? '' : h).trim();
+  });
+}
+
+/** 見出しの並びどおりに、記録の値を並べます（見出しに無い値は捨て、知らない列は空欄） */
+function rowFromRecord_(headers, record) {
+  return headers.map(function (h) {
+    const v = h ? record[h] : undefined;
+    return v !== undefined && v !== null ? v : '';
+  });
+}
+
+/** 1行分の値を、見出しの名前で引ける形にします */
+function recordFromRow_(headers, row) {
+  const obj = {};
+  headers.forEach(function (h, i) {
+    if (h && !(h in obj)) obj[h] = row[i];
+  });
+  return obj;
 }
 
 /** 新規シートの既定列数(26列)を超えるヘッダーを書けるように列を広げる */
@@ -736,7 +897,7 @@ function nextApplicationId_(sheet, editionId) {
  */
 function upsertExhibitor_(ss, record, edition) {
   const sheet   = ensureDbSheet_(ss, DB_SHEET_EXHIBITORS, DB_EXHIBITOR_HEADERS);
-  const headers = DB_EXHIBITOR_HEADERS;
+  const headers = sheetHeaders_(sheet);
 
   const mailKey = normalizeEmail_(record['メールアドレス']) ||
                   ('name:' + String(record['氏名'] || '').replace(/\s/g, '') + '/' + String(record['出展名'] || '').replace(/\s/g, ''));
@@ -753,7 +914,7 @@ function upsertExhibitor_(ss, record, edition) {
     for (let i = 0; i < keys.length; i++) {
       if (String(keys[i][0]).trim() === mailKey) {
         targetRow = i + 2;
-        existing  = sheet.getRange(targetRow, 1, 1, headers.length).getValues()[0];
+        existing  = recordFromRow_(headers, sheet.getRange(targetRow, 1, 1, headers.length).getValues()[0]);
         break;
       }
     }
@@ -784,12 +945,12 @@ function upsertExhibitor_(ss, record, edition) {
       '最終開催回':         edition.edition || edition.editionId || '',
       'スタッフメモ':       ''
     };
-    sheet.appendRow(headers.map(function (h) { return row[h] !== undefined ? row[h] : ''; }));
+    sheet.appendRow(rowFromRecord_(headers, row));
     return exhibitorId;
   }
 
   // 既存行を更新（空で上書きしない）
-  const get = function (name) { return existing[headers.indexOf(name)]; };
+  const get = function (name) { return existing[name]; };
   const keepOrUpdate = function (name, value) {
     return (value === '' || value === null || value === undefined) ? get(name) : value;
   };
@@ -818,8 +979,9 @@ function upsertExhibitor_(ss, record, edition) {
     'スタッフメモ':         get('スタッフメモ') || ''
   };
 
-  sheet.getRange(targetRow, 1, 1, headers.length)
-    .setValues([headers.map(function (h) { return updated[h] !== undefined ? updated[h] : ''; })]);
+  // スタッフが足した列など、ここで扱わない列はいまの値のまま残す
+  const merged = Object.assign({}, existing, updated);
+  sheet.getRange(targetRow, 1, 1, headers.length).setValues([rowFromRecord_(headers, merged)]);
 
   return updated['出展者ID'];
 }
@@ -845,16 +1007,21 @@ function upsertEvent_(ss, edition, config) {
   if (!edition.editionId) return;
 
   const sheet   = ensureDbSheet_(ss, DB_SHEET_EVENTS, DB_EVENT_HEADERS);
-  const headers = DB_EVENT_HEADERS;
+  const headers = sheetHeaders_(sheet);
   const lastRow = sheet.getLastRow();
+  const idxId   = headers.indexOf('開催回ID');
 
   const count = countApplicationsOfEdition_(ss, edition.editionId);
 
   let targetRow = 0;
-  if (lastRow >= 2) {
-    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  let existing  = {};
+  if (lastRow >= 2 && idxId >= 0) {
+    const ids = sheet.getRange(2, idxId + 1, lastRow - 1, 1).getValues();
     for (let i = 0; i < ids.length; i++) {
       if (String(ids[i][0]).trim() === edition.editionId) { targetRow = i + 2; break; }
+    }
+    if (targetRow) {
+      existing = recordFromRow_(headers, sheet.getRange(targetRow, 1, 1, headers.length).getValues()[0]);
     }
   }
 
@@ -869,7 +1036,7 @@ function upsertEvent_(ss, edition, config) {
     '登録日時':               Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss')
   };
 
-  const values = [headers.map(function (h) { return row[h] !== undefined ? row[h] : ''; })];
+  const values = [rowFromRecord_(headers, Object.assign({}, existing, row))];
 
   if (targetRow) {
     sheet.getRange(targetRow, 1, 1, headers.length).setValues(values);
@@ -1015,8 +1182,17 @@ function sendConfirmationEmail(params, calc, config) {
   // テンプレートに {{photoNotice}} があればその位置に、無ければ本文の先頭に差し込む
   variables.photoNotice = params.photoPending ? buildPhotoNoticeText_(config) : '';
 
-  const subject  = applyTemplate(emailCfg.confirmationSubject || '【{{eventName}}】お申込みを受け付けました', variables);
-  const template = emailCfg.confirmationBodyTemplate || defaultConfirmationTemplate();
+  // 満枠でキャンセル待ちになった方には、振込の案内が無い専用の文面を送る
+  const waitlisted = params.applicationStatus === STATUS_WAITLIST;
+  const subject = applyTemplate(
+    waitlisted
+      ? (emailCfg.waitlistSubject || defaultWaitlistSubject())
+      : (emailCfg.confirmationSubject || '【{{eventName}}】お申込みを受け付けました'),
+    variables
+  );
+  const template = waitlisted
+    ? (emailCfg.waitlistBodyTemplate || defaultWaitlistTemplate())
+    : (emailCfg.confirmationBodyTemplate || defaultConfirmationTemplate());
 
   let body = applyTemplate(template, variables);
   if (params.photoPending && template.indexOf('{{photoNotice}}') === -1) {
@@ -1083,12 +1259,17 @@ function sendAdminEmail(params, calc, config, dbResult) {
     bd.memberDiscount > 0 ? '会員割引: -¥' + bd.memberDiscount.toLocaleString() : null
   ].filter(Boolean);
 
-  const subject = applyTemplate(
+  const waitlisted = params.applicationStatus === STATUS_WAITLIST;
+  const subject = (waitlisted ? '【キャンセル待ち】' : '') + applyTemplate(
     emailCfg.adminNotificationSubject || '【新規申込】{{name}}様 ({{exhibitorName}})',
     { name: params.name, exhibitorName: params.exhibitorName || '', eventName: eventName }
   );
 
-  const body = '新しい出展申込がありました。\n\n' +
+  const body = (waitlisted
+      ? '満枠のため、キャンセル待ちとして受け付けた申込です。\n' +
+        '空きが出て繰り上げるときは、受付シートの「ステータス」を「申込」に書き換えて、' +
+        'この方へご連絡ください。\n\n'
+      : '新しい出展申込がありました。\n\n') +
     '━━ 申込者情報 ━━━━━━━━━━━━━━━━\n' +
     'お名前:         ' + (params.name || '') + '\n' +
     'ふりがな:       ' + (params.furigana || '') + '\n' +
@@ -1101,6 +1282,7 @@ function sendAdminEmail(params, calc, config, dbResult) {
     '出展名:         ' + (params.exhibitorName || '-') + '\n' +
     'カテゴリ:       ' + (params.category || '-') + '\n' +
     'ブース:         ' + calc.boothName + '\n' +
+    'ステータス:     ' + (params.applicationStatus || STATUS_APPLIED) + '\n' +
     '早割:           ' + (calc.isEarlyBird ? 'あり' : 'なし') + '\n\n' +
     '━━ カスタム回答 ━━━━━━━━━━━━━━━━\n' +
     (customQLines.join('\n') || 'なし') + '\n\n' +
@@ -1332,8 +1514,12 @@ function handleGetExhibitors(config) {
       return i >= 0 ? row[i] : '';
     };
 
+    // キャンセル・キャンセル待ちの方は載せない
     const exhibitors = rows
-      .filter(function (row) { return col(row, '出展名') || col(row, '氏名'); })
+      .filter(function (row) {
+        return (col(row, '出展名') || col(row, '氏名')) &&
+               String(col(row, 'ステータス') || '').indexOf('キャンセル') < 0;
+      })
       .map(function (row) {
         return {
           name:            col(row, '出展名') || col(row, '氏名'),
@@ -1368,7 +1554,76 @@ function handleClearCache(params) {
     return { success: false, error: '管理トークンが正しくありません' };
   }
   clearConfigCache();
-  return { success: true, message: '設定キャッシュをクリアしました' };
+  CacheService.getScriptCache().remove(BOOTH_STATUS_CACHE_KEY);
+
+  const result = { success: true, message: '設定キャッシュをクリアしました', addedColumns: [] };
+
+  // 質問を増やした場合などに、申込を待たずに受付シートの見出しを追加しておく
+  try {
+    const config = getConfig();
+    const sheet  = config.spreadsheetId
+      ? SpreadsheetApp.openById(config.spreadsheetId).getSheetByName(RECEPTION_SHEET_NAME)
+      : null;
+    if (sheet) {
+      const lock = LockService.getScriptLock();
+      lock.waitLock(30000);
+      try {
+        const before = sheet.getLastColumn();
+        const after  = ensureReceptionHeaders_(sheet, config);
+        result.addedColumns = after.slice(before);
+      } finally {
+        lock.releaseLock();
+      }
+    }
+  } catch (err) {
+    console.warn('受付シートの見出しを確認できませんでした:', err);
+    result.headerError = err.message;
+  }
+
+  return result;
+}
+
+/**
+ * 申込フォームに出す、ブースごとの空き状況を返します。
+ *
+ * 残り枠の数は「フォームに出す」設定で、出してよい時だけ返します
+ * （出さない設定のときは、満枠かどうかだけが分かります）。
+ * 一度数えた結果は30秒だけ使い回し、申込が入ると消します。
+ */
+function handleBoothStatus(config) {
+  const cache  = CacheService.getScriptCache();
+  const cached = cache.get(BOOTH_STATUS_CACHE_KEY);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) { /* 壊れていたら数え直す */ }
+  }
+
+  let counts = {};
+  try {
+    const sheet = SpreadsheetApp.openById(config.spreadsheetId).getSheetByName(RECEPTION_SHEET_NAME);
+    if (sheet && sheet.getLastColumn() > 0) {
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      counts = countReceptionSheetByBooth_(sheet, headers);
+    }
+  } catch (err) {
+    console.warn('受付シートを数えられませんでした:', err);
+  }
+
+  const result = buildBoothStatus_(config, counts);
+  cache.put(BOOTH_STATUS_CACHE_KEY, JSON.stringify(result), BOOTH_STATUS_CACHE_SEC);
+  return result;
+}
+
+/** ブースごとの空き状況を組み立てます（シートに触れない部分） */
+function buildBoothStatus_(config, counts) {
+  const booths = {};
+  (config.booths || []).forEach(function (b) {
+    const st = boothSeatStatus_(b, (counts || {})[b.name] || 0);
+    booths[b.id] = {
+      full:      st.full,
+      remaining: st.showRemaining ? st.remaining : null
+    };
+  });
+  return { success: true, waitlist: isWaitlistEnabled_(config), booths: booths };
 }
 
 /**
@@ -1425,7 +1680,9 @@ function createReceptionSpreadsheet_(config, requestedName) {
     }
   }
 
-  if (!headers || !headers.length) headers = buildReceptionHeaders(config);
+  // 前回の見出し（並べ替えやスタッフ用の列を含む）に、いまのフォームで足りない見出しを右端に足す
+  if (!headers || !headers.length) headers = [];
+  headers = headers.concat(missingReceptionHeaders_(headers, buildReceptionHeaders(config)));
 
   const ss    = SpreadsheetApp.create(name);
   const sheet = ss.getSheets()[0];
@@ -1499,7 +1756,7 @@ function handleStatus() {
 
   const status = {
     success: true,
-    version: '2.0.0',
+    version: BACKEND_VERSION,
     configJsonUrl: CONFIG_JSON_URL,
     eventName: edition.eventName,
     edition: edition.edition,
@@ -1644,7 +1901,7 @@ function migrateReceptionToDatabase() {
   // ---- データベース側も1回だけ読む ----
   const dbSs     = SpreadsheetApp.openById(dbId);
   const appSheet = ensureDbSheet_(dbSs, DB_SHEET_APPLICATIONS, DB_APPLICATION_HEADERS);
-  const appHeaders = DB_APPLICATION_HEADERS;
+  const appHeaders = sheetHeaders_(appSheet);
 
   const seen   = {};   // すでに入っている申込（重複を防ぐ）
   const prefix = edition.editionId + '-';
@@ -1717,7 +1974,8 @@ function migrateReceptionToDatabase() {
       '合計金額':         col(row, '合計金額'),
       '入金確認':         col(row, '入金確認'),
       '入金日':           formatCellDate_(col(row, '入金日')),
-      'ステータス':       String(col(row, '入金確認') || '').trim() ? '入金済' : '申込',
+      'ステータス':       String(col(row, 'ステータス') || '').trim() ||
+                          (String(col(row, '入金確認') || '').trim() ? '入金済' : STATUS_APPLIED),
       'スタッフメモ':     col(row, 'スタッフメモ'),
       'LINEユーザーID':   col(row, 'LINEユーザーID'),
       'LINE表示名':       col(row, 'LINE表示名'),
@@ -1725,9 +1983,7 @@ function migrateReceptionToDatabase() {
       '登録日時':         now
     };
 
-    newRows.push(appHeaders.map(function (h) {
-      return record[h] !== undefined && record[h] !== null ? record[h] : '';
-    }));
+    newRows.push(rowFromRecord_(appHeaders, record));
   });
 
   // ---- まとめて1回で書き込む ----
@@ -1778,17 +2034,20 @@ function fillExhibitorIds_(appSheet) {
   const exSheet = ss.getSheetByName(DB_SHEET_EXHIBITORS);
   if (!exSheet || exSheet.getLastRow() < 2) return;
 
-  const exRows = exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).getValues();
+  const exHeaders = sheetHeaders_(exSheet);
+  const exRows = exSheet.getRange(2, 1, exSheet.getLastRow() - 1, exHeaders.length).getValues();
   const idByKey = {};
-  const iKey = DB_EXHIBITOR_HEADERS.indexOf('メールキー');
-  const iId  = DB_EXHIBITOR_HEADERS.indexOf('出展者ID');
+  const iKey = exHeaders.indexOf('メールキー');
+  const iId  = exHeaders.indexOf('出展者ID');
+  if (iKey < 0 || iId < 0) return;
   exRows.forEach(function (r) { idByKey[String(r[iKey])] = r[iId]; });
 
-  const headers = DB_APPLICATION_HEADERS;
+  const headers = sheetHeaders_(appSheet);
   const iExId = headers.indexOf('出展者ID');
   const iName = headers.indexOf('氏名');
   const iMail = headers.indexOf('メールアドレス');
   const iShop = headers.indexOf('出展名');
+  if (iExId < 0) return;
 
   const rows = appSheet.getRange(2, 1, appSheet.getLastRow() - 1, headers.length).getValues();
   const ids  = rows.map(function (r) {
@@ -1870,14 +2129,15 @@ function renameEditionId() {
 
   // events: 開催回ID
   const evSheet = ss.getSheetByName(DB_SHEET_EVENTS);
-  if (evSheet && evSheet.getLastRow() >= 2) {
+  const idxEvId = evSheet ? sheetHeaders_(evSheet).indexOf('開催回ID') : -1;
+  if (evSheet && evSheet.getLastRow() >= 2 && idxEvId >= 0) {
     const rowCount = evSheet.getLastRow() - 1;
-    const ids = evSheet.getRange(2, 1, rowCount, 1).getValues();
+    const ids = evSheet.getRange(2, idxEvId + 1, rowCount, 1).getValues();
     let touched = false;
     ids.forEach(function (r) {
       if (String(r[0]).trim() === OLD_ID) { r[0] = NEW_ID; touched = true; }
     });
-    if (touched) evSheet.getRange(2, 1, rowCount, 1).setValues(ids);
+    if (touched) evSheet.getRange(2, idxEvId + 1, rowCount, 1).setValues(ids);
   }
 
   console.log('開催回IDを付け替えました: ' + OLD_ID + ' → ' + NEW_ID + '（applications ' + changed + '件）');
@@ -1908,32 +2168,37 @@ function rebuildExhibitors() {
   const appHeaders = appSheet.getRange(1, 1, 1, appSheet.getLastColumn()).getValues()[0];
   const appRows    = appSheet.getRange(2, 1, appSheet.getLastRow() - 1, appSheet.getLastColumn()).getValues();
 
-  const exSheet  = ensureDbSheet_(ss, DB_SHEET_EXHIBITORS, DB_EXHIBITOR_HEADERS);
-  const existing = {};
-  if (exSheet.getLastRow() >= 2) {
-    const cur = exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).getValues();
-    cur.forEach(function (row) {
-      const obj = {};
-      DB_EXHIBITOR_HEADERS.forEach(function (h, i) { obj[h] = row[i]; });
-      if (obj['メールキー']) existing[String(obj['メールキー'])] = obj;
-    });
-  }
-
-  const rows = buildExhibitorRows_(appHeaders, appRows, existing);
-  writeExhibitorRows_(exSheet, rows);
+  const exSheet = ensureDbSheet_(ss, DB_SHEET_EXHIBITORS, DB_EXHIBITOR_HEADERS);
+  const rows    = rewriteExhibitors_(exSheet, appHeaders, appRows);
 
   console.log('exhibitors を作り直しました: ' + rows.length + '名');
   console.log('（applications ' + appRows.length + '件から集計）');
 }
 
-/** exhibitors シートを丸ごと書き直します（1行目は残します） */
-function writeExhibitorRows_(exSheet, rows) {
+/**
+ * exhibitors を applications から数え直して、丸ごと書き直します（1行目は残します）。
+ * 列の並びはシートの見出しに合わせます。
+ */
+function rewriteExhibitors_(exSheet, appHeaders, appRows) {
+  const exHeaders = sheetHeaders_(exSheet);
+  const existing  = {};
+  if (exSheet.getLastRow() >= 2) {
+    const cur = exSheet.getRange(2, 1, exSheet.getLastRow() - 1, exHeaders.length).getValues();
+    cur.forEach(function (row) {
+      const obj = recordFromRow_(exHeaders, row);
+      if (obj['メールキー']) existing[String(obj['メールキー'])] = obj;
+    });
+  }
+
+  const rows = buildExhibitorRows_(appHeaders, appRows, existing, exHeaders);
+
   if (exSheet.getLastRow() > 1) {
-    exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).clearContent();
+    exSheet.getRange(2, 1, exSheet.getLastRow() - 1, exHeaders.length).clearContent();
   }
   if (rows.length) {
-    exSheet.getRange(2, 1, rows.length, DB_EXHIBITOR_HEADERS.length).setValues(rows);
+    exSheet.getRange(2, 1, rows.length, exHeaders.length).setValues(rows);
   }
+  return rows;
 }
 
 /** applications を読み直して exhibitors を作り直します（移行の仕上げにも使用） */
@@ -1944,27 +2209,19 @@ function refreshExhibitorsFromApplications_(ss) {
   const appHeaders = appSheet.getRange(1, 1, 1, appSheet.getLastColumn()).getValues()[0];
   const appRows    = appSheet.getRange(2, 1, appSheet.getLastRow() - 1, appSheet.getLastColumn()).getValues();
 
-  const exSheet  = ensureDbSheet_(ss, DB_SHEET_EXHIBITORS, DB_EXHIBITOR_HEADERS);
-  const existing = {};
-  if (exSheet.getLastRow() >= 2) {
-    const cur = exSheet.getRange(2, 1, exSheet.getLastRow() - 1, DB_EXHIBITOR_HEADERS.length).getValues();
-    cur.forEach(function (row) {
-      const obj = {};
-      DB_EXHIBITOR_HEADERS.forEach(function (h, i) { obj[h] = row[i]; });
-      if (obj['メールキー']) existing[String(obj['メールキー'])] = obj;
-    });
-  }
-
-  const rows = buildExhibitorRows_(appHeaders, appRows, existing);
-  writeExhibitorRows_(exSheet, rows);
-  return rows.length;
+  const exSheet = ensureDbSheet_(ss, DB_SHEET_EXHIBITORS, DB_EXHIBITOR_HEADERS);
+  return rewriteExhibitors_(exSheet, appHeaders, appRows).length;
 }
 
 /**
  * applications の全行から exhibitors の中身を組み立てます。
  * シートに触れないため、単体で検証できます。
+ *
+ * exHeaders … 書き込み先の見出しの並び（省略時は標準の並び）。
+ * スタッフが足した列など、ここで計算しない列は、いまの値を引き継ぎます。
  */
-function buildExhibitorRows_(appHeaders, appRows, existing) {
+function buildExhibitorRows_(appHeaders, appRows, existing, exHeaders) {
+  const outHeaders = exHeaders && exHeaders.length ? exHeaders : DB_EXHIBITOR_HEADERS;
   const col = function (row, name) {
     const i = appHeaders.indexOf(name);
     return i >= 0 ? row[i] : '';
@@ -2038,9 +2295,12 @@ function buildExhibitorRows_(appHeaders, appRows, existing) {
     };
     Object.keys(e.values).forEach(function (f) { row[f] = e.values[f]; });
 
-    return DB_EXHIBITOR_HEADERS.map(function (h) {
-      return row[h] !== undefined && row[h] !== null ? row[h] : '';
+    // 計算の対象外の列（スタッフが足した列）は、いまの値をそのまま残す
+    outHeaders.forEach(function (h) {
+      if (h && DB_EXHIBITOR_HEADERS.indexOf(h) < 0 && old[h] !== undefined) row[h] = old[h];
     });
+
+    return rowFromRecord_(outHeaders, row);
   });
 }
 
@@ -2066,7 +2326,7 @@ function syncReceptionUpdatesToDatabase() {
     return;
   }
 
-  const srcHeaders = src.getRange(1, 1, 1, src.getLastColumn()).getValues()[0];
+  const srcHeaders = resolveReceptionHeaders_(src.getRange(1, 1, 1, src.getLastColumn()).getValues()[0]);
   const srcRows    = src.getRange(2, 1, src.getLastRow() - 1, src.getLastColumn()).getValues();
   const srcCol = function (row, name) {
     const i = srcHeaders.indexOf(name);
@@ -2108,9 +2368,15 @@ function syncReceptionUpdatesToDatabase() {
         }
       });
 
+      // ステータス: 受付シートに書いてあればそれを使い、入金確認があれば「入金済」にする
+      // （キャンセル・キャンセル待ちの行は入金済にしない）
       const statusIdx = dbHeaders.indexOf('ステータス');
-      if (statusIdx >= 0 && String(srcCol(row, '入金確認') || '').trim()) {
-        dbSheet.getRange(i + 2, statusIdx + 1).setValue('入金済');
+      if (statusIdx >= 0) {
+        let status = String(srcCol(row, 'ステータス') || '').trim();
+        if (String(srcCol(row, '入金確認') || '').trim() && status.indexOf('キャンセル') < 0) {
+          status = '入金済';
+        }
+        if (status) dbSheet.getRange(i + 2, statusIdx + 1).setValue(status);
       }
 
       updated++;
@@ -2201,6 +2467,37 @@ function formatSnsLinks(snsJson) {
   }
 }
 
+/** キャンセル待ちの方へのメール件名（管理画面で未設定のとき） */
+function defaultWaitlistSubject() {
+  return '【{{eventName}}】キャンセル待ちで受け付けました';
+}
+
+/** キャンセル待ちの方へのメール本文（管理画面で未設定のとき） */
+function defaultWaitlistTemplate() {
+  return [
+    '{{name}} 様',
+    '',
+    'この度は「{{eventName}}」へのお申込みありがとうございます。',
+    '',
+    'お選びいただいた「{{boothName}}」は満枠のため、',
+    'キャンセル待ちとして受け付けました。',
+    '',
+    '空きが出ましたら、事務局より順番にご連絡いたします。',
+    'ご連絡があるまで、出展料のお振込みはお控えください。',
+    '',
+    '■ お申込み内容',
+    'お名前: {{name}}',
+    '出展名: {{exhibitorName}}',
+    '出展ブース: {{boothName}}',
+    '{{customAnswers}}',
+    '受付日時: {{submittedAt}}',
+    '',
+    'ご不明な点はこのメールへ返信ください。',
+    '',
+    '{{eventName}} 運営事務局'
+  ].join('\n');
+}
+
 function defaultConfirmationTemplate() {
   return [
     '{{name}} 様',
@@ -2241,6 +2538,11 @@ function testReceptionColumnMapping() {
   headerRow.forEach(function (h, i) {
     console.log((i + 1) + '列目 [' + (h || '(空欄)') + '] → ' + row[i]);
   });
+
+  const missing = missingReceptionHeaders_(headerRow, buildReceptionHeaders(config));
+  console.log(missing.length
+    ? '次の申込で右端に追加される見出し: ' + missing.join(', ')
+    : '足りない見出しはありません');
 }
 
 /** 受付シートへ1行テスト書き込みします（確認後、行を削除してください） */

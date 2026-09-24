@@ -20,6 +20,12 @@ let optionValues = {
 let snsLinkCount = 1;
 // 選択時に縮小・圧縮を済ませた写真（送信時はこれをそのまま使う）
 let preparedPhoto = null;
+// バックエンドから受け取ったブースの空き状況 { ブースID: { full, remaining } }
+let boothAvailability = {};
+// 満枠のブースをキャンセル待ちとして受け付けるか。
+// バックエンドが対応していると確かめられたときだけ true にする
+// （古いバックエンドは、キャンセル待ちのつもりの申込を通常の申込として受け付けてしまうため）
+let waitlistEnabled = false;
 
 // ========================================
 // SNS判別パターン
@@ -72,6 +78,9 @@ function initApp() {
   if (CONFIG.features?.repeaterSearch) {
     initRepeaterSearch();
   }
+
+  // 残り枠を数えるブースがあれば、いまの空き状況を取りに行く（表示は先に出しておく）
+  loadBoothAvailability();
 
   // 規約モーダルにテキストを注入
   const termsContent = document.getElementById('termsContent');
@@ -290,6 +299,88 @@ function selectCategory(category, btn) {
 }
 
 // ========================================
+// ブースの空き状況
+// ========================================
+
+/** 満枠か（手動で締め切った／定員に達した） */
+function isBoothFull(booth) {
+  return !!(booth?.soldOut || boothAvailability[booth?.id]?.full);
+}
+
+/** 満枠でも、キャンセル待ちとして選べるか */
+function canApplyAsWaitlist(booth) {
+  return isBoothFull(booth) && waitlistEnabled;
+}
+
+/**
+ * バックエンドから、ブースごとの空き状況を受け取って表示に反映します。
+ * 受け取れなかった場合は設定ファイルの内容だけで表示し、満枠のブースは選べないままにします
+ * （満枠かどうかは送信時にバックエンドでも必ず確かめます）。
+ */
+async function loadBoothAvailability() {
+  const booths = CONFIG.booths || [];
+  const counting   = booths.some(b => b.seats?.enabled);
+  const waitClosed = CONFIG.features?.waitlist !== false && booths.some(b => b.soldOut);
+  if (!counting && !waitClosed) return;
+
+  const base = CONFIG.workerUrl || CONFIG.gasUrl;
+  if (!base) return;
+
+  try {
+    const url = new URL(base);
+    url.searchParams.set('action', 'booth_status');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await res.json();
+    if (!data?.success || !data.booths) return;   // 古いバックエンドは空き状況を返さない
+
+    boothAvailability = data.booths;
+    waitlistEnabled   = data.waitlist === true;
+    refreshBooths();
+  } catch (err) {
+    console.warn('ブースの空き状況を取得できませんでした:', err);
+  }
+}
+
+/** ブースの一覧を描き直す（選んでいたブースはそのまま選んだ状態にする） */
+function refreshBooths() {
+  const container = document.getElementById('boothAccordion');
+  if (!container) return;
+  const keepId = selectedBooth?.id;
+  container.textContent = '';
+  initBoothAccordion();
+
+  if (!keepId) return;
+  const booth = (CONFIG.booths || []).find(b => b.id === keepId);
+  if (booth && isBoothFull(booth) && !canApplyAsWaitlist(booth)) {
+    // 選んでいる間に満枠になり、キャンセル待ちも受け付けない場合は選び直してもらう
+    selectedBooth = null;
+    document.getElementById('boothIdInput').value = '';
+    updateWaitlistNotice();
+    calculatePrice();
+    return;
+  }
+  const radio = [...container.querySelectorAll('input[name="boothRadio"]')].find(r => r.value === keepId);
+  if (radio) {
+    radio.checked = true;
+    radio.closest('.booth-option')?.classList.add('selected');
+  }
+  updateWaitlistNotice();
+}
+
+/** 選んだブースが満枠のとき、キャンセル待ちになることを知らせる */
+function updateWaitlistNotice() {
+  const notice = document.getElementById('waitlistNotice');
+  const waiting = !!selectedBooth && canApplyAsWaitlist(selectedBooth);
+  if (notice) notice.classList.toggle('hidden', !waiting);
+
+  const btn = document.getElementById('submitBtn');
+  if (btn && !btn.disabled) btn.textContent = waiting ? 'キャンセル待ちで申し込む' : '申し込む';
+}
+
+// ========================================
 // ブース表示
 // ========================================
 function initBoothAccordion() {
@@ -337,8 +428,12 @@ function createBoothOption(booth) {
   const earlyPrice   = booth.prices.earlyBird;
   const regularPrice = booth.prices.regular;
 
+  const full      = isBoothFull(booth);
+  const waitlist  = full && canApplyAsWaitlist(booth);
+  const remaining = boothAvailability[booth.id]?.remaining;
+
   const option = document.createElement('label');
-  option.className = 'booth-option' + (booth.soldOut ? ' sold-out' : '');
+  option.className = 'booth-option' + (full ? (waitlist ? ' waitlist' : ' sold-out') : '');
 
   const radio = document.createElement('input');
   radio.type  = 'radio';
@@ -346,18 +441,31 @@ function createBoothOption(booth) {
   radio.value = booth.id;
 
   const name = document.createElement('span');
+  name.className = 'booth-name';
   name.style.flex = '1';
   name.textContent = booth.name;
 
   option.append(radio, name);
 
-  if (booth.soldOut) {
+  if (full && !waitlist) {
     radio.disabled = true;
     const badge = document.createElement('span');
     badge.className = 'sold-out-badge';
     badge.textContent = '満枠';
     option.appendChild(badge);
   } else {
+    if (waitlist) {
+      const badge = document.createElement('span');
+      badge.className = 'waitlist-badge';
+      badge.textContent = '満枠・キャンセル待ち';
+      name.appendChild(badge);
+    } else if (typeof remaining === 'number' && remaining > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'remaining-badge';
+      badge.textContent = `残りあと${remaining}枠`;
+      name.appendChild(badge);
+    }
+
     radio.addEventListener('change', () => selectBooth(booth.id));
     const price = document.createElement('span');
     price.className = 'booth-price';
@@ -419,6 +527,7 @@ function selectBooth(boothId) {
 
   updateOptionsUI();
   updateSessionWarning();
+  updateWaitlistNotice();
   calculatePrice();
 }
 
@@ -1087,7 +1196,11 @@ async function submitForm() {
 
     if (result.success) {
       // バックエンド側で写真を保存できなかった場合も未受領として扱う
-      showCompleteModal(!photoAttached || result.photoPending === true);
+      showCompleteModal(!photoAttached || result.photoPending === true, {
+        waitlisted: result.waitlisted === true,
+        expected:   !!selectedBooth && canApplyAsWaitlist(selectedBooth),
+        boothName:  selectedBooth?.name || ''
+      });
     } else {
       throw new Error(result.error || '送信に失敗しました。再度お試しください。');
     }
@@ -1095,6 +1208,8 @@ async function submitForm() {
   } catch (err) {
     console.error('Submit error:', err);
     alert(`送信エラー:\n\n${err.message}\n\n解決しない場合は、主催者へお問合せください。`);
+    // 満枠になって断られた場合に備えて、空き状況を取り直す
+    loadBoothAvailability();
   } finally {
     document.getElementById('loadingOverlay')?.classList.remove('visible');
     document.getElementById('submitBtn').disabled = false;
@@ -1103,9 +1218,34 @@ async function submitForm() {
 
 // 申込完了モーダルを表示する
 // photoPending が true のときだけ、写真を公式LINEへ送っていただく案内を出す
-function showCompleteModal(photoPending) {
+// waitlist.waitlisted が true のときは、キャンセル待ちで受け付けたことを伝える
+function showCompleteModal(photoPending, waitlist) {
   const modal  = document.getElementById('completeModal');
   const notice = document.getElementById('photoPendingNotice');
+
+  const waitBox = document.getElementById('waitlistResult');
+  if (waitBox) {
+    const waiting = !!waitlist?.waitlisted;
+    waitBox.classList.toggle('hidden', !waiting);
+    if (waiting) {
+      const booth = waitlist.boothName ? `「${waitlist.boothName}」` : 'お選びのブース';
+      // 申込の途中で満枠になった場合は、その旨を先に伝える
+      const lead = waitlist.expected
+        ? `${booth}は満枠のため、`
+        : `お申込みの直前に${booth}が満枠になったため、`;
+      const text   = document.getElementById('waitlistResultText');
+      const strong = document.createElement('strong');
+      strong.textContent = 'キャンセル待ち';
+      text.replaceChildren(
+        lead, strong, 'として受け付けました。', document.createElement('br'),
+        '空きが出た場合に、事務局から順番にご連絡します。ご連絡があるまで、出展料のお振込みはお待ちください。'
+      );
+      const title = document.getElementById('completeTitle');
+      if (title) title.textContent = 'キャンセル待ちで受け付けました';
+      const icon = document.getElementById('completeIcon');
+      if (icon) icon.textContent = '⏳';
+    }
+  }
 
   if (notice) {
     notice.classList.toggle('hidden', !photoPending);

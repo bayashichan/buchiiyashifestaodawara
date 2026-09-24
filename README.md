@@ -11,9 +11,11 @@
 
 設定画面は1つだけです → `admin/config-editor.html`（スマホ対応）
 
-イベント名・開催回・色・ブース・料金・質問項目・規約・メール文面・保存先を、
+イベント名・開催回・色・ブース・料金・定員（残り枠）・質問項目・規約・メール文面・保存先を、
 すべてこの画面から変更して「設定内容を保存」で反映します。
-次の開催をはじめるときは「📅 イベントのこと」→「🆕 次の開催をはじめる」から。
+次の開催をはじめるときは「📅 イベントのこと」→「🆕 次の開催をはじめる」から
+（受付シートの作成から保存まで、確認のあと一度に行います）。
+満枠のブースは「キャンセル待ち」として受け付けられます（「🏪 ブース（出展枠）」で設定）。
 初回だけ合い言葉の入力が必要です。詳しくは
 [`docs/MIGRATION.md`](docs/MIGRATION.md) の「管理画面の使い方」を参照してください。
 
@@ -38,6 +40,7 @@ GAS を触らずに設定を変更できます。
 
 ```bash
 node gas/tests/mapping.test.js            # 受付シートの列マッピングと重複判定
+node gas/tests/sheets.test.js             # 申込→受付シート→DB→メールの流れ（残り枠・キャンセル待ち・見出し）
 
 npm i --no-save jsdom                     # 下のテストに必要（初回のみ）
 node apply/tests/sns.test.mjs             # SNSリンク欄が送信時に拾われるか
@@ -46,6 +49,8 @@ node apply/tests/photo.test.mjs           # 写真が送れない場合でも申
 node admin/tests/config-editor.test.mjs   # 管理画面の読み込み・保存・合い言葉
 ```
 
+- 最新版（v2.1）への更新手順 → [`docs/MIGRATION.md`](docs/MIGRATION.md) の「最新版（v2.1）への更新手順」
 - 新しい開催回を始める手順 → [`docs/MIGRATION.md`](docs/MIGRATION.md)
+- 残り枠とキャンセル待ちの運用 → [`docs/MIGRATION.md`](docs/MIGRATION.md) の「7. 残り枠とキャンセル待ち」
 - データベースの列定義 → [`docs/DATABASE.md`](docs/DATABASE.md)
 - 取り込みが途中で止まったときの直し方 → [`docs/MIGRATION.md`](docs/MIGRATION.md) の「取り込みが途中で止まったとき」
