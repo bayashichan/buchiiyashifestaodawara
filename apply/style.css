@@ -205,6 +205,14 @@ textarea.input-field {
   margin: -0.15rem 0 0.5rem;
 }
 
+/* URL・Instagramの答えが整えきれなかったときの案内（申込は止めない） */
+.answer-hint {
+  font-size: 0.8rem;
+  color: #b45309;
+  line-height: 1.6;
+  margin-top: 0.35rem;
+}
+
 /* 自由な質問の選択肢（指で押しやすいよう1行ずつ） */
 .q-choices {
   display: grid;
@@ -403,6 +411,20 @@ textarea.input-field {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+}
+
+/* 見出しのすぐ下の注意書き（SNSリンク欄など。改行もそのまま） */
+.section-note {
+  padding: 0.75rem 1rem;
+  background: #fef3c7;
+  border: 1.5px solid #f59e0b;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: #92400e;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 1.25rem;
 }
 
 /* ========================================

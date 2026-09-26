@@ -6,6 +6,7 @@
  *  - 答え方ごとに入力欄が出る（長い文章・短い文章・数字・1つ選ぶ・いくつでも選ぶ・プルダウン）
  *  - 必ず答えてもらう質問の入力チェック、送られる答え
  *  - 前回の内容を呼び出したとき、選択肢の答えも入る
+ *  - URL・Instagramのアカウント名は、形をそろえて送る（そろわなければ案内を出す）
  *
  * 実行方法:
  *   npm i --no-save jsdom
@@ -167,6 +168,61 @@ console.log('\n[5] 前回の内容を呼び出したとき');
   const checked = id => [...block(doc, id).querySelectorAll('input:checked')].map(el => el.value).join(',');
   ok('1つ選ぶ質問に前回の答えが入る', checked('出展メニュー名') === '整体', checked('出展メニュー名'));
   ok('いくつでも選ぶ質問に前回の答えが入る', checked('自己紹介') === '常連,地元', checked('自己紹介'));
+}
+
+// ============================================================
+console.log('\n[6] URL・Instagramのアカウント名');
+{
+  const { window, doc, sent } = await boot([
+    { id: 'Facebook',  label: 'Facebook',  type: 'url',       required: false, maxLength: 100, showCounter: true },
+    { id: 'Instagram', label: 'Instagram', type: 'instagram', required: false, maxLength: 100, showCounter: true }
+  ]);
+  const fb = doc.getElementById('Facebook');
+  const ig = doc.getElementById('Instagram');
+  const hintShown = id => !block(doc, id).querySelector('.answer-hint').classList.contains('hidden');
+  const type = (el, v) => { el.value = v; el.dispatchEvent(new window.Event('input')); el.dispatchEvent(new window.Event('change')); };
+
+  ok('スマホで先頭が大文字にならない', ig.getAttribute('autocapitalize') === 'off' && fb.getAttribute('inputmode') === 'url');
+
+  const IG = [
+    ['@Buchi_Iyashi',                                    '@buchi_iyashi'],
+    ['buchi_iyashi',                                     '@buchi_iyashi'],
+    ['＠ｂｕｃｈｉ．ｉｙａｓｈｉ',                         '@buchi.iyashi'],
+    [' https://www.instagram.com/buchi_iyashi/?igsh=abc ', '@buchi_iyashi'],
+    ['instagram.com/buchi.iyashi',                       '@buchi.iyashi']
+  ];
+  IG.forEach(([input, want]) => {
+    type(ig, input);
+    ok(`Instagram「${input.trim()}」→「${want}」`, ig.value === want && !hintShown('Instagram'), `${ig.value} / 案内${hintShown('Instagram') ? 'あり' : 'なし'}`);
+  });
+  ok('整えたあとの文字数がカウンターに出る',
+    block(doc, 'Instagram').querySelector('.char-counter')?.textContent === `${'@buchi.iyashi'.length}/100`,
+    block(doc, 'Instagram').querySelector('.char-counter')?.textContent);
+  type(ig, 'ぶち癒し');
+  ok('アカウント名にならない文字は、そのまま残して案内を出す', ig.value === 'ぶち癒し' && hintShown('Instagram'));
+  type(ig, 'https://www.instagram.com/p/ABC123/');
+  ok('投稿のURLは名前と取り違えずに案内を出す', ig.value === 'https://www.instagram.com/p/ABC123/' && hintShown('Instagram'));
+  ig.value = 'ぶち';
+  ig.dispatchEvent(new window.Event('input'));
+  ok('打ち直しはじめたら案内を消す', !hintShown('Instagram'));
+  type(ig, '');
+  ok('空なら案内を出さない', !hintShown('Instagram'));
+
+  type(fb, 'www.facebook.com/hanako');
+  ok('Facebook「https://」が無ければ足す', fb.value === 'https://www.facebook.com/hanako' && !hintShown('Facebook'), fb.value);
+  type(fb, 'https://www.facebook.com/share/1AbC/');
+  ok('URLはそのまま', fb.value === 'https://www.facebook.com/share/1AbC/' && !hintShown('Facebook'), fb.value);
+  type(fb, '山田 花子');
+  ok('URLでなければ、そのまま残して案内を出す', fb.value === '山田 花子' && hintShown('Facebook'));
+  ok('案内が出ても申込は止めない（任意の質問）', window.validateForm().length === 0, window.validateForm().join(' / '));
+
+  // 入力欄を離れずに送った場合（change が起きない）も、送る答えはそろえる
+  fb.value = 'facebook.com/profile.php?id=123';
+  ig.value = '@Hanako.Salon';
+  await window.submitForm();
+  const answers = JSON.parse(sent.body?.get('customAnswers') || '{}');
+  ok('送る答え：Facebook', answers['Facebook'] === 'https://facebook.com/profile.php?id=123', answers['Facebook']);
+  ok('送る答え：Instagram', answers['Instagram'] === '@hanako.salon', answers['Instagram']);
 }
 
 console.log(ng === 0 ? '\n✅ すべて成功' : `\n❌ ${ng}件失敗`);

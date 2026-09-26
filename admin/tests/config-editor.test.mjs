@@ -29,6 +29,14 @@ config.event.edition   = '第1回';
 config.event.editionId = '第1回';
 config.spreadsheetEdition = '第1回';
 config.booths.forEach(b => { delete b.seats; b.soldOut = false; });
+// 質問と並び順も第1回のものに固定する（本番で質問を足したり名前を変えたりしても、同じ前提でテストできるように）
+config.customQuestions = [
+  { id: '出展メニュー名', type: 'textarea', label: '出展メニュー名', placeholder: '例：タロット占い 20分 2,000円',
+    required: true, showCounter: true, maxLength: 100 },
+  { id: '自己紹介', type: 'textarea', label: '自己紹介', placeholder: '200文字以内でご記入ください',
+    required: true, showCounter: true, maxLength: 200 }
+];
+delete config.formOrder;
 
 const atobUtf8 = b64 => Buffer.from(b64, 'base64').toString('utf8');
 
@@ -111,6 +119,8 @@ ok('受付シートがURL形式で表示される',
 ok('ブースが件数分ならぶ', doc.querySelectorAll('#boothList .item').length === config.booths.length);
 ok('質問が件数分ならぶ', doc.querySelectorAll('#questionList .item').length === config.customQuestions.length);
 ok('ジャンルが件数分ならぶ', doc.querySelectorAll('#tagList .tag').length === config.categories.length);
+ok('SNSリンク欄の注意書きが入る', doc.getElementById('f-snsNote').value === (config.standardFields.snsNote || ''),
+   doc.getElementById('f-snsNote').value);
 ok('起動直後は保存ボタンが押せない', doc.getElementById('saveBtn').disabled);
 
 console.log('\n[2] 色のプレビュー');
@@ -142,6 +152,9 @@ boothName.dispatchEvent(new window.Event('input'));
 doc.getElementById('f-dbUrl').value =
   'https://docs.google.com/spreadsheets/d/1QjOHkZRXZOJF7e6pslNPO2S_rnnHXaUxhY_LJrH9D6M/edit?gid=0#gid=0';
 
+// SNSリンク欄の注意書き（改行も入る）
+doc.getElementById('f-snsNote').value = '⚠️注意書⚠️\nFacebook、Instagramをお持ちの方は、ご入力下さい。';
+
 const collectResult = window.collect();
 ok('入力内容にエラーが無い', collectResult === null, String(collectResult));
 doc.getElementById('saveBtn').dispatchEvent(new window.Event('click'));
@@ -160,6 +173,9 @@ ok('貼ったURLからシートIDだけを取り出す',
    body?.databaseSpreadsheetId === '1QjOHkZRXZOJF7e6pslNPO2S_rnnHXaUxhY_LJrH9D6M', body?.databaseSpreadsheetId);
 ok('画面に無い項目も消えずに残る',
    body?.terms === config.terms && body?.gasUrl === config.gasUrl && body?.features.liffId === config.features.liffId);
+ok('SNSリンク欄の注意書きが改行ごと保存される',
+   body?.standardFields.snsNote === '⚠️注意書⚠️\nFacebook、Instagramをお持ちの方は、ご入力下さい。',
+   JSON.stringify(body?.standardFields.snsNote));
 ok('持ち込み物品の設定がブースごとに残る',
    body?.booths[2].askEquipment === true && body?.features.bodyEquipment === true,
    JSON.stringify(body?.booths[2]));
@@ -991,9 +1007,11 @@ console.log('\n[20] 自由な質問の説明と答え方');
   // 今ある質問：これまでどおりの欄に、説明が加わる
   const first = doc.querySelector('#questionList .item');
   ok('説明の欄がある', !!field(first, '説明（任意）') && field(first, '説明（任意）').tagName === 'TEXTAREA');
-  ok('答え方を選べる（6通り）',
+  ok('答え方を選べる（8通り）',
      [...field(first, '答え方').options].map(o => o.textContent).join(',') ===
-     '長い文章,短い文章,数字,選択肢から1つ選ぶ,選択肢からいくつでも選ぶ,選択肢から1つ選ぶ（プルダウン）');
+     '長い文章,短い文章,数字,選択肢から1つ選ぶ,選択肢からいくつでも選ぶ,選択肢から1つ選ぶ（プルダウン）,' +
+     'URL（ホームページ・Facebookのプロフィールなど）,Instagramのアカウント名（@〜にそろえます）',
+     [...field(first, '答え方').options].map(o => o.textContent).join(','));
   ok('長い文章では入力例と最大文字数を決める',
      labels(first).includes('入力例（うすい文字で出ます）') && labels(first).includes('最大文字数') &&
      !labels(first).includes('選択肢（1行に1つ）'), labels(first).join(','));
@@ -1067,6 +1085,42 @@ console.log('\n[20] 自由な質問の説明と答え方');
   ok('申込フォームに説明が出る', fb?.querySelector('.question-desc')?.textContent === 'いちばん近いものを選んでください');
   ok('申込フォームにチェックボックスがならぶ',
      [...(fb?.querySelectorAll('input[type=checkbox]') || [])].map(i => i.value).join(',') === '午前,午後,終日');
+}
+
+// ============================================================
+console.log('\n[21] URL・Instagramのアカウント名で答える質問');
+{
+  const { window, doc, saved } = await boot();
+  const type  = (el, v) => { el.value = v; el.dispatchEvent(new window.Event('input', { bubbles: true })); };
+  const labels = item => [...item.querySelectorAll('.field > label')].map(l => l.textContent);
+  const field  = (item, name) => [...item.querySelectorAll('.field')]
+    .find(f => f.querySelector(':scope > label')?.textContent === name)?.querySelector('input, textarea, select');
+
+  doc.getElementById('addQuestion').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  const item = [...doc.querySelectorAll('#questionList .item')].at(-1);
+  type(field(item, '質問文'), 'Instagram');
+  const kind = field(item, '答え方');
+  kind.value = 'instagram';
+  kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  ok('入力例と最大文字数を決められる',
+     labels(item).includes('入力例（うすい文字で出ます）') && labels(item).includes('最大文字数'), labels(item).join(','));
+  ok('入力例の見本が「@アカウント名」', field(item, '入力例（うすい文字で出ます）').placeholder === '@アカウント名');
+  ok('見本は1行の入力欄', !item.querySelector('.example .qx-input').classList.contains('qx-area'));
+
+  doc.getElementById('saveBtn').dispatchEvent(new window.Event('click'));
+  await wait(200);
+  const body = lastSaved(saved);
+  ok('答え方が保存される', body.customQuestions.find(q => q.id === 'Instagram')?.type === 'instagram');
+
+  // 保存した設定の申込フォームで、URLを貼ると「@名前」になる
+  const formDom = new JSDOM(fs.readFileSync(`${REPO}/apply/index.html`, 'utf8'), { runScripts: 'outside-only', url: 'https://example.test/apply/' });
+  formDom.window.fetch = async () => ({ ok: true, json: async () => body });
+  formDom.window.eval(fs.readFileSync(`${REPO}/apply/script.js`, 'utf8'));
+  await wait(80);
+  const ig = formDom.window.document.getElementById('Instagram');
+  ig.value = 'https://www.instagram.com/Buchi_Iyashi/';
+  ig.dispatchEvent(new formDom.window.Event('change'));
+  ok('申込フォームで「@名前」にそろう', ig.value === '@buchi_iyashi', ig.value);
 }
 
 console.log(ng === 0 ? '\n✅ すべて成功' : `\n❌ ${ng}件失敗`);

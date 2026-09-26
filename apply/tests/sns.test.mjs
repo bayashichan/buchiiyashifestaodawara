@@ -31,10 +31,10 @@ const URLS = [
   'https://lin.ee/example'
 ];
 
-async function run(scriptSource, label) {
+async function run(scriptSource, label, cfg = config) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.test/apply/' });
   const { window } = dom, doc = window.document;
-  window.fetch = async () => ({ ok: true, json: async () => config });
+  window.fetch = async () => ({ ok: true, json: async () => cfg });
   window.alert = () => {};
 
   window.eval(scriptSource);
@@ -107,6 +107,38 @@ expect('SNS種別が正しく判定される', after.collected.map(c => c.type).
 expect('削除後は残り2件だけになる', afterRemove.length === 2);
 expect('削除後もバッジと入力欄の対応がずれない',
   afterRemove[0]?.type === 'Instagram' && afterRemove[1]?.type === '公式LINE');
+
+// 注意書き（管理画面で入れた文字）と「HP、公式LINEなど」の見出し
+// 本番の設定が変わってもテストの前提が変わらないよう、必要な項目だけ固定する
+const NOTE = '⚠️注意書⚠️\nテスト用の注意書きです。';
+const withSns = (standardFields, customQuestions) => ({
+  ...config,
+  standardFields: { ...config.standardFields, ...standardFields },
+  customQuestions,
+  formOrder: undefined
+});
+const FB_IG = [
+  { id: 'Facebook',  label: 'Facebook',  type: 'text', required: false },
+  { id: 'Instagram', label: 'Instagram', type: 'text', required: false }
+];
+const sectionOf = doc => doc.querySelector('[data-section="sns"]');
+
+const shown  = await run(newSrc, '注意書きあり', withSns({ snsNote: NOTE, showSnsLinks: true }, FB_IG));
+const noteEl = shown.doc.getElementById('snsNote');
+const blank  = await run(newSrc, '注意書きなし', withSns({ snsNote: '  ', showSnsLinks: true }, FB_IG));
+const noSns  = await run(newSrc, 'SNS欄を出さない設定', withSns({ snsNote: NOTE, showSnsLinks: false }, []));
+
+console.log('\n■ 注意書きと見出し');
+expect('注意書きが改行ごと表示される', !noteEl.classList.contains('hidden') && noteEl.textContent === NOTE);
+expect('注意書きは「SNSリンク」の見出しのすぐ下（質問より上）',
+  noteEl.parentElement === sectionOf(shown.doc) &&
+  noteEl.previousElementSibling?.classList.contains('section-title') &&
+  noteEl.nextElementSibling?.classList.contains('section-body'));
+expect('空白だけなら注意書きを出さない', blank.doc.getElementById('snsNote').classList.contains('hidden'));
+expect('リンク欄に「HP、公式LINEなど」の見出しが付く',
+  shown.doc.querySelector('#snsSection .input-label')?.textContent === 'HP、公式LINEなど');
+expect('見出しの下に何も無ければ、注意書きごと見出しを隠す',
+  sectionOf(noSns.doc).classList.contains('hidden'));
 
 console.log(ng === 0 ? '\n✅ すべて成功' : `\n❌ ${ng}件失敗`);
 process.exit(ng === 0 ? 0 : 1);
