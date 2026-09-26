@@ -791,68 +791,166 @@ function renderCustomQuestions() {
   const home = document.querySelector('[data-section="exhibit"] .section-body');
   if (!home) return;
 
-  (CONFIG.customQuestions || []).forEach(q => {
+  (CONFIG.customQuestions || []).forEach((q, i) => {
     const wrapper = document.createElement('div');
     wrapper.dataset.block = `q:${q.id}`;
+    const group = isChoiceGroup(q);   // 選択肢をならべる質問（1つ選ぶ・いくつでも選ぶ）
 
-    const label = document.createElement('label');
+    // 質問文（管理画面で入れた文字をそのまま出す）
+    const label = document.createElement(group ? 'div' : 'label');
     label.className = 'input-label';
-    label.setAttribute('for', q.id);
-    label.innerHTML = `${q.label}${q.required ? '<span class="required">*</span>' : ''}`;
+    label.id = `cq${i}_label`;
+    if (!group) label.htmlFor = q.id;
+    label.textContent = q.label;
+    if (q.required) {
+      const mark = document.createElement('span');
+      mark.className = 'required';
+      mark.textContent = '*';
+      label.appendChild(mark);
+    }
     wrapper.appendChild(label);
 
-    let input;
-    if (q.type === 'textarea') {
-      input = document.createElement('textarea');
-      input.rows = 4;
-    } else if (q.type === 'select') {
-      input = document.createElement('select');
-      input.className = 'input-field';
-      const defaultOpt = document.createElement('option');
-      defaultOpt.value = '';
-      defaultOpt.textContent = '選択してください';
-      input.appendChild(defaultOpt);
-      (q.options || []).forEach(opt => {
-        const o = document.createElement('option');
-        o.value = opt;
-        o.textContent = opt;
-        input.appendChild(o);
-      });
-    } else if (q.type === 'number') {
-      input = document.createElement('input');
-      input.type = 'number';
-      input.min = '0';
-    } else {
-      input = document.createElement('input');
-      input.type = 'text';
+    // 説明（質問文のすぐ下に小さく出す。改行もそのまま）
+    const description = String(q.description || '').trim();
+    let desc = null;
+    if (description) {
+      desc = document.createElement('p');
+      desc.className = 'question-desc';
+      desc.id = `cq${i}_desc`;
+      desc.textContent = description;
+      wrapper.appendChild(desc);
     }
 
+    const input = group ? createChoiceGroup(q) : createAnswerInput(q);
     input.id = q.id;
-    input.name = q.id;
-    if (input.tagName !== 'SELECT') input.className = 'input-field';
-    if (q.placeholder) input.placeholder = q.placeholder;
-    if (q.maxLength)   input.maxLength   = q.maxLength;
-    if (q.required)    input.required    = true;
+    if (group) input.setAttribute('aria-labelledby', label.id);
+    if (desc)  input.setAttribute('aria-describedby', desc.id);
     wrapper.appendChild(input);
 
-    // 文字数カウンター
-    if (q.showCounter && q.maxLength) {
+    // 文字数カウンター（文章で答える質問だけ）
+    if (isTextAnswer(q) && q.showCounter && q.maxLength) {
       const counter = document.createElement('div');
       counter.className = 'char-counter';
-      counter.id = `counter_${q.id}`;
-      counter.innerHTML = `<span id="count_${q.id}">0</span>/${q.maxLength}`;
+      const count = document.createElement('span');
+      count.textContent = '0';
+      counter.append(count, `/${q.maxLength}`);
       wrapper.appendChild(counter);
 
       input.addEventListener('input', () => {
         const len = input.value.length;
-        const countEl = document.getElementById(`count_${q.id}`);
-        if (countEl) countEl.textContent = len;
+        count.textContent = len;
         counter.classList.toggle('over', len > q.maxLength);
       });
     }
 
     home.appendChild(wrapper);
   });
+}
+
+/*
+ * 自由な質問の答え方（config.json の customQuestions[].type）
+ *   textarea … 長い文章　　text … 短い文章　　number … 数字
+ *   radio    … 選択肢から1つ選ぶ　　checkbox … 選択肢からいくつでも選ぶ
+ *   select   … 選択肢から1つ選ぶ（プルダウン）
+ * 選択肢は customQuestions[].options に入っています。
+ */
+
+/** 選択肢をボタンのようにならべる質問か */
+function isChoiceGroup(q) {
+  return q.type === 'radio' || q.type === 'checkbox';
+}
+
+/** 選択肢から選ぶ質問か（プルダウンも含む） */
+function isChoiceQuestion(q) {
+  return isChoiceGroup(q) || q.type === 'select';
+}
+
+/** 文章で答える質問か（文字数を数える） */
+function isTextAnswer(q) {
+  return !isChoiceQuestion(q) && q.type !== 'number';
+}
+
+/** 文章・数字・プルダウンの入力欄をつくる */
+function createAnswerInput(q) {
+  let input;
+  if (q.type === 'textarea') {
+    input = document.createElement('textarea');
+    input.rows = 4;
+  } else if (q.type === 'select') {
+    input = document.createElement('select');
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = '選択してください';
+    input.appendChild(defaultOpt);
+    (q.options || []).forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt;
+      input.appendChild(o);
+    });
+  } else if (q.type === 'number') {
+    input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+  } else {
+    input = document.createElement('input');
+    input.type = 'text';
+  }
+
+  input.name = q.id;
+  input.className = 'input-field';
+  if (q.placeholder && q.type !== 'select') input.placeholder = q.placeholder;
+  if (q.maxLength && isTextAnswer(q))       input.maxLength   = q.maxLength;
+  if (q.required)                           input.required    = true;
+  return input;
+}
+
+/** 選択肢を1行ずつならべる（1つ選ぶ＝ラジオボタン、いくつでも選ぶ＝チェックボックス） */
+function createChoiceGroup(q) {
+  const box = document.createElement('div');
+  box.className = 'q-choices';
+  box.setAttribute('role', q.type === 'radio' ? 'radiogroup' : 'group');
+
+  (q.options || []).forEach(opt => {
+    const row = document.createElement('label');
+    row.className = 'q-choice';
+    const input = document.createElement('input');
+    input.type = q.type;
+    input.name = q.id;
+    input.value = opt;
+    const text = document.createElement('span');
+    text.textContent = opt;
+    row.append(input, text);
+    box.appendChild(row);
+  });
+  return box;
+}
+
+/** 質問のかたまり（質問のIDには記号も入りうるので、セレクタを使わずに探す） */
+function questionBlock(q) {
+  return [...document.querySelectorAll('[data-block]')].find(el => el.dataset.block === `q:${q.id}`) || null;
+}
+
+/** 自由な質問の答え（いくつでも選べる質問は「、」でつなぐ） */
+function getCustomAnswer(q) {
+  if (isChoiceGroup(q)) {
+    const block = questionBlock(q);
+    if (!block) return '';
+    return [...block.querySelectorAll('input:checked')].map(el => el.value).join('、');
+  }
+  return document.getElementById(q.id)?.value ?? '';
+}
+
+/** 自由な質問に答えを入れる（前回の内容を呼び出すとき） */
+function setCustomAnswer(q, value) {
+  if (!value) return;
+  if (isChoiceGroup(q)) {
+    const picked = q.type === 'checkbox' ? String(value).split('、') : [String(value)];
+    questionBlock(q)?.querySelectorAll('input').forEach(el => { el.checked = picked.includes(el.value); });
+    return;
+  }
+  const el = document.getElementById(q.id);
+  if (el) el.value = value;
 }
 
 // ========================================
@@ -1114,13 +1212,15 @@ function validateForm() {
   // カスタム質問
   (CONFIG.customQuestions || []).forEach(q => {
     if (!q.required) return;
-    const input = document.getElementById(q.id);
-    if (!input || !input.value.trim()) {
-      errors.push(`${q.label}を入力してください`);
+    const answer = getCustomAnswer(q);
+    // 枠の色を変えるのは入力欄だけ（選択肢をならべた質問は枠が無い）
+    const input = isChoiceGroup(q) ? null : document.getElementById(q.id);
+    if (!answer.trim()) {
+      errors.push(isChoiceQuestion(q) ? `${q.label}を選択してください` : `${q.label}を入力してください`);
       if (input) input.classList.add('border-red-500');
     } else {
-      input.classList.remove('border-red-500');
-      if (q.maxLength && input.value.length > q.maxLength) {
+      if (input) input.classList.remove('border-red-500');
+      if (isTextAnswer(q) && q.maxLength && answer.length > q.maxLength) {
         errors.push(`${q.label}は${q.maxLength}文字以内で入力してください`);
       }
     }
@@ -1211,8 +1311,7 @@ async function submitForm() {
     // カスタム質問の回答（JSON形式で送信）
     const customAnswers = {};
     (CONFIG.customQuestions || []).forEach(q => {
-      const el = document.getElementById(q.id);
-      customAnswers[q.id] = el ? el.value : '';
+      customAnswers[q.id] = getCustomAnswer(q);
     });
     formData.set('customAnswers', JSON.stringify(customAnswers));
 
@@ -1685,11 +1784,7 @@ function fillFormWithData(data) {
     '出展メニュー名': data.menu,
     '自己紹介':       data.intro
   };
-  (CONFIG?.customQuestions || []).forEach(q => {
-    const value = answerByLabel[q.label];
-    const el = document.getElementById(q.id);
-    if (el && value) el.value = value;
-  });
+  (CONFIG?.customQuestions || []).forEach(q => setCustomAnswer(q, answerByLabel[q.label]));
 
   // 写真掲載可否
   if (data.photoPermission) {
