@@ -291,6 +291,42 @@
 
   .btn-del-wide { width: 100%; min-height: 46px; }
 
+  /* ============ 質問の並び順（▲▼ か ≡ をつまんで動かす） ============ */
+  .order-list { list-style: none; display: flex; flex-direction: column; gap: .4rem; }
+  .order-row {
+    display: flex; align-items: center; gap: .3rem;
+    min-height: 52px; padding: .2rem .3rem .2rem 0; margin-left: .75rem;
+    background: #fff; border: 1.5px solid var(--line); border-radius: .6rem;
+  }
+  /* 見出しは帯にして、下の質問がぶら下がって見えるように */
+  .order-row.order-sec { margin-left: 0; background: var(--brand-soft); border-color: #e3cdd9; }
+  .order-sec .order-name { color: var(--brand); }
+  .order-grip {
+    flex: 0 0 auto; width: 44px; align-self: stretch;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; color: var(--ink-soft); cursor: grab;
+    touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  .order-name {
+    flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .4rem;
+    font-size: .92rem; font-weight: 700; line-height: 1.45; word-break: break-all;
+  }
+  .order-off .order-name { color: var(--ink-soft); font-weight: 400; }
+  .order-btn {
+    flex: 0 0 auto; width: 44px; height: 44px;
+    border: 1.5px solid var(--line); border-radius: .5rem; background: #fff; color: var(--brand);
+    font: inherit; font-size: 1rem; line-height: 1; cursor: pointer;
+  }
+  .order-btn:disabled { opacity: .3; cursor: default; }
+  .order-sorting { user-select: none; -webkit-user-select: none; }
+  .order-sorting .order-row:not(.order-dragging) { transition: transform .15s ease; }
+  .order-dragging {
+    position: relative; z-index: 5; cursor: grabbing;
+    border-color: var(--brand); box-shadow: 0 10px 28px rgba(42,26,34,.25);
+  }
+  .order-moved { animation: order-flash 1s ease; }
+  @keyframes order-flash { from { background: #fff1b8; border-color: #e7b45c; } }
+
   /* ============ 確認・進み具合（画面の下から出るパネル） ============ */
   .sheet-overlay {
     position: fixed; inset: 0; z-index: 100; background: rgba(42,26,34,.5);
@@ -733,7 +769,7 @@
     </details>
 
     <!-- ========== 申込フォームの内容 ========== -->
-    <details class="card">
+    <details class="card" id="askCard">
       <summary>📝 申込フォームで聞くこと</summary>
       <div class="card-body">
 
@@ -780,12 +816,27 @@
           <div style="font-weight:700;margin-bottom:.5rem">自由に聞きたいこと</div>
           <div id="questionList" style="display:flex;flex-direction:column;gap:.85rem"></div>
           <button type="button" class="btn btn-add" id="addQuestion" style="margin-top:.75rem">＋ 質問を追加</button>
+          <p class="hint" style="margin-top:.5rem">質問の順番は、すぐ下の「↕️ 質問の並び順」で変えられます</p>
         </div>
 
         <div class="note note-warn">
           <strong>受付中は質問文を変えないでください。</strong>
           質問文がそのまま集計シートの見出しになるため、途中で変えるとその質問の答えが記録されなくなります。
         </div>
+      </div>
+    </details>
+
+    <!-- ========== 質問の並び順 ========== -->
+    <details class="card" id="orderCard">
+      <summary>↕️ 質問の並び順</summary>
+      <div class="card-body">
+        <p class="hint" style="font-size:.85rem">申込フォームに出る順番です。<strong>▲ ▼</strong> を押すか、左の <strong>≡</strong> を指で押さえたまま上下に動かすと並びが変わります。色つきの帯は見出しで、見出しも動かせます。</p>
+
+        <ol class="order-list" id="orderList" aria-label="申込フォームの質問の並び順"></ol>
+
+        <div class="note note-info">「いまは表示しない」と出ている項目は、フォームには出ません（オンにするとこの位置に出ます）。中に何もない見出しも、フォームには出ません。並べ替えても、受付シートの列の並びは変わりません。</div>
+
+        <button type="button" class="btn" id="orderReset" style="min-height:46px">はじめの並び順にもどす</button>
       </div>
     </details>
 
@@ -1086,6 +1137,46 @@ const DB_KEY_QUESTIONS = ['出展メニュー名', '自己紹介'];
 // 残り枠の設定が無いブースに入れておく初期値
 const DEFAULT_SEATS = { enabled: false, total: 10, show: true, showWhenAtMost: 0 };
 
+// 申込フォームの質問の並び順の初期値（apply/script.js の DEFAULT_FORM_ORDER と同じにしておく）
+//   'section:〇〇' … 見出し　'questions' … 自由な質問を置く場所　それ以外 … 質問のかたまり
+const DEFAULT_FORM_ORDER = [
+  'section:basic', 'name', 'furigana', 'phone', 'address', 'email',
+  'section:exhibit', 'exhibitorName', 'category', 'booth', 'questions', 'photo', 'photoPermission',
+  'section:sns', 'sns',
+  'section:options', 'options',
+  'section:party', 'party',
+  'section:stampRally', 'stampRally',
+  'section:member', 'member',
+  'section:other', 'terms', 'notes'
+];
+
+// 並び順の一覧に出す見出しの名前（申込フォームの見出しと同じ）
+const FORM_SECTION_NAMES = {
+  basic: '📝 基本情報', exhibit: '✨ 出展内容', sns: '🔗 SNSリンク', options: '⚙️ オプション',
+  party: '🎉 懇親会', stampRally: '🎁 スタンプラリー', member: '🏅 会員特典', other: '📋 規約・その他'
+};
+
+// 並び順の一覧での呼び方と、いまフォームに出す設定になっているか
+const FORM_BLOCKS = {
+  name:            { label: () => 'お名前（本名）' },
+  furigana:        { label: () => 'ふりがな' },
+  phone:           { label: () => '電話番号',                  shown: () => chk('sf-phone') },
+  address:         { label: () => '郵便番号・住所',             shown: () => chk('sf-address') },
+  email:           { label: () => 'メールアドレス（確認用も）' },
+  exhibitorName:   { label: () => val('f-exhibitorLabel') || '出展名' },
+  category:        { label: () => '出展カテゴリ（ジャンル）',   shown: () => cfg.categories.length > 0 },
+  booth:           { label: () => '出展ブース（持ち込み物品も）' },
+  photo:           { label: () => 'プロフィール写真',           shown: () => chk('sf-photo') },
+  photoPermission: { label: () => '写真をSNSに載せてよいか',     shown: () => chk('sf-photoPerm') },
+  sns:             { label: () => 'SNSのリンク',                shown: () => chk('sf-sns') },
+  options:         { label: () => 'オプション（コンセントなど）' },
+  party:           { label: () => '懇親会・二次会の出欠',        shown: () => !!cfg.pricing.options.party?.enabled },
+  stampRally:      { label: () => 'スタンプラリーの景品提供',     shown: () => chk('f-stamp') },
+  member:          { label: () => val('f-memberLabel') || '会員割引', shown: () => chk('f-member') },
+  terms:           { label: () => '出展規約への同意' },
+  notes:           { label: () => '質問・備考欄',               shown: () => chk('sf-notes') }
+};
+
 // 保存後、申込フォームに反映されたかを確かめる間隔と回数（6秒 × 30回 = 最大3分）
 var TIMING = { publishPollMs: 6000, publishTries: 30 };
 
@@ -1099,6 +1190,10 @@ let busy  = false;          // 次の開催の準備など、まとめて処理�
 let originalEdition = '';
 let lastPublish = Promise.resolve(null);   // 保存後の反映確認
 const lastRanges = new WeakMap();          // 本文欄ごとに、最後にカーソルがあった位置
+// 申込フォームの並び順。見出し・質問のかたまりは名前、自由な質問はその質問そのもの
+// （質問文を変えるとIDも変わるため、保存するときに 'q:質問のID' に書き出す）
+let formOrder = [];
+let orderDrag = null;                      // ≡ をつまんで動かしている最中の状態
 
 // =====================================================================
 // 起動
@@ -1155,6 +1250,13 @@ function bindEvents() {
     cfg.customQuestions.push(newQuestion());
     renderQuestions(); markDirty();
   });
+  document.getElementById('orderReset').addEventListener('click', resetFormOrder);
+
+  // 並び順の一覧は、質問文や「出す・出さない」の切り替えに合わせて書き直す
+  const orderSources = '#askCard, #optionList, #f-member, #f-memberLabel';
+  ['input', 'change'].forEach(type => document.addEventListener(type, e => {
+    if (e.target.closest?.(orderSources)) renderFormOrder();
+  }));
   document.getElementById('addTag').addEventListener('click', addTag);
   document.getElementById('newTag').addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); addTag(); }
@@ -1574,6 +1676,9 @@ function collect() {
     qs.add(l);
     q.id = l;
   }
+  // 並び順（自由な質問は、いま決まったIDで書き出す）
+  syncFormOrder();
+  cfg.formOrder = formOrder.map(k => typeof k === 'string' ? k : `q:${k.id}`);
 
   // 早割・会員割引
   cfg.features.earlyBird = chk('f-earlyBird');
@@ -1653,6 +1758,7 @@ function render() {
   set('c-headTxt', cfg.theme.headerTextColor || '#160f29');
   updatePreview();
 
+  buildFormOrder();
   renderBooths();
   renderTags();
   renderOptions();
@@ -1698,6 +1804,8 @@ function render() {
 
   // 質問ごとの差し込みボタンは設定を読んでからでないと作れない
   buildMailChips();
+  // 並び順の一覧は、各欄に値を入れたあとで（「表示しない」かどうかを欄から読むため）
+  renderFormOrder();
   updateNewEventSub();
   updateSheetAlert();
   renderFormLinks();
@@ -2023,6 +2131,280 @@ function renderQuestions() {
 
     box.appendChild(el);
   });
+
+  // 足した・消した質問を並び順の一覧にも反映する
+  renderFormOrder();
+}
+
+// ---- 質問の並び順 ----
+
+/**
+ * 保存された並び順（formOrder）を、いまある質問に合わせて整えます（apply/script.js と同じ決まり）。
+ * 知らない名前や消した質問は外し、並びに無いものは、初期の並びで直前にあるものの後ろに入れます。
+ */
+function resolveFormOrder(saved, questionIds) {
+  const defaults = DEFAULT_FORM_ORDER.flatMap(k =>
+    k === 'questions' ? questionIds.map(id => `q:${id}`) : [k]);
+  const known = new Set(defaults);
+
+  const order = [];
+  (Array.isArray(saved) ? saved : []).forEach(k => {
+    if (known.has(k) && !order.includes(k)) order.push(k);
+  });
+
+  defaults.forEach((k, i) => {
+    if (order.includes(k)) return;
+    let at = 0;
+    for (let j = i - 1; j >= 0; j--) {
+      const p = order.indexOf(defaults[j]);
+      if (p >= 0) { at = p + 1; break; }
+    }
+    order.splice(at, 0, k);
+  });
+  return order;
+}
+
+/** 読み込んだ設定の並び順を、画面で動かせる形にする */
+function buildFormOrder() {
+  const byId = new Map(cfg.customQuestions.map(q => [q.id, q]));
+  formOrder = resolveFormOrder(cfg.formOrder, [...byId.keys()])
+    .map(k => k.startsWith('q:') ? byId.get(k.slice(2)) : k)
+    .filter(Boolean);
+  syncFormOrder();
+  syncQuestionOrder();
+}
+
+/** 足した質問・消した質問を並び順に反映する */
+function syncFormOrder() {
+  formOrder = formOrder.filter(k => typeof k === 'string' || cfg.customQuestions.includes(k));
+  cfg.customQuestions.forEach(q => {
+    if (formOrder.includes(q)) return;
+    // 足した質問は、自由な質問のいちばん下へ（まだ1つも無ければ、出展ブースのうしろへ）
+    let at = -1;
+    formOrder.forEach((k, i) => { if (typeof k !== 'string') at = i; });
+    if (at < 0) at = formOrder.indexOf('booth');
+    formOrder.splice(at < 0 ? formOrder.length : at + 1, 0, q);
+  });
+}
+
+/**
+ * 「自由に聞きたいこと」の並び（質問 1、質問 2…）も、フォームの並びに合わせる。
+ * メールに差し込む答えの順番もこの並びになる。並びが変わったら true を返す
+ */
+function syncQuestionOrder() {
+  const qs = formOrder.filter(k => typeof k !== 'string');
+  if (qs.length === cfg.customQuestions.length && qs.every((q, i) => cfg.customQuestions[i] === q)) return false;
+  cfg.customQuestions.splice(0, cfg.customQuestions.length, ...qs);
+  return true;
+}
+
+function renderFormOrder() {
+  const list = document.getElementById('orderList');
+  if (!list || !cfg || orderDrag) return;   // 動かしている最中は書き直さない
+  syncFormOrder();
+  list.textContent = '';
+  formOrder.forEach((key, i) => list.appendChild(orderRow(key, i)));
+}
+
+function orderRow(key, i) {
+  const row = document.createElement('li');
+  row.className = 'order-row';
+
+  let text, tag = '', shown = true;
+  if (typeof key !== 'string') {
+    text = String(key.label || '').trim() || '（質問文がまだありません）';
+    tag  = '自由な質問';
+  } else if (key.startsWith('section:')) {
+    row.classList.add('order-sec');   // 見出しは色つきの帯で見分ける
+    text = FORM_SECTION_NAMES[key.slice('section:'.length)] || key;
+  } else {
+    const block = FORM_BLOCKS[key];
+    text  = block ? block.label() : key;
+    shown = !block?.shown || block.shown();
+  }
+  if (!shown) row.classList.add('order-off');
+
+  const grip = document.createElement('span');
+  grip.className = 'order-grip';
+  grip.textContent = '≡';
+  grip.setAttribute('aria-hidden', 'true');
+  grip.addEventListener('pointerdown', e => startOrderDrag(e, i));
+
+  const name = document.createElement('span');
+  name.className = 'order-name';
+  const t = document.createElement('span');
+  t.textContent = text;
+  name.appendChild(t);
+  if (tag)    name.appendChild(orderPill(tag));
+  if (!shown) name.appendChild(orderPill('いまは表示しない'));
+
+  const up   = orderButton('▲', 'order-up',   `「${text}」を上へ`, i === 0,                    () => moveFormOrder(i, i - 1));
+  const down = orderButton('▼', 'order-down', `「${text}」を下へ`, i === formOrder.length - 1, () => moveFormOrder(i, i + 1));
+
+  row.append(grip, name, up, down);
+  return row;
+}
+
+function orderPill(text) {
+  const p = document.createElement('span');
+  p.className = 'pill';
+  p.textContent = text;
+  return p;
+}
+
+function orderButton(text, cls, label, disabled, onClick) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = `order-btn ${cls}`;
+  b.textContent = text;
+  b.disabled = disabled;
+  b.setAttribute('aria-label', label);
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+/** 並び順の from 番目を to 番目へ動かす（▲▼ボタン） */
+function moveFormOrder(from, to) {
+  if (to < 0 || to >= formOrder.length || from === to) return;
+  const list   = document.getElementById('orderList');
+  const before = list.children[from]?.getBoundingClientRect().top;
+
+  formOrder.splice(to, 0, formOrder.splice(from, 1)[0]);
+  afterFormOrderChange();
+
+  // 押したボタンが指の下に残るよう、動いた分だけ画面もずらす（続けて押せば同じ項目が動く）
+  const row = list.children[to];
+  const delta = row.getBoundingClientRect().top - before;
+  if (delta) window.scrollBy(0, delta);
+
+  const same = row.querySelector(to < from ? '.order-up' : '.order-down');
+  (same && !same.disabled ? same : row.querySelector('.order-btn:not(:disabled)'))?.focus({ preventScroll: true });
+  flashOrderRow(row);
+}
+
+function afterFormOrderChange() {
+  // 「自由に聞きたいこと」の番号も並びに合わせる（書き直すと並び順の一覧も書き直される）
+  if (syncQuestionOrder()) renderQuestions();
+  else renderFormOrder();
+  markDirty();
+}
+
+function flashOrderRow(row) {
+  row.classList.remove('order-moved');
+  void row.offsetWidth;   // 同じ行を続けて動かしたときも光らせ直す
+  row.classList.add('order-moved');
+}
+
+function resetFormOrder() {
+  if (!confirm('質問の並び順を、はじめの並びにもどしますか？\n（保存するまで申込フォームは変わりません）')) return;
+  const qs = formOrder.filter(k => typeof k !== 'string');
+  formOrder = DEFAULT_FORM_ORDER.flatMap(k => k === 'questions' ? qs : [k]);
+  afterFormOrderChange();
+  toast('はじめの並び順にもどしました。「設定内容を保存」で反映されます');
+}
+
+/**
+ * ≡ をつまんで上下に動かす（指でもマウスでも）。
+ * 動かしている間は行を見た目だけずらし、指を離したときに並び順を入れ替える
+ */
+function startOrderDrag(e, index) {
+  if (orderDrag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  e.preventDefault();
+
+  const list = document.getElementById('orderList');
+  const rows = [...list.children];
+  const row  = rows[index];
+  const listTop = list.getBoundingClientRect().top + window.scrollY;
+  const tops    = rows.map(r => r.getBoundingClientRect().top + window.scrollY - listTop);
+  const heights = rows.map(r => r.offsetHeight);
+  const gap = rows.length > 1 ? Math.max(0, tops[1] - tops[0] - heights[0]) : 0;
+
+  orderDrag = {
+    pointerId: e.pointerId, list, rows, row, index, target: index,
+    listTop, tops, heights, step: heights[index] + gap,
+    grab: e.clientY + window.scrollY - listTop - tops[index],
+    startY: e.clientY, y: e.clientY, moved: false, frame: 0
+  };
+  try { e.target.setPointerCapture(e.pointerId); } catch { /* つかめなくても window で受け取る */ }
+
+  row.classList.add('order-dragging');
+  list.classList.add('order-sorting');
+  window.addEventListener('pointermove', onOrderDragMove);
+  window.addEventListener('pointerup', onOrderDragEnd);
+  window.addEventListener('pointercancel', onOrderDragEnd);
+  orderDrag.frame = requestAnimationFrame(orderDragFrame);
+}
+
+function onOrderDragMove(e) {
+  if (!orderDrag || e.pointerId !== orderDrag.pointerId) return;
+  e.preventDefault();
+  orderDrag.y = e.clientY;
+  if (Math.abs(e.clientY - orderDrag.startY) > 6) orderDrag.moved = true;
+  layoutOrderDrag();
+}
+
+/** 指の位置に合わせて、つまんだ行と、よける行を動かす */
+function layoutOrderDrag() {
+  const d = orderDrag;
+  const top = d.y + window.scrollY - d.listTop - d.grab;   // つまんだ行の上端（一覧の中での位置）
+  const max = d.tops[d.tops.length - 1] + d.heights[d.heights.length - 1] - d.heights[d.index];
+  const clamped = Math.min(Math.max(top, 0), max);
+  d.row.style.transform = `translateY(${clamped - d.tops[d.index]}px)`;
+
+  // つまんだ行の真ん中が、ほかの行の真ん中を越えたら入れ替わる
+  const center = clamped + d.heights[d.index] / 2;
+  let target = d.index;
+  d.rows.forEach((r, i) => {
+    const mid = d.tops[i] + d.heights[i] / 2;
+    if (i > d.index && center > mid) target = i;
+    if (i < d.index && center < mid && target >= d.index) target = i;
+  });
+  d.target = target;
+
+  d.rows.forEach((r, i) => {
+    if (i === d.index) return;
+    let shift = 0;
+    if (i > d.index && i <= target) shift = -d.step;
+    if (i < d.index && i >= target) shift = d.step;
+    r.style.transform = shift ? `translateY(${shift}px)` : '';
+  });
+}
+
+/** 画面の上下の端まで持っていったら、少しずつ画面を動かす */
+function orderDragFrame() {
+  const d = orderDrag;
+  if (!d) return;
+  d.frame = requestAnimationFrame(orderDragFrame);
+  if (!d.moved) return;   // つまんだだけでは画面を動かさない
+
+  const topEdge    = (document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0) + 56;
+  const bottomEdge = window.innerHeight - (document.querySelector('.savebar')?.offsetHeight || 0) - 56;
+  let speed = 0;
+  if (d.y < topEdge)    speed = -Math.min(12, (topEdge - d.y) / 4);
+  if (d.y > bottomEdge) speed =  Math.min(12, (d.y - bottomEdge) / 4);
+  if (speed) {
+    window.scrollBy(0, speed);
+    layoutOrderDrag();
+  }
+}
+
+function onOrderDragEnd(e) {
+  const d = orderDrag;
+  if (!d || e.pointerId !== d.pointerId) return;
+  cancelAnimationFrame(d.frame);
+  window.removeEventListener('pointermove', onOrderDragMove);
+  window.removeEventListener('pointerup', onOrderDragEnd);
+  window.removeEventListener('pointercancel', onOrderDragEnd);
+  d.rows.forEach(r => { r.style.transform = ''; });
+  d.row.classList.remove('order-dragging');
+  d.list.classList.remove('order-sorting');
+  orderDrag = null;
+
+  // 途中で止められたとき（電話がかかってきた など）は動かさない
+  if (e.type === 'pointercancel' || d.target === d.index) return;
+  formOrder.splice(d.target, 0, formOrder.splice(d.index, 1)[0]);
+  afterFormOrderChange();
+  flashOrderRow(d.list.children[d.target]);
 }
 
 // ---- ジャンル ----
@@ -2042,6 +2424,7 @@ function renderTags() {
     t.append(label, del);
     box.appendChild(t);
   });
+  renderFormOrder();   // ジャンルが無くなると、フォームに出展カテゴリが出なくなる
 }
 
 function addTag() {

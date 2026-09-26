@@ -65,6 +65,8 @@ function initApp() {
   initCategories();
   initBoothAccordion();
   renderCustomQuestions();
+  applyFormOrder();
+  refreshSections();
   initCharCounters();
   initSnsInputs();
   initPostalCodeSearch();
@@ -782,19 +784,16 @@ document.addEventListener('DOMContentLoaded', () => {
 // カスタム質問レンダリング
 // ========================================
 function renderCustomQuestions() {
-  const container = document.getElementById('customQuestionsSection');
-  if (!container) return;
-  container.innerHTML = '';
+  // 作り直すときは、前に作ったものを消してから
+  document.querySelectorAll('[data-block^="q:"]').forEach(el => el.remove());
 
-  const questions = CONFIG.customQuestions || [];
-  if (!questions.length) {
-    container.style.display = 'none';
-    return;
-  }
+  // いったん「出展内容」の最後に置き、applyFormOrder() で並び順どおりの場所へ動かす
+  const home = document.querySelector('[data-section="exhibit"] .section-body');
+  if (!home) return;
 
-  questions.forEach(q => {
+  (CONFIG.customQuestions || []).forEach(q => {
     const wrapper = document.createElement('div');
-    wrapper.style.marginBottom = '1rem';
+    wrapper.dataset.block = `q:${q.id}`;
 
     const label = document.createElement('label');
     label.className = 'input-label';
@@ -852,7 +851,116 @@ function renderCustomQuestions() {
       });
     }
 
-    container.appendChild(wrapper);
+    home.appendChild(wrapper);
+  });
+}
+
+// ========================================
+// 質問の並び順
+// ========================================
+
+/**
+ * 並び順の初期値（config.json に formOrder が無いときの並び）です。
+ * index.html に書いてある順番と同じで、管理画面（admin/config-editor.html）の
+ * DEFAULT_FORM_ORDER とも同じにしておきます。
+ *   'section:〇〇' … 見出し（index.html の data-section）
+ *   'questions'    … 自由な質問（customQuestions）を設定の順に置く場所
+ *   それ以外       … 質問のかたまり（index.html の data-block）
+ * 自由な質問は formOrder の中では 'q:質問のID' と書きます。
+ */
+const DEFAULT_FORM_ORDER = [
+  'section:basic', 'name', 'furigana', 'phone', 'address', 'email',
+  'section:exhibit', 'exhibitorName', 'category', 'booth', 'questions', 'photo', 'photoPermission',
+  'section:sns', 'sns',
+  'section:options', 'options',
+  'section:party', 'party',
+  'section:stampRally', 'stampRally',
+  'section:member', 'member',
+  'section:other', 'terms', 'notes'
+];
+
+/**
+ * 保存された並び順（formOrder）を、いまある質問に合わせて整えます。
+ * 知らない名前や消した質問は外し、並びに無いもの（あとから足した質問など）は、
+ * 初期の並びで直前にあるものの後ろに入れます。formOrder が無ければ初期の並びになります。
+ */
+function resolveFormOrder(saved, questionIds) {
+  const defaults = DEFAULT_FORM_ORDER.flatMap(k =>
+    k === 'questions' ? questionIds.map(id => `q:${id}`) : [k]);
+  const known = new Set(defaults);
+
+  const order = [];
+  (Array.isArray(saved) ? saved : []).forEach(k => {
+    if (known.has(k) && !order.includes(k)) order.push(k);
+  });
+
+  defaults.forEach((k, i) => {
+    if (order.includes(k)) return;
+    let at = 0;
+    for (let j = i - 1; j >= 0; j--) {
+      const p = order.indexOf(defaults[j]);
+      if (p >= 0) { at = p + 1; break; }
+    }
+    order.splice(at, 0, k);
+  });
+  return order;
+}
+
+/** 見出しと質問のかたまりを、設定された並び順に置き直す */
+function applyFormOrder() {
+  const form = document.getElementById('applicationForm');
+  if (!form) return;
+
+  // 質問のIDには記号も入りうるので、セレクタではなく名前の対応表で探す
+  const sections = new Map();
+  form.querySelectorAll('[data-section]').forEach(el => sections.set(el.dataset.section, el));
+  const blocks = new Map();
+  form.querySelectorAll('[data-block]').forEach(el => blocks.set(el.dataset.block, el));
+
+  const order = resolveFormOrder(CONFIG.formOrder, (CONFIG.customQuestions || []).map(q => q.id));
+  let body = null;
+  order.forEach(key => {
+    if (key.startsWith('section:')) {
+      const section = sections.get(key.slice('section:'.length));
+      if (!section) return;
+      form.appendChild(section);
+      body = section.querySelector('.section-body');
+      return;
+    }
+    const block = blocks.get(key);
+    if (!block) return;
+    // 見出しより前に置かれた質問は、見出しの無い枠に入れる
+    if (!body) body = createUntitledSection(form);
+    body.appendChild(block);
+  });
+}
+
+function createUntitledSection(form) {
+  const section = document.createElement('section');
+  section.className = 'form-section';
+  const body = document.createElement('div');
+  body.className = 'section-body';
+  section.appendChild(body);
+  form.appendChild(section);
+  return body;
+}
+
+/**
+ * 表示する質問が1つも無い見出しは隠し、見えている見出しに 1, 2, 3… と番号を振ります。
+ * （電話番号・SNSなどを出さない設定にしたときや、並べ替えで中身が空になったとき）
+ */
+function refreshSections() {
+  let no = 0;
+  document.querySelectorAll('#applicationForm > .form-section').forEach(section => {
+    const body  = section.querySelector('.section-body');
+    const shown = !!body && [...body.children].some(el =>
+      !el.classList.contains('hidden') && el.style.display !== 'none');
+    section.classList.toggle('hidden', !shown);
+
+    const title = section.querySelector('.section-title');
+    if (!shown || !title || !section.dataset.title) return;
+    no++;
+    title.textContent = `${section.dataset.icon} ${no}. ${section.dataset.title}`;
   });
 }
 
