@@ -11,8 +11,9 @@
 
 設定画面は1つだけです → `admin/config-editor.html`（スマホ対応）
 
-イベント名・開催回・色・ブース・料金・定員（残り枠）・質問項目・規約・メール文面・保存先を、
+イベント名・開催回・色・ブース・料金・定員（残り枠）・質問項目と並び順・規約・メール文面・保存先を、
 すべてこの画面から変更して「設定内容を保存」で反映します。
+質問の順番は「↕️ 質問の並び順」で、▲▼ を押すか ≡ を指でつまんで動かすだけで変えられます。
 次の開催をはじめるときは「📅 イベントのこと」→「🆕 次の開催をはじめる」から
 （受付シートの作成から保存まで、確認のあと一度に行います）。
 満枠のブースは「キャンセル待ち」として受け付けられます（「🏪 ブース（出展枠）」で設定）。
@@ -46,7 +47,8 @@ npm i --no-save jsdom                     # 下のテストに必要（初回の
 node apply/tests/sns.test.mjs             # SNSリンク欄が送信時に拾われるか
 node apply/tests/booth.test.mjs           # ブース選択・料金・持ち込み物品の表示
 node apply/tests/photo.test.mjs           # 写真が送れない場合でも申込できるか
-node admin/tests/config-editor.test.mjs   # 管理画面の読み込み・保存・合い言葉
+node apply/tests/order.test.mjs           # 質問の並び順（formOrder）どおりに表示されるか
+node admin/tests/config-editor.test.mjs   # 管理画面の読み込み・保存・合い言葉・並べ替え
 ```
 
 - 最新版（v2.1）への更新手順 → [`docs/MIGRATION.md`](docs/MIGRATION.md) の「最新版（v2.1）への更新手順」

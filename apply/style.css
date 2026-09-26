@@ -131,6 +131,13 @@ body {
   border-bottom: 2px solid var(--color-primary-light);
 }
 
+/* 見出しの中の質問の並び（並び順は script.js が config.json の formOrder から決める） */
+.section-body,
+.block-stack {
+  display: grid;
+  gap: 1rem;
+}
+
 /* ========================================
    入力フィールド
    ======================================== */

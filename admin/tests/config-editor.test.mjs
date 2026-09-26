@@ -807,5 +807,175 @@ console.log('\n[18] 申込フォームのURLをコピーする');
      liff.doc.getElementById('liffUrl').value);
 }
 
+// ============================================================
+console.log('\n[19] 質問の並び順');
+{
+  const { window, doc, saved } = await boot();
+  const [Q1, Q2] = config.customQuestions.map(q => q.label);   // 出展メニュー名・自己紹介
+
+  // 一覧の行を、画面での見た目どおりの位置にあるものとして扱う（jsdom は位置を計算しないため）
+  const ROW = 56, LIST_TOP = 100;
+  const proto = window.HTMLElement.prototype;
+  const rect = top => ({ top, bottom: top + ROW - 4, height: ROW - 4, left: 0, right: 300, width: 300 });
+  const origRect   = proto.getBoundingClientRect;
+  const origHeight = Object.getOwnPropertyDescriptor(proto, 'offsetHeight');
+  proto.getBoundingClientRect = function () {
+    if (this.id === 'orderList') return rect(LIST_TOP);
+    if (this.classList?.contains('order-row')) return rect(LIST_TOP + [...this.parentNode.children].indexOf(this) * ROW);
+    return origRect.call(this);
+  };
+  Object.defineProperty(proto, 'offsetHeight', {
+    configurable: true, get() { return this.classList?.contains('order-row') ? ROW - 4 : 0; }
+  });
+  const scrolled = [];
+  window.scrollBy = (x, y) => scrolled.push(y);
+
+  const rows  = () => [...doc.querySelectorAll('#orderList .order-row')];
+  const names = () => rows().map(r => r.querySelector('.order-name > span').textContent);
+  const rowOf = name => rows().find(r => r.querySelector('.order-name > span').textContent === name);
+  const click = el => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  const saveNow = async () => {
+    doc.getElementById('saveBtn').dispatchEvent(new window.Event('click'));
+    await wait(200);
+    return lastSaved(saved);
+  };
+
+  ok('見出し8つ・項目17・自由な質問2つがならぶ', rows().length === 27, rows().length);
+  ok('はじめは申込フォームと同じ並び',
+     names().slice(0, 9).join(',') === '📝 基本情報,お名前（本名）,ふりがな,電話番号,郵便番号・住所,メールアドレス（確認用も）,✨ 出展内容,出展名（セラピスト名・屋号）,出展カテゴリ（ジャンル）',
+     names().slice(0, 9).join(','));
+  ok('自由な質問は出展ブースのうしろ',
+     names().indexOf(Q1) === names().indexOf('出展ブース（持ち込み物品も）') + 1 &&
+     names().indexOf(Q2) === names().indexOf(Q1) + 1, names().join(','));
+  ok('見出しは帯で出る', rows()[0].classList.contains('order-sec') && !rows()[1].classList.contains('order-sec'));
+  ok('いちばん上の ▲ は押せない', rows()[0].querySelector('.order-up').disabled);
+  ok('いちばん下の ▼ は押せない', rows().at(-1).querySelector('.order-down').disabled);
+  ok('ボタンに読み上げ用の名前がある',
+     rowOf('ふりがな').querySelector('.order-up').getAttribute('aria-label') === '「ふりがな」を上へ');
+  ok('開いただけでは未保存にならない', doc.getElementById('saveBtn').disabled);
+
+  // ▲ を2回：自己紹介を出展メニュー名より上、出展ブースより上へ
+  click(rowOf(Q2).querySelector('.order-up'));
+  ok('▲ で1つ上に動く', names().indexOf(Q2) === names().indexOf(Q1) - 1, names().join(','));
+  ok('押したボタンが指の下に残るよう画面もずらす', scrolled.at(-1) === -ROW, scrolled.join(','));
+  ok('動かした行が光る', rowOf(Q2).classList.contains('order-moved'));
+  ok('動かすと保存ボタンが押せる', !doc.getElementById('saveBtn').disabled);
+  ok('続けて押せるよう、同じボタンにフォーカスが残る',
+     doc.activeElement === rowOf(Q2).querySelector('.order-up'));
+  ok('「自由に聞きたいこと」の番号も並びに合わせる',
+     doc.querySelector('#questionList .item input[type=text]').value === Q2);
+
+  click(rowOf(Q2).querySelector('.order-up'));
+  ok('もう一度押すとさらに上へ', names().indexOf(Q2) === names().indexOf('出展ブース（持ち込み物品も）') - 1,
+     names().join(','));
+
+  // ▼ で見出しをまたぐ：電話番号を「出展内容」の見出しの下へ
+  for (let i = 0; i < 3; i++) click(rowOf('電話番号').querySelector('.order-down'));
+  ok('見出しをまたいで動かせる',
+     names().indexOf('電話番号') === names().indexOf('✨ 出展内容') + 1, names().join(','));
+
+  // 見出しも動かせる：会員特典の見出しと中身を、基本情報のうしろへ
+  const moveUp = (name, times) => { for (let i = 0; i < times; i++) click(rowOf(name).querySelector('.order-up')); };
+  moveUp('🏅 会員特典', names().indexOf('🏅 会員特典') - names().indexOf('✨ 出展内容'));
+  const memberLabel = config.features.memberDiscountLabel;
+  moveUp(memberLabel, names().indexOf(memberLabel) - names().indexOf('✨ 出展内容'));
+  ok('見出しを動かせる', names().indexOf('🏅 会員特典') === names().indexOf('✨ 出展内容') - 2, names().join(','));
+  ok('会員割引の項目が会員特典の見出しの下に来る',
+     names().indexOf(memberLabel) === names().indexOf('🏅 会員特典') + 1, names().join(','));
+
+  // 出さない設定の項目
+  const phoneSwitch = doc.getElementById('sf-phone');
+  phoneSwitch.checked = false;
+  phoneSwitch.dispatchEvent(new window.Event('change', { bubbles: true }));
+  ok('出さない設定にした項目は「いまは表示しない」と出る',
+     rowOf('電話番号').classList.contains('order-off') && rowOf('電話番号').textContent.includes('いまは表示しない'));
+  phoneSwitch.checked = true;
+  phoneSwitch.dispatchEvent(new window.Event('change', { bubbles: true }));
+  ok('出す設定に戻すと消える', !rowOf('電話番号').classList.contains('order-off'));
+
+  // ≡ をつまんで動かす：備考欄を「基本情報」の見出しのすぐ下へ
+  const from = names().indexOf('質問・備考欄');
+  const grip = rowOf('質問・備考欄').querySelector('.order-grip');
+  const startY = LIST_TOP + from * ROW + 20;
+  const pe = (type, y) => new window.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'touch', clientY: y, button: 0 });
+  grip.dispatchEvent(pe('pointerdown', startY));
+  ok('つまむと持ち上がる', rowOf('質問・備考欄').classList.contains('order-dragging'));
+  window.dispatchEvent(pe('pointermove', LIST_TOP + 1 * ROW + 10));
+  ok('ほかの行がよける', rows()[1].style.transform === `translateY(${ROW}px)`, rows()[1].style.transform);
+  window.dispatchEvent(pe('pointerup', LIST_TOP + 1 * ROW + 10));
+  ok('指を離した位置に入る', names()[1] === '質問・備考欄', names().slice(0, 3).join(','));
+  ok('よけた行は元に戻る', rows().every(r => !r.style.transform));
+
+  const fromName = names()[5];
+  rows()[5].querySelector('.order-grip').dispatchEvent(pe('pointerdown', LIST_TOP + 5 * ROW + 20));
+  window.dispatchEvent(pe('pointermove', LIST_TOP + 12 * ROW));
+  window.dispatchEvent(pe('pointercancel', LIST_TOP + 12 * ROW));
+  ok('途中で止められたら動かさない', names()[5] === fromName, names()[5]);
+
+  // 質問を足す・名前を変える
+  click(doc.getElementById('addQuestion'));
+  const items = doc.querySelectorAll('#questionList .item');
+  const labelInput = items[items.length - 1].querySelector('input[type=text]');
+  labelInput.value = '当日の出展人数';
+  labelInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+  ok('足した質問は自由な質問のいちばん下に入る',
+     names().indexOf('当日の出展人数') === names().indexOf(Q1) + 1, names().join(','));
+  ok('質問文を変えると一覧にも反映される', !!rowOf('当日の出展人数'));
+
+  const body = await saveNow();
+  const qAt = key => body.formOrder.indexOf(key);
+  ok('並び順が保存される', Array.isArray(body.formOrder) && body.formOrder.length === 28, body.formOrder?.length);
+  ok('自由な質問は q:質問文 で保存される',
+     qAt(`q:${Q2}`) >= 0 && qAt(`q:${Q2}`) < qAt('booth') && qAt('q:当日の出展人数') === qAt(`q:${Q1}`) + 1,
+     body.formOrder.join(','));
+  ok('見出しを動かした並びが保存される',
+     qAt('section:member') < qAt('section:exhibit') && qAt('member') === qAt('section:member') + 1);
+  ok('質問の設定も同じ並びで保存される（メールの答えの順番）',
+     body.customQuestions.map(q => q.id).join(',') === [Q2, Q1, '当日の出展人数'].join(','),
+     body.customQuestions.map(q => q.id).join(','));
+
+  // 保存した並びで申込フォームを開くと、その順に出る
+  const formDom = new JSDOM(fs.readFileSync(`${REPO}/apply/index.html`, 'utf8'), { runScripts: 'outside-only', url: 'https://example.test/apply/' });
+  formDom.window.fetch = async () => ({ ok: true, json: async () => body });
+  formDom.window.eval(fs.readFileSync(`${REPO}/apply/script.js`, 'utf8'));
+  await wait(80);
+  const formBlocks = [...formDom.window.document.querySelectorAll('#applicationForm [data-block]')]
+    .map(el => el.dataset.block);
+  ok('申込フォームも同じ並びになる',
+     formBlocks.join(',') === body.formOrder.filter(k => !k.startsWith('section:')).join(','),
+     `\n    フォーム: ${formBlocks.join(',')}\n    保存: ${body.formOrder.join(',')}`);
+
+  // 質問文を変えても、並びの中の位置は変わらない
+  const firstQ = doc.querySelector('#questionList .item input[type=text]');
+  firstQ.value = '自己紹介（200字）';
+  firstQ.dispatchEvent(new window.Event('input', { bubbles: true }));
+  const renamed = await saveNow();
+  ok('質問文を変えても同じ位置のまま',
+     renamed.formOrder.indexOf('q:自己紹介（200字）') === qAt(`q:${Q2}`) && !renamed.formOrder.includes(`q:${Q2}`),
+     renamed.formOrder.join(','));
+
+  // 質問を消す
+  const delBtns = doc.querySelectorAll('#questionList .item .btn-del');
+  click(delBtns[delBtns.length - 1]);
+  ok('消した質問は一覧からも消える', !rowOf('当日の出展人数'));
+
+  // はじめの並びにもどす
+  click(doc.getElementById('orderReset'));
+  ok('はじめの並びにもどせる',
+     names().slice(0, 7).join(',') === '📝 基本情報,お名前（本名）,ふりがな,電話番号,郵便番号・住所,メールアドレス（確認用も）,✨ 出展内容',
+     names().slice(0, 7).join(','));
+  ok('もどしても自由な質問の順番はそのまま',
+     names().indexOf('自己紹介（200字）') < names().indexOf(Q1));
+
+  proto.getBoundingClientRect = origRect;
+  Object.defineProperty(proto, 'offsetHeight', origHeight);
+}
+
+// 並び順が保存されていない設定（これまでの設定）でも開ける
+{
+  const { doc } = await boot();
+  ok('並び順が無い設定でも一覧が出る', doc.querySelectorAll('#orderList .order-row').length === 27);
+}
+
 console.log(ng === 0 ? '\n✅ すべて成功' : `\n❌ ${ng}件失敗`);
 process.exit(ng === 0 ? 0 : 1);

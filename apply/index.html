@@ -104,29 +104,37 @@
          ============================== -->
     <form id="applicationForm" novalidate>
 
-      <!-- セクション1: 基本情報 -->
-      <section class="form-section">
+      <!--
+        並び順について
+        見出し（data-section）と質問のかたまり（data-block）は、config.json の formOrder の順に
+        script.js が並べ直します（管理画面の「↕️ 質問の並び順」で変えられます）。
+        ここに書いてある順番は、formOrder が無いときの並びです（script.js の DEFAULT_FORM_ORDER と同じ）。
+        見出しの番号は、表示される見出しだけで 1, 2, 3… と振り直します。
+      -->
+
+      <!-- 基本情報 -->
+      <section class="form-section" data-section="basic" data-icon="📝" data-title="基本情報">
         <h2 class="section-title">📝 1. 基本情報</h2>
 
-        <div style="display:grid;gap:1rem">
-          <div>
+        <div class="section-body">
+          <div data-block="name">
             <label class="input-label" for="nameInput">お名前<span style="font-size:0.75rem;color:#ea580c;margin-left:0.25rem;">（本名でお願いします）</span><span class="required">*</span></label>
             <input type="text" name="name" id="nameInput" class="input-field" placeholder="山田 花子" required>
           </div>
 
-          <div>
+          <div data-block="furigana">
             <label class="input-label">ふりがな<span class="required">*</span></label>
             <input type="text" name="furigana" class="input-field" placeholder="やまだ はなこ" required>
           </div>
 
           <!-- 電話番号 -->
-          <div id="phoneSection">
+          <div id="phoneSection" data-block="phone">
             <label class="input-label">電話番号<span class="required">*</span></label>
             <input type="tel" name="phoneNumber" class="input-field" placeholder="090-1234-5678">
           </div>
 
           <!-- 住所 -->
-          <div id="addressSection">
+          <div id="addressSection" data-block="address">
             <div style="margin-bottom:0.75rem">
               <label class="input-label">郵便番号<span class="required">*</span></label>
               <div style="display:flex;gap:0.5rem">
@@ -143,68 +151,73 @@
             </div>
           </div>
 
-          <div>
-            <label class="input-label">メールアドレス<span class="required">*</span></label>
-            <input type="email" name="email" id="emailInput" class="input-field" placeholder="example@email.com" required>
-          </div>
+          <!-- メールアドレス（確認用とひとまとまり） -->
+          <div data-block="email" class="block-stack">
+            <div>
+              <label class="input-label">メールアドレス<span class="required">*</span></label>
+              <input type="email" name="email" id="emailInput" class="input-field" placeholder="example@email.com" required>
+            </div>
 
-          <div>
-            <label class="input-label">メールアドレス（確認）<span class="required">*</span></label>
-            <input type="email" name="emailConfirm" id="emailConfirmInput" class="input-field" placeholder="もう一度入力してください" required>
-            <p id="emailMatchError" class="hidden" style="font-size:0.75rem;color:#ef4444;margin-top:0.25rem">メールアドレスが一致しません</p>
+            <div>
+              <label class="input-label">メールアドレス（確認）<span class="required">*</span></label>
+              <input type="email" name="emailConfirm" id="emailConfirmInput" class="input-field" placeholder="もう一度入力してください" required>
+              <p id="emailMatchError" class="hidden" style="font-size:0.75rem;color:#ef4444;margin-top:0.25rem">メールアドレスが一致しません</p>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- セクション2: 出展内容 -->
-      <section class="form-section">
+      <!-- 出展内容 -->
+      <section class="form-section" data-section="exhibit" data-icon="✨" data-title="出展内容">
         <h2 class="section-title">✨ 2. 出展内容</h2>
 
-        <div style="display:grid;gap:1rem">
+        <div class="section-body">
           <!-- 出展名 -->
-          <div>
+          <div data-block="exhibitorName">
             <label class="input-label" id="exhibitorNameLabel" for="exhibitorNameInput">出展名（セラピスト名・屋号）<span class="required">*</span></label>
             <input type="text" name="exhibitorName" id="exhibitorNameInput" class="input-field" placeholder="ヒーリングサロン〇〇" required>
           </div>
 
           <!-- 出展カテゴリ -->
-          <div id="categorySection">
+          <div id="categorySection" data-block="category">
             <label class="input-label">出展カテゴリ<span class="required">*</span></label>
             <div id="categoryButtons" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem"></div>
             <input type="hidden" name="category" id="categoryInput">
           </div>
 
-          <!-- セッション禁止警告 -->
-          <div id="sessionWarning" class="session-warning">
-            ⚠️ <strong>ご注意</strong>: 選択されたブースではセッション・体験型の出展ができません。物販・飲食のみの出展となります。
-          </div>
+          <!-- 出展ブース（セッション禁止の注意・持ち込み物品とひとまとまり） -->
+          <div data-block="booth" class="block-stack">
+            <!-- セッション禁止警告 -->
+            <div id="sessionWarning" class="session-warning">
+              ⚠️ <strong>ご注意</strong>: 選択されたブースではセッション・体験型の出展ができません。物販・飲食のみの出展となります。
+            </div>
 
-          <!-- ブース選択 -->
-          <div>
-            <label class="input-label">出展ブース<span class="required">*</span></label>
-            <div id="boothAccordion" style="display:grid;gap:0.5rem;margin-top:0.5rem"></div>
-            <input type="hidden" name="boothId" id="boothIdInput">
+            <!-- ブース選択 -->
+            <div>
+              <label class="input-label">出展ブース<span class="required">*</span></label>
+              <div id="boothAccordion" style="display:grid;gap:0.5rem;margin-top:0.5rem"></div>
+              <input type="hidden" name="boothId" id="boothIdInput">
 
-            <!-- 満枠のブースを選んだときだけ表示 -->
-            <div id="waitlistNotice" class="waitlist-notice hidden" role="status">
-              ⏳ <strong>このブースは満枠のため、キャンセル待ちとしての受付になります。</strong><br>
-              空きが出た場合に、事務局から順番にご連絡します。
-              ご連絡があるまで、出展料のお振込みはお待ちください。
+              <!-- 満枠のブースを選んだときだけ表示 -->
+              <div id="waitlistNotice" class="waitlist-notice hidden" role="status">
+                ⏳ <strong>このブースは満枠のため、キャンセル待ちとしての受付になります。</strong><br>
+                空きが出た場合に、事務局から順番にご連絡します。
+                ご連絡があるまで、出展料のお振込みはお待ちください。
+              </div>
+            </div>
+
+            <!-- ボディケアブース持ち込み物品（features.bodyEquipment） -->
+            <div id="equipmentSection" data-feature="bodyEquipment" class="hidden">
+              <label class="input-label">持ち込み物品</label>
+              <textarea name="equipment" class="input-field" rows="2" placeholder="施術ベッド、タオル、マッサージオイル など"></textarea>
+              <p style="font-size:0.75rem;color:#9ca3af;margin-top:0.25rem">※ ボディケアブースの方はご記入ください</p>
             </div>
           </div>
 
-          <!-- ボディケアブース持ち込み物品（features.bodyEquipment） -->
-          <div id="equipmentSection" data-feature="bodyEquipment" class="hidden">
-            <label class="input-label">持ち込み物品</label>
-            <textarea name="equipment" class="input-field" rows="2" placeholder="施術ベッド、タオル、マッサージオイル など"></textarea>
-            <p style="font-size:0.75rem;color:#9ca3af;margin-top:0.25rem">※ ボディケアブースの方はご記入ください</p>
-          </div>
-
-          <!-- カスタム質問エリア（script.js で動的生成） -->
-          <div id="customQuestionsSection"></div>
+          <!-- 自由な質問（config.json の customQuestions）は、script.js が作って並び順どおりの場所に置きます -->
 
           <!-- 写真アップロード -->
-          <div id="photoSection">
+          <div id="photoSection" data-block="photo">
             <label class="input-label">プロフィール写真（正方形推奨）<span class="required" id="photoRequiredTag">*</span></label>
 
             <!-- 写真再利用オプション（リピーター用） -->
@@ -247,7 +260,7 @@
           </div>
 
           <!-- 写真掲載可否 -->
-          <div id="photoPermissionSection">
+          <div id="photoPermissionSection" data-block="photoPermission">
             <label class="input-label">プロフィール写真のSNS投稿への掲載<span class="required">*</span></label>
             <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
               <label class="checkbox-label"><input type="radio" name="photoPermission" value="可" required> 可</label>
@@ -257,145 +270,163 @@
         </div>
       </section>
 
-      <!-- セクション3: SNSリンク -->
-      <section class="form-section" id="snsSection">
+      <!-- SNSリンク -->
+      <section class="form-section" data-section="sns" data-icon="🔗" data-title="SNSリンク">
         <h2 class="section-title">🔗 3. SNSリンク</h2>
-        <p style="font-size:0.85rem;color:#6b7280;margin-bottom:1rem">URLを入力すると自動でSNS種別を判別します（任意）</p>
+        <div class="section-body">
+          <div id="snsSection" data-block="sns">
+            <p style="font-size:0.85rem;color:#6b7280;margin-bottom:1rem">URLを入力すると自動でSNS種別を判別します（任意）</p>
 
-        <div id="snsLinksContainer" style="display:grid;gap:0.5rem">
-          <div class="sns-link-row">
-            <span class="sns-badge" data-index="0">未入力</span>
-            <input type="url" name="snsLink1" class="input-field sns-input" data-index="0" style="flex:1" placeholder="https://...">
+            <div id="snsLinksContainer" style="display:grid;gap:0.5rem">
+              <div class="sns-link-row">
+                <span class="sns-badge" data-index="0">未入力</span>
+                <input type="url" name="snsLink1" class="input-field sns-input" data-index="0" style="flex:1" placeholder="https://...">
+              </div>
+            </div>
+            <button type="button" id="addSnsBtn" style="margin-top:0.75rem;color:var(--color-primary);font-weight:600;background:none;border:none;cursor:pointer;font-family:inherit;font-size:0.9rem">
+              ＋ SNSリンクを追加
+            </button>
           </div>
         </div>
-        <button type="button" id="addSnsBtn" style="margin-top:0.75rem;color:var(--color-primary);font-weight:600;background:none;border:none;cursor:pointer;font-family:inherit;font-size:0.9rem">
-          ＋ SNSリンクを追加
-        </button>
       </section>
 
-      <!-- セクション4: オプション -->
-      <section class="form-section">
+      <!-- オプション -->
+      <section class="form-section" data-section="options" data-icon="⚙️" data-title="オプション">
         <h2 class="section-title">⚙️ 4. オプション</h2>
-
-        <!-- 電源 -->
-        <div id="optionPower" class="option-group">
-          <label class="input-label" id="powerLabel">コンセント使用（¥500）</label>
-          <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
-            <label class="checkbox-label"><input type="radio" name="usePower" value="1"> はい</label>
-            <label class="checkbox-label"><input type="radio" name="usePower" value="0" checked> いいえ</label>
-          </div>
-        </div>
-
-        <!-- 椅子追加 -->
-        <div id="optionChairs" class="option-group hidden">
-          <label class="input-label" id="chairLabel">椅子追加（¥100/脚）</label>
-          <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
-            <label class="checkbox-label"><input type="radio" name="wantChairs" value="1" onchange="toggleChairsCount()"> はい</label>
-            <label class="checkbox-label"><input type="radio" name="wantChairs" value="0" checked onchange="toggleChairsCount()"> いいえ</label>
-          </div>
-          <div id="chairsCountSection" class="hidden" style="margin-top:0.75rem">
-            <div class="quantity-input">
-              <button type="button" class="quantity-btn" onclick="adjustQuantity('chairs',-1)">−</button>
-              <span id="chairsValue" class="quantity-value">1</span>
-              <button type="button" class="quantity-btn" onclick="adjustQuantity('chairs',1)">＋</button>
-              <span style="font-size:0.85rem;color:#6b7280">最大 <span id="chairsMax">0</span> 脚</span>
+        <div class="section-body">
+          <div data-block="options">
+            <!-- 電源 -->
+            <div id="optionPower" class="option-group">
+              <label class="input-label" id="powerLabel">コンセント使用（¥500）</label>
+              <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
+                <label class="checkbox-label"><input type="radio" name="usePower" value="1"> はい</label>
+                <label class="checkbox-label"><input type="radio" name="usePower" value="0" checked> いいえ</label>
+              </div>
             </div>
-          </div>
-          <input type="hidden" name="extraChairs" id="extraChairsInput" value="0">
-        </div>
 
-        <!-- スタッフ追加 -->
-        <div id="optionStaff" class="option-group hidden">
-          <label class="input-label" id="staffLabel">参加人数追加（¥1,000/人）</label>
-          <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
-            <label class="checkbox-label"><input type="radio" name="wantStaff" value="1" onchange="toggleStaffCount()"> はい</label>
-            <label class="checkbox-label"><input type="radio" name="wantStaff" value="0" checked onchange="toggleStaffCount()"> いいえ</label>
-          </div>
-          <div id="staffCountSection" class="hidden" style="margin-top:0.75rem">
-            <div class="quantity-input">
-              <button type="button" class="quantity-btn" onclick="adjustQuantity('staff',-1)">−</button>
-              <span id="staffValue" class="quantity-value">1</span>
-              <button type="button" class="quantity-btn" onclick="adjustQuantity('staff',1)">＋</button>
-              <span style="font-size:0.85rem;color:#6b7280">最大 <span id="staffMax">0</span> 名</span>
+            <!-- 椅子追加 -->
+            <div id="optionChairs" class="option-group hidden">
+              <label class="input-label" id="chairLabel">椅子追加（¥100/脚）</label>
+              <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
+                <label class="checkbox-label"><input type="radio" name="wantChairs" value="1" onchange="toggleChairsCount()"> はい</label>
+                <label class="checkbox-label"><input type="radio" name="wantChairs" value="0" checked onchange="toggleChairsCount()"> いいえ</label>
+              </div>
+              <div id="chairsCountSection" class="hidden" style="margin-top:0.75rem">
+                <div class="quantity-input">
+                  <button type="button" class="quantity-btn" onclick="adjustQuantity('chairs',-1)">−</button>
+                  <span id="chairsValue" class="quantity-value">1</span>
+                  <button type="button" class="quantity-btn" onclick="adjustQuantity('chairs',1)">＋</button>
+                  <span style="font-size:0.85rem;color:#6b7280">最大 <span id="chairsMax">0</span> 脚</span>
+                </div>
+              </div>
+              <input type="hidden" name="extraChairs" id="extraChairsInput" value="0">
             </div>
-          </div>
-          <input type="hidden" name="extraStaff" id="extraStaffInput" value="0">
-        </div>
 
-        <p id="noOptionsMessage" style="font-size:0.85rem;color:#9ca3af">※ ブースを選択するとオプションが表示されます</p>
+            <!-- スタッフ追加 -->
+            <div id="optionStaff" class="option-group hidden">
+              <label class="input-label" id="staffLabel">参加人数追加（¥1,000/人）</label>
+              <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
+                <label class="checkbox-label"><input type="radio" name="wantStaff" value="1" onchange="toggleStaffCount()"> はい</label>
+                <label class="checkbox-label"><input type="radio" name="wantStaff" value="0" checked onchange="toggleStaffCount()"> いいえ</label>
+              </div>
+              <div id="staffCountSection" class="hidden" style="margin-top:0.75rem">
+                <div class="quantity-input">
+                  <button type="button" class="quantity-btn" onclick="adjustQuantity('staff',-1)">−</button>
+                  <span id="staffValue" class="quantity-value">1</span>
+                  <button type="button" class="quantity-btn" onclick="adjustQuantity('staff',1)">＋</button>
+                  <span style="font-size:0.85rem;color:#6b7280">最大 <span id="staffMax">0</span> 名</span>
+                </div>
+              </div>
+              <input type="hidden" name="extraStaff" id="extraStaffInput" value="0">
+            </div>
+
+            <p id="noOptionsMessage" style="font-size:0.85rem;color:#9ca3af">※ ブースを選択するとオプションが表示されます</p>
+          </div>
+        </div>
       </section>
 
-      <!-- セクション5: 懇親会・二次会（features制御） -->
-      <section class="form-section" data-feature="party">
+      <!-- 懇親会・二次会（features制御） -->
+      <section class="form-section" data-section="party" data-icon="🎉" data-title="懇親会">
         <h2 class="section-title">🎉 5. 懇親会</h2>
+        <div class="section-body">
+          <div data-block="party" data-feature="party">
+            <!-- 懇親会 -->
+            <div class="party-section">
+              <label class="input-label" id="partyLabel">懇親会の出欠（¥5,000/名）</label>
+              <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
+                <label class="checkbox-label"><input type="radio" name="partyAttend" value="出席" onchange="togglePartyCount()"> 出席</label>
+                <label class="checkbox-label"><input type="radio" name="partyAttend" value="欠席" checked onchange="togglePartyCount()"> 欠席</label>
+              </div>
+              <div id="partyCountSection" class="hidden" style="margin-top:0.75rem">
+                <div class="quantity-input">
+                  <button type="button" class="quantity-btn" onclick="adjustPartyCount('party',-1)">−</button>
+                  <span id="partyValue" class="quantity-value">1</span>
+                  <button type="button" class="quantity-btn" onclick="adjustPartyCount('party',1)">＋</button>
+                </div>
+              </div>
+              <input type="hidden" name="partyCount" id="partyCountInput" value="0">
+            </div>
 
-        <!-- 懇親会 -->
-        <div class="party-section">
-          <label class="input-label" id="partyLabel">懇親会の出欠（¥5,000/名）</label>
-          <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
-            <label class="checkbox-label"><input type="radio" name="partyAttend" value="出席" onchange="togglePartyCount()"> 出席</label>
-            <label class="checkbox-label"><input type="radio" name="partyAttend" value="欠席" checked onchange="togglePartyCount()"> 欠席</label>
-          </div>
-          <div id="partyCountSection" class="hidden" style="margin-top:0.75rem">
-            <div class="quantity-input">
-              <button type="button" class="quantity-btn" onclick="adjustPartyCount('party',-1)">−</button>
-              <span id="partyValue" class="quantity-value">1</span>
-              <button type="button" class="quantity-btn" onclick="adjustPartyCount('party',1)">＋</button>
+            <!-- 二次会（features.secondaryParty） -->
+            <div class="party-section" data-feature="secondaryParty">
+              <label class="input-label">二次会の出欠<span style="font-size:0.75rem;color:#9ca3af">（費用は現場徴収）</span></label>
+              <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
+                <label class="checkbox-label"><input type="radio" name="secondaryPartyAttend" value="出席" onchange="toggleSecondaryPartyCount()"> 出席</label>
+                <label class="checkbox-label"><input type="radio" name="secondaryPartyAttend" value="欠席" checked onchange="toggleSecondaryPartyCount()"> 欠席</label>
+              </div>
+              <div id="secondaryPartyCountSection" class="hidden" style="margin-top:0.75rem">
+                <div class="quantity-input">
+                  <button type="button" class="quantity-btn" onclick="adjustPartyCount('secondary',-1)">−</button>
+                  <span id="secondaryValue" class="quantity-value">1</span>
+                  <button type="button" class="quantity-btn" onclick="adjustPartyCount('secondary',1)">＋</button>
+                </div>
+              </div>
+              <input type="hidden" name="secondaryPartyCount" id="secondaryPartyCountInput" value="0">
             </div>
           </div>
-          <input type="hidden" name="partyCount" id="partyCountInput" value="0">
-        </div>
-
-        <!-- 二次会（features.secondaryParty） -->
-        <div class="party-section" data-feature="secondaryParty">
-          <label class="input-label">二次会の出欠<span style="font-size:0.75rem;color:#9ca3af">（費用は現場徴収）</span></label>
-          <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
-            <label class="checkbox-label"><input type="radio" name="secondaryPartyAttend" value="出席" onchange="toggleSecondaryPartyCount()"> 出席</label>
-            <label class="checkbox-label"><input type="radio" name="secondaryPartyAttend" value="欠席" checked onchange="toggleSecondaryPartyCount()"> 欠席</label>
-          </div>
-          <div id="secondaryPartyCountSection" class="hidden" style="margin-top:0.75rem">
-            <div class="quantity-input">
-              <button type="button" class="quantity-btn" onclick="adjustPartyCount('secondary',-1)">−</button>
-              <span id="secondaryValue" class="quantity-value">1</span>
-              <button type="button" class="quantity-btn" onclick="adjustPartyCount('secondary',1)">＋</button>
-            </div>
-          </div>
-          <input type="hidden" name="secondaryPartyCount" id="secondaryPartyCountInput" value="0">
         </div>
       </section>
 
-      <!-- セクション6: 企画・協会（features制御） -->
-      <section class="form-section" data-feature="stampRally">
+      <!-- スタンプラリー（features制御） -->
+      <section class="form-section" data-section="stampRally" data-icon="🎁" data-title="スタンプラリー">
         <h2 class="section-title">🎁 6. スタンプラリー</h2>
-        <div>
-          <label class="input-label">景品の提供</label>
-          <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
-            <label class="checkbox-label"><input type="radio" name="stampRallyPrize" value="ある" onchange="togglePrizeInput()"> ある</label>
-            <label class="checkbox-label"><input type="radio" name="stampRallyPrize" value="ない" checked onchange="togglePrizeInput()"> ない</label>
-          </div>
-          <div id="prizeInputSection" class="hidden" style="margin-top:0.75rem">
-            <input type="text" name="prizeContent" class="input-field" placeholder="景品内容を入力してください">
+        <div class="section-body">
+          <div data-block="stampRally" data-feature="stampRally">
+            <div>
+              <label class="input-label">景品の提供</label>
+              <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
+                <label class="checkbox-label"><input type="radio" name="stampRallyPrize" value="ある" onchange="togglePrizeInput()"> ある</label>
+                <label class="checkbox-label"><input type="radio" name="stampRallyPrize" value="ない" checked onchange="togglePrizeInput()"> ない</label>
+              </div>
+              <div id="prizeInputSection" class="hidden" style="margin-top:0.75rem">
+                <input type="text" name="prizeContent" class="input-field" placeholder="景品内容を入力してください">
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- 会員割引（features.memberDiscount） -->
-      <div data-feature="memberDiscount" class="form-section hidden" id="memberSection">
-        <h2 class="section-title">🏅 会員特典</h2>
-        <div>
-          <label class="input-label" id="memberDiscountLabel">会員割引の適用</label>
-          <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
-            <label class="checkbox-label"><input type="radio" name="isMember" value="1"> はい（割引適用）</label>
-            <label class="checkbox-label"><input type="radio" name="isMember" value="0" checked> いいえ</label>
+      <section class="form-section hidden" data-section="member" data-icon="🏅" data-title="会員特典">
+        <h2 class="section-title">🏅 7. 会員特典</h2>
+        <div class="section-body">
+          <div data-block="member" data-feature="memberDiscount" class="hidden" id="memberSection">
+            <div>
+              <label class="input-label" id="memberDiscountLabel">会員割引の適用</label>
+              <div style="display:flex;gap:1.5rem;margin-top:0.5rem">
+                <label class="checkbox-label"><input type="radio" name="isMember" value="1"> はい（割引適用）</label>
+                <label class="checkbox-label"><input type="radio" name="isMember" value="0" checked> いいえ</label>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- セクション7: 規約・備考 -->
-      <section class="form-section">
-        <h2 class="section-title">📋 7. 規約・その他</h2>
-        <div style="display:grid;gap:1rem">
-          <div class="terms-box">
+      <!-- 規約・その他 -->
+      <section class="form-section" data-section="other" data-icon="📋" data-title="規約・その他">
+        <h2 class="section-title">📋 8. 規約・その他</h2>
+        <div class="section-body">
+          <div class="terms-box" data-block="terms">
             <label class="checkbox-label">
               <input type="checkbox" name="agreeTerms">
               <span>
@@ -406,7 +437,7 @@
             </label>
           </div>
 
-          <div id="notesSection">
+          <div id="notesSection" data-block="notes">
             <label class="input-label">質問・備考欄</label>
             <textarea name="notes" class="input-field" rows="3" placeholder="ご質問やご要望があればご記入ください"></textarea>
           </div>
