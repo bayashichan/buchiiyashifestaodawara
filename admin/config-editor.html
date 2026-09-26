@@ -803,7 +803,7 @@
             <label class="toggle"><input type="checkbox" id="sf-photo"><span></span></label></div>
           <div class="switch"><div><div class="txt">写真をSNSに載せてよいか</div></div>
             <label class="toggle"><input type="checkbox" id="sf-photoPerm"><span></span></label></div>
-          <div class="switch"><div><div class="txt">SNSのリンク</div></div>
+          <div class="switch"><div><div class="txt">SNSのリンク（HP、公式LINEなど）</div></div>
             <label class="toggle"><input type="checkbox" id="sf-sns"><span></span></label></div>
           <div class="switch"><div><div class="txt">質問・備考欄</div></div>
             <label class="toggle"><input type="checkbox" id="sf-notes"><span></span></label></div>
@@ -813,6 +813,12 @@
             <div><div class="txt">前回の内容を呼び出せるようにする</div>
               <div class="sub">2回目以降の出展者さんが、前回の申込内容を自動入力できます</div></div>
             <label class="toggle"><input type="checkbox" id="f-repeater"><span></span></label></div>
+        </div>
+
+        <div class="field">
+          <label for="f-snsNote">SNSリンク欄の注意書き（任意）</label>
+          <textarea id="f-snsNote" rows="3" placeholder="⚠️注意書⚠️&#10;出展者様ご紹介でタグ付けの為、&#10;Facebook、Instagramをお持ちの方は、ご入力下さい。"></textarea>
+          <span class="hint">申込フォームの「SNSリンク」の見出しのすぐ下に、黄色い枠で表示します。空にすると表示しません</span>
         </div>
 
         <div class="field">
@@ -1180,7 +1186,7 @@ const FORM_BLOCKS = {
   booth:           { label: () => '出展ブース（持ち込み物品も）' },
   photo:           { label: () => 'プロフィール写真',           shown: () => chk('sf-photo') },
   photoPermission: { label: () => '写真をSNSに載せてよいか',     shown: () => chk('sf-photoPerm') },
-  sns:             { label: () => 'SNSのリンク',                shown: () => chk('sf-sns') },
+  sns:             { label: () => 'SNSのリンク（HP、公式LINEなど）', shown: () => chk('sf-sns') },
   options:         { label: () => 'オプション（コンセントなど）' },
   party:           { label: () => '懇親会・二次会の出欠',        shown: () => !!cfg.pricing.options.party?.enabled },
   stampRally:      { label: () => 'スタンプラリーの景品提供',     shown: () => chk('f-stamp') },
@@ -1719,6 +1725,7 @@ function collect() {
   cfg.standardFields.showPhotoPermission = chk('sf-photoPerm');
   cfg.standardFields.showSnsLinks        = chk('sf-sns');
   cfg.standardFields.showNotes           = chk('sf-notes');
+  cfg.standardFields.snsNote             = val('f-snsNote');
   cfg.features.stampRally     = chk('f-stamp');
   cfg.features.repeaterSearch = chk('f-repeater');
   cfg.lineOfficialUrl         = val('f-lineUrl');
@@ -1803,6 +1810,7 @@ function render() {
   check('sf-photoPerm', cfg.standardFields.showPhotoPermission !== false);
   check('sf-sns',       cfg.standardFields.showSnsLinks        !== false);
   check('sf-notes',     cfg.standardFields.showNotes           !== false);
+  set('f-snsNote',      cfg.standardFields.snsNote);
   check('f-stamp',      cfg.features.stampRally);
   check('f-repeater',   cfg.features.repeaterSearch);
   set('f-lineUrl',      cfg.lineOfficialUrl);

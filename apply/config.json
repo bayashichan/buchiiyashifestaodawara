@@ -141,7 +141,8 @@
     "showPhotoUpload": true,
     "showSnsLinks": true,
     "showPhotoPermission": true,
-    "showNotes": true
+    "showNotes": true,
+    "snsNote": "⚠️注意書⚠️\n出展者様ご紹介でタグ付けの為、\nFacebook、Instagramをお持ちの方は、ご入力下さい。"
   },
   "customQuestions": [
     {
@@ -165,7 +166,6 @@
     {
       "id": "Facebook",
       "label": "Facebook",
-      "description": "⚠️注意書⚠️\n出展者様ご紹介でタグ付けの為、\nFacebookアカウントをお持ちの方は、リンクの入力をお願いします。",
       "type": "text",
       "placeholder": "https://www.facebook.com/share",
       "required": false,
@@ -175,7 +175,6 @@
     {
       "id": "Instagram",
       "label": "Instagram",
-      "description": "⚠️注意書⚠️\n出展者様ご紹介でタグ付けの為、\nInstagramアカウントをお持ちの方は、アカウント名の入力をお願いします。",
       "type": "text",
       "placeholder": "@アカウント名",
       "required": false,

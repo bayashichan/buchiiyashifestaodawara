@@ -405,6 +405,20 @@ textarea.input-field {
   align-items: center;
 }
 
+/* 見出しのすぐ下の注意書き（SNSリンク欄など。改行もそのまま） */
+.section-note {
+  padding: 0.75rem 1rem;
+  background: #fef3c7;
+  border: 1.5px solid #f59e0b;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: #92400e;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 1.25rem;
+}
+
 /* ========================================
    セッション禁止警告
    ======================================== */

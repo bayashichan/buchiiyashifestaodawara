@@ -111,6 +111,8 @@ ok('受付シートがURL形式で表示される',
 ok('ブースが件数分ならぶ', doc.querySelectorAll('#boothList .item').length === config.booths.length);
 ok('質問が件数分ならぶ', doc.querySelectorAll('#questionList .item').length === config.customQuestions.length);
 ok('ジャンルが件数分ならぶ', doc.querySelectorAll('#tagList .tag').length === config.categories.length);
+ok('SNSリンク欄の注意書きが入る', doc.getElementById('f-snsNote').value === (config.standardFields.snsNote || ''),
+   doc.getElementById('f-snsNote').value);
 ok('起動直後は保存ボタンが押せない', doc.getElementById('saveBtn').disabled);
 
 console.log('\n[2] 色のプレビュー');
@@ -142,6 +144,9 @@ boothName.dispatchEvent(new window.Event('input'));
 doc.getElementById('f-dbUrl').value =
   'https://docs.google.com/spreadsheets/d/1QjOHkZRXZOJF7e6pslNPO2S_rnnHXaUxhY_LJrH9D6M/edit?gid=0#gid=0';
 
+// SNSリンク欄の注意書き（改行も入る）
+doc.getElementById('f-snsNote').value = '⚠️注意書⚠️\nFacebook、Instagramをお持ちの方は、ご入力下さい。';
+
 const collectResult = window.collect();
 ok('入力内容にエラーが無い', collectResult === null, String(collectResult));
 doc.getElementById('saveBtn').dispatchEvent(new window.Event('click'));
@@ -160,6 +165,9 @@ ok('貼ったURLからシートIDだけを取り出す',
    body?.databaseSpreadsheetId === '1QjOHkZRXZOJF7e6pslNPO2S_rnnHXaUxhY_LJrH9D6M', body?.databaseSpreadsheetId);
 ok('画面に無い項目も消えずに残る',
    body?.terms === config.terms && body?.gasUrl === config.gasUrl && body?.features.liffId === config.features.liffId);
+ok('SNSリンク欄の注意書きが改行ごと保存される',
+   body?.standardFields.snsNote === '⚠️注意書⚠️\nFacebook、Instagramをお持ちの方は、ご入力下さい。',
+   JSON.stringify(body?.standardFields.snsNote));
 ok('持ち込み物品の設定がブースごとに残る',
    body?.booths[2].askEquipment === true && body?.features.bodyEquipment === true,
    JSON.stringify(body?.booths[2]));

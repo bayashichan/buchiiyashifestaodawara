@@ -242,6 +242,14 @@ function applyFeatures() {
   if (sf.showSnsLinks    === false) hideById('snsSection');
   if (sf.showPhotoPermission === false) hideById('photoPermissionSection');
   if (sf.showNotes       === false) hideById('notesSection');
+
+  // SNSリンク欄の注意書き（見出しのすぐ下に出す。空なら出さない）
+  const snsNote = document.getElementById('snsNote');
+  const snsNoteText = String(sf.snsNote || '').trim();
+  if (snsNote) {
+    snsNote.textContent = snsNoteText;
+    snsNote.classList.toggle('hidden', !snsNoteText);
+  }
 }
 
 function setFeatureVisible(featureName, isVisible) {
