@@ -977,5 +977,97 @@ console.log('\n[19] 質問の並び順');
   ok('並び順が無い設定でも一覧が出る', doc.querySelectorAll('#orderList .order-row').length === 27);
 }
 
+// ============================================================
+console.log('\n[20] 自由な質問の説明と答え方');
+{
+  const { window, doc, saved } = await boot();
+  const click = el => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  const type  = (el, v) => { el.value = v; el.dispatchEvent(new window.Event('input', { bubbles: true })); };
+  const labels = item => [...item.querySelectorAll('.field > label')].map(l => l.textContent);
+  const field  = (item, name) => [...item.querySelectorAll('.field')]
+    .find(f => f.querySelector(':scope > label')?.textContent === name)?.querySelector('input, textarea, select');
+  const example = item => item.querySelector('.example');
+
+  // 今ある質問：これまでどおりの欄に、説明が加わる
+  const first = doc.querySelector('#questionList .item');
+  ok('説明の欄がある', !!field(first, '説明（任意）') && field(first, '説明（任意）').tagName === 'TEXTAREA');
+  ok('答え方を選べる（6通り）',
+     [...field(first, '答え方').options].map(o => o.textContent).join(',') ===
+     '長い文章,短い文章,数字,選択肢から1つ選ぶ,選択肢からいくつでも選ぶ,選択肢から1つ選ぶ（プルダウン）');
+  ok('長い文章では入力例と最大文字数を決める',
+     labels(first).includes('入力例（うすい文字で出ます）') && labels(first).includes('最大文字数') &&
+     !labels(first).includes('選択肢（1行に1つ）'), labels(first).join(','));
+  ok('見本に質問文が出る', example(first).querySelector('.qx-title')?.textContent.startsWith(config.customQuestions[0].label));
+
+  // 説明を書くと見本にも出る
+  type(field(first, '説明（任意）'), '  メニュー名と時間・料金を\nお書きください  ');
+  ok('説明を書くと見本に出る（改行もそのまま）',
+     example(first).querySelector('.qx-desc')?.textContent === 'メニュー名と時間・料金を\nお書きください',
+     JSON.stringify(example(first).querySelector('.qx-desc')?.textContent));
+  ok('説明を書くと未保存になる', !doc.getElementById('saveBtn').disabled);
+
+  // 質問を足して「選択肢から1つ選ぶ」にする
+  click(doc.getElementById('addQuestion'));
+  const item = [...doc.querySelectorAll('#questionList .item')].at(-1);
+  ok('足した質問は、いちばん上が質問文の欄', item.querySelector('input') === field(item, '質問文'));
+  type(field(item, '質問文'), '希望の時間帯');
+  type(field(item, '説明（任意）'), 'いちばん近いものを選んでください');
+  const kind = field(item, '答え方');
+  kind.value = 'radio';
+  kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  ok('選択肢から選ぶ答え方にすると、選択肢の欄に変わる',
+     labels(item).includes('選択肢（1行に1つ）') && !labels(item).includes('最大文字数') &&
+     !labels(item).includes('入力例（うすい文字で出ます）'), labels(item).join(','));
+  ok('選択肢が無いうちは、見本で入れるよう案内', !!example(item).querySelector('.qx-empty'));
+
+  // 選択肢が無いまま保存しようとすると止める
+  doc.getElementById('saveBtn').dispatchEvent(new window.Event('click'));
+  await wait(50);
+  ok('選択肢が無いと保存しない', saved.length === 0, `${saved.length}回`);
+  ok('理由が分かる', doc.getElementById('toast').textContent.includes('「希望の時間帯」の選択肢を入れてください'),
+     doc.getElementById('toast').textContent);
+
+  type(field(item, '選択肢（1行に1つ）'), '午前\n\n 午後 \n終日\n午前');
+  ok('見本に選択肢がならぶ',
+     [...example(item).querySelectorAll('.qx-choice')].map(e => e.textContent).join('|') === '○　午前|○　午後|○　終日',
+     [...example(item).querySelectorAll('.qx-choice')].map(e => e.textContent).join('|'));
+
+  // いくつでも選ぶ → 見本の印が変わる。選択肢は切り替えても消えない
+  kind.value = 'checkbox';
+  kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  ok('答え方を変えても、書いた選択肢は残る', field(item, '選択肢（1行に1つ）').value === '午前\n午後\n終日',
+     JSON.stringify(field(item, '選択肢（1行に1つ）').value));
+  ok('いくつでも選ぶ見本は □', example(item).querySelector('.qx-choice')?.textContent === '□　午前');
+
+  // 「必ず答えてもらう」を切ると見本の * が消える
+  const req = [...item.querySelectorAll('.switch')].find(s => s.textContent.includes('必ず答えてもらう')).querySelector('input');
+  req.checked = false;
+  req.dispatchEvent(new window.Event('change', { bubbles: true }));
+  ok('任意にすると見本の * が消える', !example(item).querySelector('.qx-required'));
+
+  doc.getElementById('saveBtn').dispatchEvent(new window.Event('click'));
+  await wait(200);
+  const body = lastSaved(saved);
+  const q1 = body.customQuestions[0];
+  const qn = body.customQuestions.find(q => q.id === '希望の時間帯');
+  ok('説明は前後の空白をとって保存', q1.description === 'メニュー名と時間・料金を\nお書きください', JSON.stringify(q1.description));
+  ok('説明を書いていない質問には説明を残さない', !('description' in body.customQuestions[1]));
+  ok('答え方が保存される', qn?.type === 'checkbox', qn?.type);
+  ok('選択肢は空行・重なりを除いて保存', JSON.stringify(qn?.options) === '["午前","午後","終日"]', JSON.stringify(qn?.options));
+  ok('足した質問の説明も保存', qn?.description === 'いちばん近いものを選んでください');
+  ok('任意の設定も保存', qn?.required === false);
+  ok('文章で答える質問には選択肢を残さない', !('options' in q1));
+
+  // 保存した設定で申込フォームを開くと、説明と選択肢が出る
+  const formDom = new JSDOM(fs.readFileSync(`${REPO}/apply/index.html`, 'utf8'), { runScripts: 'outside-only', url: 'https://example.test/apply/' });
+  formDom.window.fetch = async () => ({ ok: true, json: async () => body });
+  formDom.window.eval(fs.readFileSync(`${REPO}/apply/script.js`, 'utf8'));
+  await wait(80);
+  const fb = [...formDom.window.document.querySelectorAll('[data-block]')].find(el => el.dataset.block === 'q:希望の時間帯');
+  ok('申込フォームに説明が出る', fb?.querySelector('.question-desc')?.textContent === 'いちばん近いものを選んでください');
+  ok('申込フォームにチェックボックスがならぶ',
+     [...(fb?.querySelectorAll('input[type=checkbox]') || [])].map(i => i.value).join(',') === '午前,午後,終日');
+}
+
 console.log(ng === 0 ? '\n✅ すべて成功' : `\n❌ ${ng}件失敗`);
 process.exit(ng === 0 ? 0 : 1);

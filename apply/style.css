@@ -195,6 +195,46 @@ textarea.input-field {
 }
 .char-counter.over { color: #ef4444; font-weight: 700; }
 
+/* 自由な質問の説明（質問文のすぐ下に小さく出す。改行もそのまま） */
+.question-desc {
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: -0.15rem 0 0.5rem;
+}
+
+/* 自由な質問の選択肢（指で押しやすいよう1行ずつ） */
+.q-choices {
+  display: grid;
+  gap: 0.5rem;
+}
+.q-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0.55rem 0.8rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #fff;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.q-choice input {
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+.q-choice:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
 /* ========================================
    カテゴリ選択ボタン
    ======================================== */

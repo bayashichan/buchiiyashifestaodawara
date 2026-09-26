@@ -48,7 +48,8 @@ node apply/tests/sns.test.mjs             # SNSリンク欄が送信時に拾わ
 node apply/tests/booth.test.mjs           # ブース選択・料金・持ち込み物品の表示
 node apply/tests/photo.test.mjs           # 写真が送れない場合でも申込できるか
 node apply/tests/order.test.mjs           # 質問の並び順（formOrder）どおりに表示されるか
-node admin/tests/config-editor.test.mjs   # 管理画面の読み込み・保存・合い言葉・並べ替え
+node apply/tests/questions.test.mjs       # 自由な質問の説明・答え方（選択肢など）
+node admin/tests/config-editor.test.mjs   # 管理画面の読み込み・保存・合い言葉・並べ替え・質問の説明と答え方
 ```
 
 - 最新版（v2.1）への更新手順 → [`docs/MIGRATION.md`](docs/MIGRATION.md) の「最新版（v2.1）への更新手順」

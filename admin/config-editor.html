@@ -291,6 +291,18 @@
 
   .btn-del-wide { width: 100%; min-height: 46px; }
 
+  /* 自由な質問の見本（フォームではこう見えます） */
+  .qx-title { font-size: .9rem; font-weight: 700; line-height: 1.5; word-break: break-all; }
+  .qx-required { color: #ef4444; margin-left: .2rem; }
+  .qx-desc { font-size: .78rem; color: #6b7280; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+  .qx-input, .qx-choice {
+    border: 1.5px solid #e5e7eb; border-radius: .5rem; padding: .5rem .7rem;
+    font-size: .85rem; min-height: 2.5rem; word-break: break-all;
+  }
+  .qx-input { color: #9ca3af; }
+  .qx-area  { min-height: 4.5rem; }
+  .qx-empty { font-size: .8rem; color: var(--ink-soft); }
+
   /* ============ 質問の並び順（▲▼ か ≡ をつまんで動かす） ============ */
   .order-list { list-style: none; display: flex; flex-direction: column; gap: .4rem; }
   .order-row {
@@ -1675,6 +1687,15 @@ function collect() {
     if (qs.has(l)) return `質問「${l}」が重複しています`;
     qs.add(l);
     q.id = l;
+
+    const d = String(q.description || '').trim();
+    if (d) q.description = d; else delete q.description;
+    if (isChoiceType(q.type)) {
+      q.options = parseOptions((q.options || []).join('\n'));
+      if (!q.options.length) return `質問「${l}」の選択肢を入れてください（1行に1つ）`;
+    } else {
+      delete q.options;
+    }
   }
   // 並び順（自由な質問は、いま決まったIDで書き出す）
   syncFormOrder();
@@ -2068,7 +2089,24 @@ function renderSeatExample(box, b) {
 
 // ---- 質問 ----
 function newQuestion() {
-  return { id: '', label: '', type: 'textarea', placeholder: '', required: true, showCounter: true, maxLength: 200 };
+  return { id: '', label: '', description: '', type: 'textarea', placeholder: '',
+           required: true, showCounter: true, maxLength: 200 };
+}
+
+// 自由な質問の答え方（申込フォーム apply/script.js が対応しているもの）
+const QUESTION_TYPES = [
+  ['textarea', '長い文章'],
+  ['text',     '短い文章'],
+  ['number',   '数字'],
+  ['radio',    '選択肢から1つ選ぶ'],
+  ['checkbox', '選択肢からいくつでも選ぶ'],
+  ['select',   '選択肢から1つ選ぶ（プルダウン）']
+];
+const isChoiceType = type => ['radio', 'checkbox', 'select'].includes(type);
+
+/** 「1行に1つ」で書いた選択肢を、空行と重なりを除いて取り出す */
+function parseOptions(text) {
+  return [...new Set(String(text || '').split('\n').map(t => t.trim()).filter(Boolean))];
 }
 
 function renderQuestions() {
@@ -2105,35 +2143,98 @@ function renderQuestions() {
     updateKeyNote();
     el.appendChild(keyNote);
 
-    el.appendChild(fieldText('入力例（うすい文字で出ます）', q.placeholder, '例：タロット占い 20分 2,000円',
-      v => q.placeholder = v));
+    el.appendChild(fieldArea('説明（任意）', q.description, '例：当日お持ちいただくものがあればお書きください',
+      v => q.description = v, '質問文のすぐ下に小さく出ます。改行もそのまま出ます', 3));
 
-    const row = document.createElement('div');
-    row.className = 'row';
-
+    // 答え方。選ぶと、その答え方で決めることだけを下に出す
     const kind = document.createElement('div');
     kind.className = 'field';
-    kind.innerHTML = '<label>入力のしかた</label>';
+    const kindLabel = document.createElement('label');
+    kindLabel.textContent = '答え方';
     const sel = document.createElement('select');
-    [['textarea', '長い文章'], ['text', '短い文章'], ['number', '数字']].forEach(([v, t]) => {
+    const type = QUESTION_TYPES.some(([v]) => v === q.type) ? q.type : 'textarea';
+    QUESTION_TYPES.forEach(([v, t]) => {
       const o = document.createElement('option');
-      o.value = v; o.textContent = t; o.selected = (q.type || 'textarea') === v;
+      o.value = v; o.textContent = t; o.selected = type === v;
       sel.appendChild(o);
     });
-    sel.addEventListener('change', () => { q.type = sel.value; markDirty(); });
-    kind.appendChild(sel);
-    row.appendChild(kind);
+    kind.append(kindLabel, sel);
+    el.appendChild(kind);
 
-    row.appendChild(fieldNumber('最大文字数', q.maxLength || 0, v => q.maxLength = v));
-    el.appendChild(row);
+    const detail = document.createElement('div');
+    detail.className = 'subsettings';
+    el.appendChild(detail);
+    sel.addEventListener('change', () => {
+      q.type = sel.value;
+      renderQuestionDetail(detail, q);
+      markDirty();
+    });
+    renderQuestionDetail(detail, q);
 
     el.appendChild(switchRow('必ず答えてもらう', '', q.required !== false, v => q.required = v));
+
+    // フォームでの見え方（書くたびに変わる）
+    const example = document.createElement('div');
+    example.className = 'example';
+    el.appendChild(example);
+    const refresh = () => renderQuestionExample(example, q);
+    el.addEventListener('input', refresh);
+    el.addEventListener('change', refresh);
+    refresh();
 
     box.appendChild(el);
   });
 
   // 足した・消した質問を並び順の一覧にも反映する
   renderFormOrder();
+}
+
+/** 答え方ごとに決めること（文章なら入力例と文字数、選択肢なら選択肢） */
+function renderQuestionDetail(box, q) {
+  box.textContent = '';
+  if (isChoiceType(q.type)) {
+    box.appendChild(fieldArea('選択肢（1行に1つ）', (q.options || []).join('\n'), '例：\n午前\n午後\n終日',
+      v => q.options = parseOptions(v), '書いた順にフォームに出ます', 4));
+    return;
+  }
+  box.appendChild(fieldText('入力例（うすい文字で出ます）', q.placeholder,
+    q.type === 'number' ? '例：2' : '例：タロット占い 20分 2,000円', v => q.placeholder = v));
+  if (q.type !== 'number') {
+    box.appendChild(fieldNumber('最大文字数', q.maxLength || 0, v => q.maxLength = v));
+  }
+}
+
+/** 申込フォームでの見え方の見本 */
+function renderQuestionExample(box, q) {
+  box.textContent = '';
+  const add = (cls, text) => {
+    const d = document.createElement('div');
+    d.className = cls;
+    d.textContent = text;
+    box.appendChild(d);
+    return d;
+  };
+
+  add('example-label', 'フォームではこう見えます');
+  const title = add('qx-title', String(q.label || '').trim() || '（質問文）');
+  if (q.required !== false) {
+    const mark = document.createElement('span');
+    mark.className = 'qx-required';
+    mark.textContent = '*';
+    title.appendChild(mark);
+  }
+  const desc = String(q.description || '').trim();
+  if (desc) add('qx-desc', desc);
+
+  if (q.type === 'select') {
+    add('qx-input', '選択してください　▾');
+  } else if (isChoiceType(q.type)) {
+    const opts = q.options || [];
+    if (!opts.length) add('qx-empty', '選択肢を入れると、ここにならびます');
+    opts.forEach(o => add('qx-choice', `${q.type === 'radio' ? '○' : '□'}　${o}`));
+  } else {
+    add('qx-input' + (q.type === 'text' || q.type === 'number' ? '' : ' qx-area'), q.placeholder || '');
+  }
 }
 
 // ---- 質問の並び順 ----
@@ -2502,6 +2603,26 @@ function fieldText(label, value, placeholder, onInput, hint) {
   if (placeholder) i.placeholder = placeholder;
   i.addEventListener('input', () => onInput(i.value));
   f.append(l, i);
+  if (hint) {
+    const h = document.createElement('span');
+    h.className = 'hint';
+    h.textContent = hint;
+    f.appendChild(h);
+  }
+  return f;
+}
+
+function fieldArea(label, value, placeholder, onInput, hint, rows = 3) {
+  const f = document.createElement('div');
+  f.className = 'field';
+  const l = document.createElement('label');
+  l.textContent = label;
+  const t = document.createElement('textarea');
+  t.rows = rows;
+  t.value = value || '';
+  if (placeholder) t.placeholder = placeholder;
+  t.addEventListener('input', () => onInput(t.value));
+  f.append(l, t);
   if (hint) {
     const h = document.createElement('span');
     h.className = 'hint';
