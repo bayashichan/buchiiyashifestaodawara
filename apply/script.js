@@ -834,6 +834,7 @@ function renderCustomQuestions() {
     if (group) input.setAttribute('aria-labelledby', label.id);
     if (desc)  input.setAttribute('aria-describedby', desc.id);
     wrapper.appendChild(input);
+    if (ANSWER_FORMATS[q.type]) attachAnswerFormat(input, ANSWER_FORMATS[q.type], wrapper);
 
     // 文字数カウンター（文章で答える質問だけ）
     if (isTextAnswer(q) && q.showCounter && q.maxLength) {
@@ -860,8 +861,73 @@ function renderCustomQuestions() {
  *   textarea … 長い文章　　text … 短い文章　　number … 数字
  *   radio    … 選択肢から1つ選ぶ　　checkbox … 選択肢からいくつでも選ぶ
  *   select   … 選択肢から1つ選ぶ（プルダウン）
+ *   url      … URL（ホームページ・Facebookのプロフィールなど）
+ *   instagram … Instagramのアカウント名（「@名前」にそろえて送る）
  * 選択肢は customQuestions[].options に入っています。
  */
+
+/*
+ * 形をそろえる答え方。入力欄を離れたときに整え、整えきれなければ下に案内を出す
+ * （申込は止めない。送るときにも同じように整える）
+ */
+const ANSWER_FORMATS = {
+  url: {
+    normalize: normalizeUrl,
+    isValid:   v => /^https?:\/\/[^\s/]+\.[^\s]+$/i.test(v),
+    hint:      'URL（https://〜）の形でご入力ください',
+    inputMode: 'url'
+  },
+  instagram: {
+    normalize: normalizeInstagram,
+    isValid:   v => /^@[a-z0-9._]{1,30}$/.test(v),
+    hint:      'アカウント名は半角の英数字と「.」「_」だけです（例：@buchi_iyashi）',
+    inputMode: 'text'
+  }
+};
+
+/** 「https://」が無いURL（www.facebook.com/〇〇 など）に付け足す */
+function normalizeUrl(value) {
+  const text = String(value || '').normalize('NFKC').trim();
+  if (!text || /^https?:\/\//i.test(text)) return text;
+  return /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(text) ? `https://${text}` : text;
+}
+
+/**
+ * Instagram のアカウント名を「@名前」にそろえます。
+ * プロフィールのURLを貼られたときは名前だけ取り出し、全角の「＠」や英数字も半角にします。
+ * （アカウント名は大文字・小文字を区別しないので、小文字にそろえる）
+ */
+function normalizeInstagram(value) {
+  const text = String(value || '').normalize('NFKC').trim();
+  if (!text) return '';
+  const url = text.match(/(?:instagram\.com|instagr\.am)\/(?:stories\/)?([^/?#\s]+)/i);
+  const name = (url ? url[1] : text).replace(/^@+/, '').trim().toLowerCase();
+  const reserved = ['p', 'reel', 'reels', 'tv', 'explore', 'accounts'];
+  return /^[a-z0-9._]{1,30}$/.test(name) && !(url && reserved.includes(name)) ? `@${name}` : text;
+}
+
+/** 入力欄を離れたら形を整え、整えきれなければ案内を出す（打ち直している間は消す） */
+function attachAnswerFormat(input, format, wrapper) {
+  input.setAttribute('inputmode', format.inputMode);
+  input.setAttribute('autocapitalize', 'off');
+  input.setAttribute('autocorrect', 'off');
+  input.spellcheck = false;
+
+  const hint = document.createElement('p');
+  hint.className = 'answer-hint hidden';
+  hint.textContent = format.hint;
+  wrapper.appendChild(hint);
+
+  input.addEventListener('input', () => hint.classList.add('hidden'));
+  input.addEventListener('change', () => {
+    const fixed = format.normalize(input.value);
+    if (fixed !== input.value) {
+      input.value = fixed;
+      input.dispatchEvent(new Event('input'));   // 文字数カウンターを合わせる
+    }
+    hint.classList.toggle('hidden', !fixed || format.isValid(fixed));
+  });
+}
 
 /** 選択肢をボタンのようにならべる質問か */
 function isChoiceGroup(q) {
@@ -946,7 +1012,8 @@ function getCustomAnswer(q) {
     if (!block) return '';
     return [...block.querySelectorAll('input:checked')].map(el => el.value).join('、');
   }
-  return document.getElementById(q.id)?.value ?? '';
+  const value = document.getElementById(q.id)?.value ?? '';
+  return ANSWER_FORMATS[q.type] ? ANSWER_FORMATS[q.type].normalize(value) : value;
 }
 
 /** 自由な質問に答えを入れる（前回の内容を呼び出すとき） */

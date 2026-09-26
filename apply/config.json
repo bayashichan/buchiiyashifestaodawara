@@ -166,7 +166,8 @@
     {
       "id": "Facebook",
       "label": "Facebook",
-      "type": "text",
+      "description": "ご自身のプロフィールページのURLをご入力ください",
+      "type": "url",
       "placeholder": "https://www.facebook.com/share",
       "required": false,
       "showCounter": true,
@@ -175,7 +176,8 @@
     {
       "id": "Instagram",
       "label": "Instagram",
-      "type": "text",
+      "description": "@から始まるアカウント名をご入力ください\n（プロフィールのURLを貼り付けても大丈夫です）",
+      "type": "instagram",
       "placeholder": "@アカウント名",
       "required": false,
       "showCounter": true,

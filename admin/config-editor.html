@@ -2108,7 +2108,9 @@ const QUESTION_TYPES = [
   ['number',   '数字'],
   ['radio',    '選択肢から1つ選ぶ'],
   ['checkbox', '選択肢からいくつでも選ぶ'],
-  ['select',   '選択肢から1つ選ぶ（プルダウン）']
+  ['select',   '選択肢から1つ選ぶ（プルダウン）'],
+  ['url',       'URL（ホームページ・Facebookのプロフィールなど）'],
+  ['instagram', 'Instagramのアカウント名（@〜にそろえます）']
 ];
 const isChoiceType = type => ['radio', 'checkbox', 'select'].includes(type);
 
@@ -2205,8 +2207,9 @@ function renderQuestionDetail(box, q) {
       v => q.options = parseOptions(v), '書いた順にフォームに出ます', 4));
     return;
   }
+  const examples = { number: '例：2', url: 'https://www.facebook.com/〇〇〇', instagram: '@アカウント名' };
   box.appendChild(fieldText('入力例（うすい文字で出ます）', q.placeholder,
-    q.type === 'number' ? '例：2' : '例：タロット占い 20分 2,000円', v => q.placeholder = v));
+    examples[q.type] || '例：タロット占い 20分 2,000円', v => q.placeholder = v));
   if (q.type !== 'number') {
     box.appendChild(fieldNumber('最大文字数', q.maxLength || 0, v => q.maxLength = v));
   }
@@ -2241,7 +2244,8 @@ function renderQuestionExample(box, q) {
     if (!opts.length) add('qx-empty', '選択肢を入れると、ここにならびます');
     opts.forEach(o => add('qx-choice', `${q.type === 'radio' ? '○' : '□'}　${o}`));
   } else {
-    add('qx-input' + (q.type === 'text' || q.type === 'number' ? '' : ' qx-area'), q.placeholder || '');
+    const oneLine = ['text', 'number', 'url', 'instagram'].includes(q.type);
+    add('qx-input' + (oneLine ? '' : ' qx-area'), q.placeholder || '');
   }
 }
 

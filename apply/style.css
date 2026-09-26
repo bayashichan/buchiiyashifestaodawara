@@ -205,6 +205,14 @@ textarea.input-field {
   margin: -0.15rem 0 0.5rem;
 }
 
+/* URL・Instagramの答えが整えきれなかったときの案内（申込は止めない） */
+.answer-hint {
+  font-size: 0.8rem;
+  color: #b45309;
+  line-height: 1.6;
+  margin-top: 0.35rem;
+}
+
 /* 自由な質問の選択肢（指で押しやすいよう1行ずつ） */
 .q-choices {
   display: grid;
