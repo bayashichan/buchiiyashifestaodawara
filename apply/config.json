@@ -188,12 +188,12 @@
   "email": {
     "adminEmail": "buchi.odawara@gmail.com",
     "replyToEmail": "buchi.odawara@gmail.com",
-    "adminSenderName": "ぶち癒しフェスタin小田原事務局",
+    "adminSenderName": "ぶち癒しフェスタin小田原実行委員事務局",
     "confirmationSubject": "",
-    "confirmationBodyTemplate": "{{name}} 様\n\nこの度は「{{eventName}}」へのご出展申込みありがとうございます。\n以下の内容でお申込みを受け付けました。\n\n■ お申込み情報\nお名前: {{name}}\nメールアドレス: {{email}}\n出展ブース: {{boothName}}\n{{customAnswers}}\n\n■ お支払い金額\n{{breakdown}}\n合計: ¥{{totalFee}}\n\n◾️ 出展料お支払いについては\n後日メールにてお知らせいたします。\n\n{{eventName}} 小田原実行委員会事務局",
+    "confirmationBodyTemplate": "{{name}} 様\n\nこの度は「{{eventName}}」へのご出展申込みありがとうございます。\n以下の内容でお申込みを受け付けました。\n\n■ お申込み情報\nお名前: {{name}}\nメールアドレス: {{email}}\n出展ブース: {{boothName}}\n{{customAnswers}}\n\n■ お支払い金額\n{{breakdown}}\n合計: ¥{{totalFee}}\n\n◾️ 出展料お支払いについては\n後日メールにてお知らせいたします。\n\n{{eventName}} 小田原実行委員事務局",
     "adminNotificationSubject": "",
     "waitlistSubject": "",
-    "waitlistBodyTemplate": "{{name}} 様\n\nこの度は「{{eventName}}」へのお申込みありがとうございます。\n\nお選びいただいた「{{boothName}}」は満枠のため、\nキャンセル待ちとして受け付けました。\n\n空きが出ましたら、事務局より順番にご連絡いたします。\nご連絡があるまで、出展料のお振込みはお控えください。\n\n■ お申込み内容\nお名前: {{name}}\n出展名: {{exhibitorName}}\n出展ブース: {{boothName}}\n{{customAnswers}}\n受付日時: {{submittedAt}}\n\nご不明な点はこのメールへ返信ください。\n\n{{eventName}} 小田原実行委員会事務局"
+    "waitlistBodyTemplate": "{{name}} 様\n\nこの度は「{{eventName}}」へのお申込みありがとうございます。\n\nお選びいただいた「{{boothName}}」は満枠のため、\nキャンセル待ちとして受け付けました。\n\n空きが出ましたら、事務局より順番にご連絡いたします。\nご連絡があるまで、出展料のお振込みはお控えください。\n\n■ お申込み内容\nお名前: {{name}}\n出展名: {{exhibitorName}}\n出展ブース: {{boothName}}\n{{customAnswers}}\n受付日時: {{submittedAt}}\n\nご不明な点はこのメールへ返信ください。\n\n{{eventName}} 小田原実行委員事務局"
   },
   "lineOfficialUrl": "",
   "configJsonUrl": "https://bayashichan.github.io/buchiiyashifestaodawara/apply/config.json",
@@ -203,7 +203,7 @@
   "databaseSpreadsheetId": "1QjOHkZRXZOJF7e6pslNPO2S_rnnHXaUxhY_LJrH9D6M",
   "driveFolderUrl": "https://drive.google.com/drive/folders/1Yr2nO-FYygBZefYbOn9qGTNzapa8CbnX",
   "spreadsheetEdition": "第2回",
-  "savedAt": "2026-10-07T06:57:29.099Z",
+  "savedAt": "2026-10-07T07:20:42.531Z",
   "formOrder": [
     "section:basic",
     "name",
