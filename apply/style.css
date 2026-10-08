@@ -675,3 +675,271 @@ textarea.input-field {
   color: #92400e;
   margin-top: 0.75rem;
 }
+
+/* ========================================
+   申込の流れ（① 入力 → ② 内容の確認 → ③ 申込完了）
+   ======================================== */
+.steps {
+  display: flex;
+  gap: 0.6rem;
+  list-style: none;
+  margin-bottom: 0.6rem;
+}
+
+.step {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.25rem;
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+/* 次の段階へ向かう矢印 */
+.step:not(:last-child)::after {
+  content: '▶';
+  position: absolute;
+  right: -0.6rem;
+  font-size: 0.55rem;
+  color: #d1d5db;
+}
+
+.step-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: #d1d5db;
+  color: #fff;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.step.current {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+.step.current .step-no { background: var(--color-primary); }
+
+.step.done { color: #15803d; border-color: #bbf7d0; background: #f0fdf4; }
+.step.done .step-no { background: #16a34a; }
+
+.steps-note {
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: #4b5563;
+  margin-bottom: 1.25rem;
+}
+
+.modal-box .steps { margin-bottom: 1.25rem; }
+
+/* ========================================
+   確認画面
+   ======================================== */
+body.confirm-open { overflow: hidden; }
+
+.confirm-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 160;              /* 画面下の料金欄・モーダルより上、送信中の表示より下 */
+  background: #f3f4f6;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.confirm-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 1rem 1rem 13rem;  /* 下は送信ボタンの欄に隠れない分 */
+}
+
+.confirm-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-align: center;
+  margin: 0.5rem 0 1rem;
+  outline: none;
+}
+
+.confirm-alert {
+  padding: 1rem;
+  background: #fef2f2;
+  border: 2px solid #f87171;
+  border-radius: 0.75rem;
+  color: #991b1b;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+
+.confirm-alert-head {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.confirm-screen .waitlist-notice,
+.confirm-screen .session-warning {
+  margin: 0 0 1rem;
+}
+
+.confirm-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+
+.confirm-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--color-primary-light);
+}
+
+.confirm-card-head h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.confirm-edit {
+  flex-shrink: 0;
+  padding: 0.3rem 0.8rem;
+  background: #fff;
+  border: 1.5px solid var(--color-primary);
+  border-radius: 9999px;
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.confirm-edit:hover { background: var(--color-primary-light); }
+
+.confirm-row {
+  padding: 0.65rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+.confirm-row:last-child { border-bottom: none; }
+
+.confirm-row dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 0.15rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.confirm-row dd {
+  font-size: 0.95rem;
+  color: #111827;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.confirm-row dd.confirm-empty { color: #9ca3af; }
+
+.confirm-photo {
+  display: block;
+  width: 5rem;
+  height: 5rem;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid #d1d5db;
+  margin-bottom: 0.25rem;
+}
+
+/* 料金は「項目 … 金額」を横にならべる */
+.confirm-price .confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+.confirm-price .confirm-row dt { font-size: 0.9rem; color: #374151; margin: 0; }
+.confirm-price .confirm-row dd { white-space: nowrap; font-weight: 600; }
+
+.confirm-price .confirm-total {
+  border-top: 2px solid #e5e7eb;
+  border-bottom: none;
+  margin-top: 0.25rem;
+}
+.confirm-price .confirm-total dt { font-weight: 700; color: #111827; }
+.confirm-price .confirm-total dd { font-size: 1.3rem; font-weight: 700; color: var(--color-primary); }
+
+.confirm-price-note {
+  font-size: 0.8rem;
+  color: #92400e;
+  line-height: 1.6;
+  margin-top: 0.25rem;
+}
+
+/* 送信ボタンの欄（いつも画面下に出しておく） */
+.confirm-actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255,255,255,0.97);
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+.confirm-actions-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  display: grid;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.confirm-actions-note {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b91c1c;
+}
+
+.confirm-submit {
+  width: 100%;
+  padding: 0.95rem 1rem;
+  font-size: 1.1rem;
+}
+
+.confirm-back {
+  background: none;
+  border: none;
+  color: #4b5563;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+.confirm-back:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+  .step { font-size: 0.72rem; gap: 0.25rem; }
+  .confirm-card { padding: 0.9rem 1rem; }
+  .confirm-submit { padding: 0.9rem 1rem; font-size: 1.05rem; }
+}

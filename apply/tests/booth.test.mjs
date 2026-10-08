@@ -137,12 +137,15 @@ const pickIn = (d, w, name) => {
 };
 pickIn(full.doc, full.window, '内側半テーブル');
 ok('選ぶとキャンセル待ちになる旨が出る', !full.doc.getElementById('waitlistNotice').classList.contains('hidden'));
-ok('申込ボタンが「キャンセル待ちで申し込む」になる',
-  full.doc.getElementById('submitBtn').textContent.trim() === 'キャンセル待ちで申し込む',
+ok('確認画面の申込ボタンが「キャンセル待ちで申し込む」になる',
+  full.doc.getElementById('confirmSubmitBtn').textContent.trim() === 'キャンセル待ちで申し込む',
+  full.doc.getElementById('confirmSubmitBtn').textContent);
+ok('画面下のボタンは確認画面へ進むだけ',
+  full.doc.getElementById('submitBtn').textContent.trim() === '確認画面へ進む',
   full.doc.getElementById('submitBtn').textContent);
 pickIn(full.doc, full.window, 'ボディ');
 ok('空きのあるブースに変えると注意が消える', full.doc.getElementById('waitlistNotice').classList.contains('hidden'));
-ok('申込ボタンの文字が戻る', full.doc.getElementById('submitBtn').textContent.trim() === '申し込む');
+ok('申込ボタンの文字が戻る', full.doc.getElementById('confirmSubmitBtn').textContent.trim() === 'この内容で申し込む');
 
 console.log('\n[5] 満枠（キャンセル待ちを受け付けない）');
 const closedCfg = JSON.parse(JSON.stringify(soldOutCfg));

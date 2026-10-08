@@ -53,6 +53,16 @@
     <input type="hidden" id="lineUserId"      name="lineUserId">
     <input type="hidden" id="lineDisplayName" name="lineDisplayName">
 
+    <!-- 申込の流れ（最後に確認画面があることを、はじめに知らせる） -->
+    <ol class="steps" aria-label="お申込みの流れ">
+      <li class="step current" aria-current="step"><span class="step-no">1</span>入力</li>
+      <li class="step"><span class="step-no">2</span>内容の確認</li>
+      <li class="step"><span class="step-no">3</span>申込完了</li>
+    </ol>
+    <p class="steps-note">
+      入力のあとに確認画面があります。確認画面の<strong>「この内容で申し込む」</strong>を押すと、お申込みが完了します。
+    </p>
+
     <!-- ==============================
          リピーター検索（feature: repeaterSearch）
          ============================== -->
@@ -457,15 +467,72 @@
         <div class="price-breakdown" id="priceBreakdown">ブースを選択してください</div>
         <div class="total-price">合計: <span id="totalPrice">¥0</span></div>
       </div>
-      <button type="button" id="submitBtn" class="submit-btn" onclick="submitForm()">
-        申し込む
+      <button type="button" id="submitBtn" class="submit-btn" onclick="openConfirm()">
+        確認画面へ進む
       </button>
     </div>
   </footer>
 
+  <!-- 確認画面（「確認画面へ進む」で開き、「この内容で申し込む」で送信する） -->
+  <div id="confirmScreen" class="confirm-screen hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="confirm-inner">
+      <ol class="steps" aria-label="お申込みの流れ">
+        <li class="step done"><span class="step-no">✓</span>入力</li>
+        <li class="step current" aria-current="step"><span class="step-no">2</span>内容の確認</li>
+        <li class="step"><span class="step-no">3</span>申込完了</li>
+      </ol>
+
+      <h2 id="confirmTitle" class="confirm-title" tabindex="-1">入力内容の確認</h2>
+
+      <div class="confirm-alert" role="alert">
+        <p class="confirm-alert-head">⚠️ まだお申込みは完了していません</p>
+        <p>
+          内容をご確認のうえ、画面下の<strong id="confirmAlertBtnName">「この内容で申し込む」</strong>ボタンを押してください。
+          ボタンを押すまで、お申込みは届きません。
+        </p>
+      </div>
+
+      <!-- 満枠のブースを選んだときだけ表示 -->
+      <div id="confirmWaitlist" class="waitlist-notice hidden">
+        ⏳ <strong>お選びのブースは満枠のため、キャンセル待ちとしてのお申込みになります。</strong><br>
+        空きが出た場合に、事務局から順番にご連絡します。
+        ご連絡があるまで、出展料のお振込みはお待ちください。
+      </div>
+
+      <!-- セッションができないブースを選んだときだけ表示 -->
+      <div id="confirmSessionWarning" class="session-warning visible hidden">
+        ⚠️ <strong>ご注意</strong>: 選択されたブースではセッション・体験型の出展ができません。物販・飲食のみの出展となります。
+      </div>
+
+      <div id="confirmList"></div>
+
+      <section class="confirm-card">
+        <div class="confirm-card-head"><h3>💴 お支払い金額</h3></div>
+        <dl id="confirmPrice" class="confirm-price"></dl>
+        <p id="confirmPriceNote" class="confirm-price-note hidden">
+          キャンセル待ちのため、事務局からご連絡があるまでお振込みはお待ちください。
+        </p>
+      </section>
+    </div>
+
+    <!-- いつも画面下に出しておく（長い一覧でもボタンを探さなくてよいように） -->
+    <div class="confirm-actions">
+      <div class="confirm-actions-inner">
+        <p class="confirm-actions-note">まだ申込は完了していません。このボタンで送信します</p>
+        <button type="button" id="confirmSubmitBtn" class="submit-btn confirm-submit" onclick="submitForm()">この内容で申し込む</button>
+        <button type="button" id="confirmBackBtn" class="confirm-back" onclick="closeConfirm()">‹ 入力画面に戻って修正する</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 申込完了モーダル -->
   <div id="completeModal" class="modal-overlay hidden">
     <div class="modal-box" style="text-align:center">
+      <ol class="steps" aria-label="お申込みの流れ">
+        <li class="step done"><span class="step-no">✓</span>入力</li>
+        <li class="step done"><span class="step-no">✓</span>内容の確認</li>
+        <li class="step current" aria-current="step"><span class="step-no">3</span>申込完了</li>
+      </ol>
       <div id="completeIcon" style="font-size:3.5rem;margin-bottom:1rem">🎊</div>
       <h2 id="completeTitle" style="font-size:1.4rem;font-weight:700;color:var(--color-primary);margin-bottom:1rem">
         お申込みありがとうございます！

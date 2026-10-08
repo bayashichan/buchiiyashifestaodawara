@@ -386,8 +386,13 @@ function updateWaitlistNotice() {
   const waiting = !!selectedBooth && canApplyAsWaitlist(selectedBooth);
   if (notice) notice.classList.toggle('hidden', !waiting);
 
-  const btn = document.getElementById('submitBtn');
-  if (btn && !btn.disabled) btn.textContent = waiting ? 'キャンセル待ちで申し込む' : '申し込む';
+  // 送信するのは確認画面のボタン（画面下のボタンは確認画面へ進むだけ）。
+  // 確認画面の案内文も、ボタンと同じ名前で呼ぶ
+  const label = waiting ? 'キャンセル待ちで申し込む' : 'この内容で申し込む';
+  const btn = document.getElementById('confirmSubmitBtn');
+  if (btn && !btn.disabled) btn.textContent = label;
+  const named = document.getElementById('confirmAlertBtnName');
+  if (named) named.textContent = `「${label}」`;
 }
 
 // ========================================
@@ -726,34 +731,33 @@ function hideTerms() {
 // ========================================
 // 料金計算
 // ========================================
+/**
+ * 料金を計算して画面下に出します。
+ * 内訳（{ label, amount }。割引はマイナス）と合計を返すので、確認画面でも同じものを使います。
+ */
 function calculatePrice() {
-  const breakdown = [];
+  const items = [];
   let total = 0;
+  const add = (label, amount) => { items.push({ label, amount }); total += amount; };
   const opts = CONFIG?.pricing?.options || {};
 
   if (selectedBooth) {
     const boothPrice = isEarlyBird()
       ? selectedBooth.prices.earlyBird
       : selectedBooth.prices.regular;
-    breakdown.push(`${selectedBooth.name}: ¥${boothPrice.toLocaleString()}`);
-    total += boothPrice;
+    add(selectedBooth.name, boothPrice);
 
     if (optionValues.staff > 0 && opts.staff?.enabled) {
-      const cost = optionValues.staff * opts.staff.price;
-      breakdown.push(`${opts.staff.label}×${optionValues.staff}: ¥${cost.toLocaleString()}`);
-      total += cost;
+      add(`${opts.staff.label}×${optionValues.staff}`, optionValues.staff * opts.staff.price);
     }
 
     if (optionValues.chairs > 0 && opts.chair?.enabled) {
-      const cost = optionValues.chairs * opts.chair.price;
-      breakdown.push(`${opts.chair.label}×${optionValues.chairs}: ¥${cost.toLocaleString()}`);
-      total += cost;
+      add(`${opts.chair.label}×${optionValues.chairs}`, optionValues.chairs * opts.chair.price);
     }
 
     const usePower = document.querySelector('input[name="usePower"]:checked')?.value === '1';
     if (usePower && selectedBooth.limits.allowPower && opts.power?.enabled) {
-      breakdown.push(`${opts.power.label}: ¥${opts.power.price.toLocaleString()}`);
-      total += opts.power.price;
+      add(opts.power.label, opts.power.price);
       optionValues.power = true;
     } else {
       optionValues.power = false;
@@ -761,23 +765,30 @@ function calculatePrice() {
   }
 
   if (optionValues.partyCount > 0 && opts.party?.enabled) {
-    const cost = optionValues.partyCount * opts.party.price;
-    breakdown.push(`${opts.party.label}×${optionValues.partyCount}: ¥${cost.toLocaleString()}`);
-    total += cost;
+    add(`${opts.party.label}×${optionValues.partyCount}`, optionValues.partyCount * opts.party.price);
   }
 
   const isMember = CONFIG.features?.memberDiscount &&
     document.querySelector('input[name="isMember"]:checked')?.value === '1';
   if (isMember && CONFIG.pricing?.memberDiscount) {
-    const disc = CONFIG.pricing.memberDiscount;
-    breakdown.push(`${CONFIG.features.memberDiscountLabel || '会員割引'}: -¥${disc.toLocaleString()}`);
-    total -= disc;
+    add(CONFIG.features.memberDiscountLabel || '会員割引', -CONFIG.pricing.memberDiscount);
   }
 
+  total = Math.max(0, total);
   const bdEl    = document.getElementById('priceBreakdown');
   const totalEl = document.getElementById('totalPrice');
-  if (bdEl)    bdEl.textContent = breakdown.length ? breakdown.join(' + ') : 'ブースを選択してください';
-  if (totalEl) totalEl.textContent = `¥${Math.max(0, total).toLocaleString()}`;
+  if (bdEl) {
+    bdEl.textContent = items.length
+      ? items.map(i => `${i.label}: ${formatYen(i.amount)}`).join(' + ')
+      : 'ブースを選択してください';
+  }
+  if (totalEl) totalEl.textContent = formatYen(total);
+  return { items, total };
+}
+
+/** 金額を「¥8,000」「-¥2,000」の形にする */
+function formatYen(amount) {
+  return `${amount < 0 ? '-' : ''}¥${Math.abs(amount).toLocaleString()}`;
 }
 
 // 電源変更時も再計算
@@ -1344,8 +1355,300 @@ function validateForm() {
 }
 
 // ========================================
+// 確認画面
+// ========================================
+// 画面下の「確認画面へ進む」で開き、確認画面の「この内容で申し込む」で送信します。
+// 「確認画面で止まってしまう」ことを防ぐため、まだ完了していないことを大きく出し、
+// 送信ボタンはいつも画面下に出しておきます。
+// スマホの「戻る」で確認画面だけを閉じられるよう、開いたときに履歴を1つ積みます
+// （積まないと、戻るでページごと離れて入力が消えてしまうため）。
+
+let confirmHistoryPushed = false;   // 確認画面のために履歴を積んだか
+let ignoreNextPop = false;          // 「戻って修正する」で自分から戻したときの popstate を無視する
+let afterConfirmPop = null;         // その popstate のあとにすること（修正する見出しへ移動）
+
+function openConfirm() {
+  const errors = validateForm();
+  if (errors.length) {
+    alert('入力エラー:\n\n' + errors.join('\n'));
+    return;
+  }
+
+  renderConfirm();
+
+  const screen = document.getElementById('confirmScreen');
+  if (!screen) return;
+  screen.classList.remove('hidden');
+  screen.scrollTop = 0;
+  document.body.classList.add('confirm-open');
+  window.addEventListener('beforeunload', warnBeforeLeave);
+
+  if (!confirmHistoryPushed) {
+    try {
+      // 戻ったときにブラウザがスクロール位置を戻すと「修正する」の移動が打ち消されるため、
+      // 位置は自分で扱う（確認画面の間も入力画面の位置はそのまま残っている）
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+      history.pushState({ applyConfirm: true }, '');
+      confirmHistoryPushed = true;
+    } catch (e) {
+      console.warn('履歴に積めませんでした（戻るボタンでは閉じられません）:', e);
+    }
+  }
+  document.getElementById('confirmTitle')?.focus({ preventScroll: true });
+}
+
+/**
+ * 確認画面を閉じて入力画面に戻る
+ *   fromHistory … ブラウザの「戻る」で閉じたとき（履歴はもう戻っている）
+ *   then        … 閉じたあとにすること（修正する見出しへ移動など）
+ */
+function closeConfirm(fromHistory = false, then = null) {
+  hideConfirm();
+  if (!fromHistory && confirmHistoryPushed) {
+    ignoreNextPop = true;
+    afterConfirmPop = then;   // 履歴が戻ったあと、もう一度
+    history.back();
+  }
+  confirmHistoryPushed = false;
+  then?.();
+}
+
+function hideConfirm() {
+  document.getElementById('confirmScreen')?.classList.add('hidden');
+  document.body.classList.remove('confirm-open');
+  window.removeEventListener('beforeunload', warnBeforeLeave);
+}
+
+function isConfirmOpen() {
+  const screen = document.getElementById('confirmScreen');
+  return !!screen && !screen.classList.contains('hidden');
+}
+
+/** 確認画面のまま閉じようとしたら、ブラウザに引き止めてもらう */
+function warnBeforeLeave(e) {
+  e.preventDefault();
+  e.returnValue = '';
+}
+
+window.addEventListener('popstate', () => {
+  if (ignoreNextPop) {
+    ignoreNextPop = false;
+    // ブラウザが戻る前のスクロール位置に戻すことがあるので、そのあとで動かす
+    const then = afterConfirmPop;
+    afterConfirmPop = null;
+    then?.();
+    return;
+  }
+  if (isConfirmOpen()) closeConfirm(true);
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && isConfirmOpen() && !document.getElementById('confirmSubmitBtn')?.disabled) {
+    closeConfirm();
+  }
+});
+
+/** 確認画面の中身を、いまの入力内容で作り直す */
+function renderConfirm() {
+  const list = document.getElementById('confirmList');
+  if (list) list.replaceChildren(...collectConfirmSections().map(buildConfirmCard));
+
+  const waiting = !!selectedBooth && canApplyAsWaitlist(selectedBooth);
+  document.getElementById('confirmWaitlist')?.classList.toggle('hidden', !waiting);
+  const noSession = !!document.getElementById('sessionWarning')?.classList.contains('visible');
+  document.getElementById('confirmSessionWarning')?.classList.toggle('hidden', !noSession);
+  updateWaitlistNotice();   // 送信ボタンの文字（キャンセル待ちかどうか）
+
+  const price = document.getElementById('confirmPrice');
+  if (price) {
+    const { items, total } = calculatePrice();
+    const rows = items.map(i => confirmRowEl(i.label, formatYen(i.amount)));
+    const sum = confirmRowEl('合計', formatYen(total));
+    sum.classList.add('confirm-total');
+    price.replaceChildren(...rows, sum);
+  }
+  document.getElementById('confirmPriceNote')?.classList.toggle('hidden', !waiting);
+}
+
+/**
+ * フォームに見えている見出しと質問を、上から順に確認用の一覧にします。
+ * 並び順（formOrder）や表示しない設定は、フォームの見た目をそのまま写すので自動で合います。
+ */
+function collectConfirmSections() {
+  const shown = el => !el.classList.contains('hidden') && el.style.display !== 'none';
+  const sections = [];
+  document.querySelectorAll('#applicationForm > .form-section').forEach(section => {
+    const body = section.querySelector('.section-body');
+    if (!shown(section) || !body) return;
+    const rows = [...body.children].filter(shown).flatMap(block => confirmRowsFor(block, shown));
+    if (!rows.length) return;
+    const title = section.querySelector('.section-title')?.textContent.trim() || 'ご入力内容';
+    sections.push({ section, title, rows });
+  });
+  return sections;
+}
+
+/** 質問のかたまり1つ分の確認行 { label, value, image } */
+function confirmRowsFor(block, shown) {
+  const key   = block.dataset.block || '';
+  const val   = sel => (document.querySelector(sel)?.value || '').trim();
+  const picked = name => document.querySelector(`input[name="${name}"]:checked`)?.value || '';
+  const opts  = CONFIG.pricing?.options || {};
+
+  if (key.startsWith('q:')) {
+    const q = (CONFIG.customQuestions || []).find(x => `q:${x.id}` === key);
+    return q ? [{ label: q.label, value: getCustomAnswer(q) }] : [];
+  }
+
+  switch (key) {
+    case 'name':     return [{ label: 'お名前',   value: val('#nameInput') }];
+    case 'furigana': return [{ label: 'ふりがな', value: val('[name="furigana"]') }];
+    case 'phone':    return [{ label: '電話番号', value: val('[name="phoneNumber"]') }];
+    case 'email':    return [{ label: 'メールアドレス', value: val('#emailInput') }];
+    case 'address': {
+      const postal = val('#postalCode');
+      return [{ label: 'ご住所', value: [postal && `〒${postal}`, val('#addressInput')].filter(Boolean).join('\n') }];
+    }
+    case 'exhibitorName':
+      return [{ label: CONFIG.standardFields?.exhibitorNameLabel || '出展名', value: val('#exhibitorNameInput') }];
+    case 'category':
+      return [{ label: '出展カテゴリ', value: selectedCategory || '' }];
+    case 'booth': {
+      const waiting = !!selectedBooth && canApplyAsWaitlist(selectedBooth);
+      const rows = [{ label: '出展ブース', value: (selectedBooth?.name || '') + (waiting ? '（キャンセル待ち）' : '') }];
+      const equip = document.getElementById('equipmentSection');
+      if (equip && shown(equip)) rows.push({ label: '持ち込み物品', value: val('[name="equipment"]') });
+      return rows;
+    }
+    case 'photo':
+      return [confirmPhotoRow()];
+    case 'photoPermission':
+      return [{ label: '写真のSNS投稿への掲載', value: picked('photoPermission') }];
+    case 'sns': {
+      const links = [...document.querySelectorAll('.sns-input')].filter(i => i.value.trim()).map(i => {
+        const badge = document.querySelector(`.sns-badge[data-index="${i.dataset.index}"]`);
+        return `${badge?.textContent || 'HP'}: ${i.value.trim()}`;
+      });
+      return [{ label: 'HP、公式LINEなど', value: links.join('\n') }];
+    }
+    case 'options': {
+      const rows = [];
+      const visible = id => { const el = document.getElementById(id); return !!el && shown(el); };
+      if (visible('optionPower')) {
+        rows.push({ label: opts.power?.label || 'コンセント使用', value: picked('usePower') === '1' ? 'はい' : 'いいえ' });
+      }
+      if (visible('optionChairs')) {
+        rows.push({ label: opts.chair?.label || '椅子追加', value: optionValues.chairs > 0 ? `${optionValues.chairs}脚` : 'なし' });
+      }
+      if (visible('optionStaff')) {
+        rows.push({ label: opts.staff?.label || '参加人数追加', value: optionValues.staff > 0 ? `${optionValues.staff}名` : 'なし' });
+      }
+      return rows;
+    }
+    case 'party': {
+      const rows = [];
+      const attend = (name, count) => picked(name) === '出席' ? `出席（${count}名）` : '欠席';
+      rows.push({ label: '懇親会', value: attend('partyAttend', optionValues.partyCount) });
+      const second = block.querySelector('[data-feature="secondaryParty"]');
+      if (second && shown(second)) {
+        rows.push({ label: '二次会', value: attend('secondaryPartyAttend', optionValues.secondaryPartyCount) });
+      }
+      return rows;
+    }
+    case 'stampRally': {
+      const has = picked('stampRallyPrize') === 'ある';
+      const what = val('[name="prizeContent"]');
+      return [{ label: '景品の提供', value: has ? (what ? `ある（${what}）` : 'ある') : 'ない' }];
+    }
+    case 'member':
+      return [{
+        label: CONFIG.features?.memberDiscountLabel || '会員割引の適用',
+        value: picked('isMember') === '1' ? 'はい（割引適用）' : 'いいえ'
+      }];
+    case 'terms':
+      return [{ label: '出展規約', value: document.querySelector('[name="agreeTerms"]')?.checked ? '同意する' : '' }];
+    case 'notes':
+      return [{ label: '質問・備考', value: val('[name="notes"]') }];
+    default:
+      return [];
+  }
+}
+
+/** プロフィール写真の確認行（選んだ写真は小さく見せる） */
+function confirmPhotoRow() {
+  const label = 'プロフィール写真';
+  if (document.getElementById('photoLater')?.checked) {
+    return { label, value: 'あとから公式LINEで送る' };
+  }
+  if (document.getElementById('usePreviousPhoto')?.checked) {
+    return { label, value: '前回の写真を使う', image: document.getElementById('prevPhotoImg')?.getAttribute('src') || '' };
+  }
+  if (preparedPhoto) {
+    return { label, value: '', image: `data:${preparedPhoto.mimeType};base64,${preparedPhoto.base64}` };
+  }
+  return { label, value: '' };
+}
+
+/** 見出し1つ分のカード（入力された文字は textContent で入れる） */
+function buildConfirmCard({ section, title, rows }) {
+  const card = document.createElement('section');
+  card.className = 'confirm-card';
+
+  const head = document.createElement('div');
+  head.className = 'confirm-card-head';
+  const h = document.createElement('h3');
+  h.textContent = title;
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.className = 'confirm-edit';
+  edit.textContent = '修正する';
+  edit.addEventListener('click', () => {
+    closeConfirm(false, () => section.scrollIntoView?.({ behavior: 'smooth', block: 'start' }));
+  });
+  head.append(h, edit);
+
+  const dl = document.createElement('dl');
+  dl.className = 'confirm-rows';
+  rows.forEach(r => dl.appendChild(confirmRowEl(r.label, r.value, r.image)));
+
+  card.append(head, dl);
+  return card;
+}
+
+function confirmRowEl(label, value, image) {
+  const row = document.createElement('div');
+  row.className = 'confirm-row';
+  const dt = document.createElement('dt');
+  dt.textContent = label;
+  const dd = document.createElement('dd');
+  if (image) {
+    const img = document.createElement('img');
+    img.className = 'confirm-photo';
+    img.src = image;
+    img.alt = label;
+    dd.appendChild(img);
+  }
+  if (value) {
+    dd.appendChild(document.createTextNode(value));
+  } else if (!image) {
+    dd.classList.add('confirm-empty');
+    dd.textContent = '（未入力）';
+  }
+  row.append(dt, dd);
+  return row;
+}
+
+// ========================================
 // フォーム送信
 // ========================================
+function setSubmitting(on) {
+  document.getElementById('loadingOverlay')?.classList.toggle('visible', on);
+  ['submitBtn', 'confirmSubmitBtn', 'confirmBackBtn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = on;
+  });
+}
+
 async function submitForm() {
   const errors = validateForm();
   if (errors.length) {
@@ -1353,15 +1656,9 @@ async function submitForm() {
     return;
   }
 
-  // セッション禁止警告
-  if (document.getElementById('sessionWarning')?.classList.contains('visible')) {
-    if (!confirm('⚠️ 選択されたブースではセッション系の出展ができません。物販・飲食のみの出展となりますがよろしいですか？')) {
-      return;
-    }
-  }
-
-  document.getElementById('loadingOverlay')?.classList.add('visible');
-  document.getElementById('submitBtn').disabled = true;
+  // 二度押しで二重に申し込まないように
+  if (document.getElementById('confirmSubmitBtn')?.disabled) return;
+  setSubmitting(true);
 
   try {
     const form = document.getElementById('applicationForm');
@@ -1477,6 +1774,7 @@ async function submitForm() {
     const result = await response.json().catch(() => { throw new Error('サーバーからの応答が不正です。'); });
 
     if (result.success) {
+      hideConfirm();
       // バックエンド側で写真を保存できなかった場合も未受領として扱う
       showCompleteModal(!photoAttached || result.photoPending === true, {
         waitlisted: result.waitlisted === true,
@@ -1489,12 +1787,12 @@ async function submitForm() {
 
   } catch (err) {
     console.error('Submit error:', err);
-    alert(`送信エラー:\n\n${err.message}\n\n解決しない場合は、主催者へお問合せください。`);
-    // 満枠になって断られた場合に備えて、空き状況を取り直す
-    loadBoothAvailability();
+    // 確認画面は開いたままにする（もう一度「この内容で申し込む」を押せば送り直せる）
+    alert(`送信エラー:\n\nお申込みはまだ完了していません。\n${err.message}\n\n解決しない場合は、主催者へお問合せください。`);
+    // 満枠になって断られた場合に備えて、空き状況を取り直す（確認画面にも反映する）
+    loadBoothAvailability().then(() => { if (isConfirmOpen()) renderConfirm(); });
   } finally {
-    document.getElementById('loadingOverlay')?.classList.remove('visible');
-    document.getElementById('submitBtn').disabled = false;
+    setSubmitting(false);
   }
 }
 

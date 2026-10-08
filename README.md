@@ -17,6 +17,7 @@
 次の開催をはじめるときは「📅 イベントのこと」→「🆕 次の開催をはじめる」から
 （受付シートの作成から保存まで、確認のあと一度に行います）。
 満枠のブースは「キャンセル待ち」として受け付けられます（「🏪 ブース（出展枠）」で設定）。
+申込フォームは「入力 → 内容の確認 → 申込完了」の3段階です。確認画面の「この内容で申し込む」を押すまで送信されません。
 初回だけ合い言葉の入力が必要です。詳しくは
 [`docs/MIGRATION.md`](docs/MIGRATION.md) の「管理画面の使い方」を参照してください。
 
@@ -49,6 +50,7 @@ node apply/tests/booth.test.mjs           # ブース選択・料金・持ち込
 node apply/tests/photo.test.mjs           # 写真が送れない場合でも申込できるか
 node apply/tests/order.test.mjs           # 質問の並び順（formOrder）どおりに表示されるか
 node apply/tests/questions.test.mjs       # 自由な質問の説明・答え方（選択肢など）
+node apply/tests/confirm.test.mjs         # 確認画面（送信前の一覧・戻って修正・二重送信の防止）
 node admin/tests/config-editor.test.mjs   # 管理画面の読み込み・保存・合い言葉・並べ替え・質問の説明と答え方
 ```
 
