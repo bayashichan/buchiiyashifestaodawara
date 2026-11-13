@@ -10,7 +10,7 @@
     "name": "第2回ぶち癒しフェスタin小田原",
     "edition": "第2回",
     "editionId": "第2回",
-    "date": "2027年4月25日（日）11:00〜16:30",
+    "date": "2027年4月25日（日）11:00〜17:00",
     "location": "おだわら市民交流センター UMECO 　神奈川県小田原市栄町一丁目1番27号",
     "earlyBirdDeadline": ""
   },
@@ -120,10 +120,10 @@
       "prohibitSession": false,
       "askEquipment": true,
       "seats": {
-        "enabled": false,
-        "total": 10,
+        "enabled": true,
+        "total": 5,
         "show": true,
-        "showWhenAtMost": 0
+        "showWhenAtMost": 3
       }
     }
   ],
@@ -203,7 +203,7 @@
   "databaseSpreadsheetId": "1QjOHkZRXZOJF7e6pslNPO2S_rnnHXaUxhY_LJrH9D6M",
   "driveFolderUrl": "https://drive.google.com/drive/folders/1Yr2nO-FYygBZefYbOn9qGTNzapa8CbnX",
   "spreadsheetEdition": "第2回",
-  "savedAt": "2026-10-08T03:26:26.882Z",
+  "savedAt": "2026-11-13T10:11:17.497Z",
   "formOrder": [
     "section:basic",
     "name",
