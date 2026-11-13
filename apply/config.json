@@ -74,10 +74,10 @@
       "prohibitSession": false,
       "askEquipment": false,
       "seats": {
-        "enabled": false,
-        "total": 10,
+        "enabled": true,
+        "total": 35,
         "show": true,
-        "showWhenAtMost": 0
+        "showWhenAtMost": 10
       }
     },
     {
@@ -97,10 +97,10 @@
       "prohibitSession": false,
       "askEquipment": false,
       "seats": {
-        "enabled": false,
-        "total": 10,
+        "enabled": true,
+        "total": 37,
         "show": true,
-        "showWhenAtMost": 0
+        "showWhenAtMost": 10
       }
     },
     {
@@ -203,7 +203,7 @@
   "databaseSpreadsheetId": "1QjOHkZRXZOJF7e6pslNPO2S_rnnHXaUxhY_LJrH9D6M",
   "driveFolderUrl": "https://drive.google.com/drive/folders/1Yr2nO-FYygBZefYbOn9qGTNzapa8CbnX",
   "spreadsheetEdition": "第2回",
-  "savedAt": "2026-11-13T10:11:17.497Z",
+  "savedAt": "2026-11-13T10:23:23.461Z",
   "formOrder": [
     "section:basic",
     "name",
